@@ -1,0 +1,45 @@
+.jacket {
+	position: fixed;
+	z-index: 100;
+	top: var(--gap-m);
+	right: var(--gap-m);
+	width: min(340px, calc(100vw - 32px));
+	color: var(--brand-c1);
+	font: 14px/1.5 sans-serif;
+
+	button {
+		padding: var(--gap-s);
+		background: var(--brand-c5);
+		border: 1px solid currentcolor;
+		border-radius: var(--br-m);
+		cursor: pointer;
+	}
+}
+
+.panel {
+	max-height: calc(100dvh - 100px);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding: var(--gap-m);
+	background: var(--brand-c5);
+	border: 1px solid currentcolor;
+	border-radius: var(--br-m);
+}
+
+.toggle {
+    display: flex;
+    gap: var(--gap-s);
+    margin-block: var(--gap-s);
+}
+
+.control {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: var(--gap-s);
+	margin-block: var(--gap-m);
+
+	input {
+        grid-column: 1 / -1;
+        width: 100%;
+    }
+}
