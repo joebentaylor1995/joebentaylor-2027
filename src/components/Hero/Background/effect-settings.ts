@@ -19,17 +19,11 @@ export const defaultSettings = {
 	trails: 0.5,
 	focus: 0.3,
 	wire: 1.2,
-	particles: 2,
 	dragOn: true,
 	pushOn: true,
 	trailsOn: true,
 	focusOn: true,
 	wireOn: false,
-	particlesOn: true,
-	pulseOn: true,
-	pulseStrength: 0.65,
-	pulseSize: 1.15,
-	particleSize: 5,
 	auto: false,
 	depth: false,
 };
@@ -40,6 +34,6 @@ export type NumericSetting = {
 export type BooleanSetting = {
 	[K in keyof DepthSettings]: DepthSettings[K] extends boolean ? K : never;
 }[keyof DepthSettings];
-export const scrollKeys = ['drag', 'push', 'trails', 'focus', 'wire', 'particles'] as const;
+export const scrollKeys = ['drag', 'push', 'trails', 'focus', 'wire'] as const;
 export const portraitUrl = '/images/hero-depth/portrait.png';
 export const depthUrl = '/images/hero-depth/depth.png';

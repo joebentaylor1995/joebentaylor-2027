@@ -1,19 +1,10 @@
 export const vertex = `attribute vec2 position;varying vec2 v;void main(){v=position*.5+.5;gl_Position=vec4(position,0.,1.);}`;
 
-const pulseShader = `uniform vec2 pulseCentre;uniform float pulseAge,pulseStrength,pulseSize;
-float pulseAt(vec2 q){
- float distanceToClick=length((q-pulseCentre)*vec2(resolution.x/resolution.y,1.));
- float ring=exp(-pow((distanceToClick/max(pulseSize,.25)-pulseAge*.70)/.13,2.));
- float envelope=smoothstep(0.,.10,pulseAge)*(1.-smoothstep(.55,1.8,pulseAge));
- return ring*envelope*pulseStrength;
-}`;
-
 export const fragment = `precision highp float;
 varying vec2 v;uniform sampler2D photo;uniform sampler2D depthMask;uniform vec2 resolution;uniform vec2 motion;uniform float intensity;uniform float lift;uniform float debug;uniform vec2 positionShift;uniform float rotation;uniform float zoom;
-${pulseShader}
 uniform vec2 cursorPos;uniform float cursorOn;uniform float cursorSpeed;
 uniform float chromaFX;uniform float glowFX;
-uniform float scrollFX[6];uniform float scrollVelocity;
+uniform float scrollFX[5];uniform float scrollVelocity;
 vec4 portrait(vec2 uv){float ok=step(0.,uv.x)*step(uv.x,1.)*step(0.,uv.y)*step(uv.y,1.);return texture2D(photo,clamp(uv,vec2(.001),vec2(.999)))*ok;}
 vec4 premultSample(vec2 uv){vec4 t=portrait(uv);return vec4(t.rgb*t.a,t.a);}
 float tipLight(vec2 uv,vec2 cursorUV,vec2 tip){return exp(-dot((uv-tip)*vec2(1.4455,1.),(uv-tip)*vec2(1.4455,1.))*2100.)*(1.-smoothstep(.025,.10,length((cursorUV-tip)*vec2(1.4455,1.))));}
@@ -112,45 +103,6 @@ if(wireAmount>.0001){
  vec3 blended=mix(result*alpha,blue*meshAlpha,wireAmount);
  alpha=mix(alpha,meshAlpha,wireAmount);result=blended/max(alpha,.0001);
 }
-// Crossfade the continuous photograph into the actual point-cloud pass.
-float particleFade=max(smoothstep(.003,.09,scrollSpeed*scrollFX[5]),smoothstep(.003,.09,pulseAt(q)));
-alpha*=1.-particleFade;
-
 if(debug>.5){float z=adjustedDepth(debugP);float mapBounds=1.-smoothstep(-aa,aa,box(debugP,vec2(0.),vec2(1.)));result=vec3(z);alpha=mapBounds;}
 gl_FragColor=vec4(result*alpha,alpha);
 }`;
-
-export const particleVertex = `precision highp float;
-attribute vec3 samplePoint;attribute vec4 sampleColour;
-uniform vec2 resolution,motion,positionShift;
-uniform float intensity,lift,zoom,rotation,amount,push,pointLimit,opacity,particleSize;
-${pulseShader}
-varying vec4 colour;varying float visibility,dispersion;
-float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-void main(){
- vec2 uv=samplePoint.xy;float raw=samplePoint.z;
- float z=(raw*.42+smoothstep(.55,.94,raw)*lift*.27)*sampleColour.a;
- vec2 offset=clamp(motion*intensity*.023,vec2(-.035),vec2(.035));offset.y+=push*.018;
- vec2 rel=(uv-.5)*(1.+clamp(push*.18,-.65,.65)*z)+offset*z-motion*intensity*.004;
- vec2 base=rel;for(int i=0;i<4;i++)rel=base/(1.+dot(rel,motion)*intensity*.027);
- float seed=hash(uv),angle=hash(uv.yx+vec2(.71,.23))*6.2831853;
- float spread=amount*(.025+seed*.14)*(.55+raw);
- vec2 radial=normalize((uv-vec2(.5,.45))*vec2(1.4455,1.)+vec2(.0001));
- rel+=(vec2(cos(angle),sin(angle))+radial*.7)*spread/vec2(1.4455,1.);
- rel.y-=amount*amount*(.015+seed*.04);
- float aspect=resolution.x/resolution.y;
- vec2 size=vec2(1.,aspect/1.4455);if(size.y<1.)size=vec2(1.4455/aspect,1.);size*=zoom;
- vec2 p=rel*size*vec2(aspect,1.);float c=cos(rotation),s=sin(rotation);
- vec2 q=vec2(c*p.x-s*p.y,s*p.x+c*p.y)/vec2(aspect,1.)+.5+positionShift;
- float wave=pulseAt(q);
- vec2 fromClick=(q-pulseCentre)*vec2(aspect,1.);
- vec2 direction=normalize(fromClick+vec2(.0001));
- q+=(direction*(.06+seed*.09)+vec2(cos(angle),sin(angle))*.035)*wave/vec2(aspect,1.);
- visibility=max(opacity,smoothstep(.003,.09,wave));dispersion=max(amount,wave);
- gl_Position=vec4(q.x*2.-1.,1.-q.y*2.,0.,1.);
- gl_PointSize=clamp(resolution.x*size.x/720.*mix(1.45,.7,smoothstep(0.,.65,dispersion))*particleSize,1.,pointLimit);
- colour=sampleColour;
-}`;
-
-export const particleFragment = `precision highp float;varying vec4 colour;varying float visibility,dispersion;
-void main(){vec2 p=gl_PointCoord-.5;float circle=1.-smoothstep(.34,.5,length(p));float shape=mix(1.,circle,smoothstep(.02,.25,dispersion));float a=colour.a*visibility*shape;if(a<.002)discard;gl_FragColor=vec4(colour.rgb*a,a);}`;

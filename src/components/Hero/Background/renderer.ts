@@ -2,7 +2,7 @@
 // ------------
 import { gsap } from 'gsap';
 import { type DepthSettings, depthUrl, portraitUrl, scrollKeys } from './effect-settings';
-import { fragment, particleFragment, particleVertex, vertex } from './shaders';
+import { fragment, vertex } from './shaders';
 
 type Uniforms = Record<string, WebGLUniformLocation | null>;
 interface RendererOptions {
@@ -15,11 +15,6 @@ export interface DepthController {
 	destroy: () => void;
 	preview: () => void;
 }
-
-const smoothstep = (low: number, high: number, value: number) => {
-	const t = Math.max(0, Math.min(1, (value - low) / (high - low)));
-	return t * t * (3 - 2 * t);
-};
 
 // Renderer lifecycle
 // ------------
@@ -52,19 +47,13 @@ export function mountDepthEffect({ canvas, host, getSettings, onReady }: Rendere
 		speed = 0,
 		idle = Infinity,
 		held = 0;
-	let pulseStart = -Infinity,
-		pulseCentre = [0.5, 0.5];
-	let press: { x: number; y: number; id: number; drag: boolean } | null = null;
 	let image: HTMLImageElement, depthImage: HTMLImageElement;
 	let main: ReturnType<typeof makeProgram>, quad: WebGLBuffer;
-	let particles: { program: ReturnType<typeof makeProgram>; buffer: WebGLBuffer; count: number } | undefined;
-	const pointLimit = (gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE) as Float32Array)[1];
-	const scrollValues = new Float32Array(6);
+	const scrollValues = new Float32Array(5);
 
 	function resetMotion() {
 		impulse = rate = speed = held = 0;
 		idle = Infinity;
-		pulseStart = -Infinity;
 		target = [0, 0];
 	}
 	function kick(delta: number) {
@@ -120,68 +109,12 @@ export function mountDepthEffect({ canvas, host, getSettings, onReady }: Rendere
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
 	}
-	function createParticles() {
-		const width = 720,
-			height = Math.round(width / 1.4455),
-			scratch = document.createElement('canvas');
-		scratch.width = width;
-		scratch.height = height;
-		const ctx = scratch.getContext('2d', { willReadFrequently: true });
-		if (!ctx) throw new Error('Unable to sample portrait');
-		ctx.drawImage(image, 0, 0, width, height);
-		const rgba = ctx.getImageData(0, 0, width, height).data;
-		ctx.clearRect(0, 0, width, height);
-		ctx.drawImage(depthImage, 0, 0, width, height);
-		const depths = ctx.getImageData(0, 0, width, height).data;
-		const points: number[] = [];
-		for (let y = 0; y < height; y++)
-			for (let x = 0; x < width; x++) {
-				const i = (y * width + x) * 4;
-				if (rgba[i + 3] < 8) continue;
-				const u = (x + 0.5) / width,
-					v = (y + 0.5) / height;
-				let z = depths[i] / 255;
-				const weight = (1 - smoothstep(0.35, 1, Math.hypot((u - 0.46) / 0.026, (v - 0.322) / 0.052))) * 0.85;
-				const face =
-					(depths[(y * width + Math.round(0.426 * width)) * 4] +
-						depths[(y * width + Math.round(0.493 * width)) * 4]) /
-					510;
-				z -= Math.max(z - face, 0) * weight;
-				points.push(u, v, z, rgba[i] / 255, rgba[i + 1] / 255, rgba[i + 2] / 255, rgba[i + 3] / 255);
-			}
-		return {
-			buffer: makeBuffer(new Float32Array(points)),
-			count: points.length / 7,
-			program: makeProgram(particleVertex, particleFragment, [
-				'resolution',
-				'motion',
-				'positionShift',
-				'intensity',
-				'lift',
-				'zoom',
-				'rotation',
-				'amount',
-				'push',
-				'pointLimit',
-				'opacity',
-				'pulseCentre',
-				'pulseAge',
-				'pulseStrength',
-				'pulseSize',
-				'particleSize',
-			]),
-		};
-	}
-	function commonUniforms(u: Uniforms, s: DepthSettings, now: number) {
+	function commonUniforms(u: Uniforms, s: DepthSettings) {
 		gl.uniform2f(u.resolution, canvas.width, canvas.height);
 		gl.uniform2f(u.motion, pointer[0] * s.horizontal, pointer[1] * s.vertical);
 		gl.uniform2f(u.positionShift, s.positionX / 100, s.positionY / 100);
 		for (const key of ['intensity', 'lift', 'zoom'] as const) gl.uniform1f(u[key], s[key]);
 		gl.uniform1f(u.rotation, (s.rotation * Math.PI) / 180);
-		gl.uniform2f(u.pulseCentre, pulseCentre[0], pulseCentre[1]);
-		gl.uniform1f(u.pulseAge, Number.isFinite(pulseStart) ? Math.max(0, (now - pulseStart) / 1000) : 10);
-		gl.uniform1f(u.pulseStrength, s.pulseOn && !s.depth ? s.pulseStrength : 0);
-		gl.uniform1f(u.pulseSize, s.pulseSize);
 	}
 	function attribute(program: WebGLProgram, name: string, size: number, stride = 0, offset = 0) {
 		const location = gl.getAttribLocation(program, name);
@@ -229,7 +162,7 @@ export function mountDepthEffect({ canvas, host, getSettings, onReady }: Rendere
 			gl.bindBuffer(gl.ARRAY_BUFFER, quad);
 			const position = attribute(main.program, 'position', 2);
 			const u = main.uniforms;
-			commonUniforms(u, s, now);
+			commonUniforms(u, s);
 			gl.uniform2f(u.cursorPos, cursor[0], cursor[1]);
 			gl.uniform1f(u.cursorOn, cursorActive);
 			gl.uniform1f(u.cursorSpeed, cursorSpeed);
@@ -240,28 +173,6 @@ export function mountDepthEffect({ canvas, host, getSettings, onReady }: Rendere
 			gl.uniform1f(u.scrollVelocity, speed);
 			gl.drawArrays(gl.TRIANGLES, 0, 6);
 			gl.disableVertexAttribArray(position);
-			const amount = speed * scrollValues[5],
-				pulseActive = s.pulseOn && s.pulseStrength > 0 && now - pulseStart < 1800;
-			if (!s.depth && (amount > 0.003 || pulseActive)) {
-				particles ??= createParticles();
-				const p = particles.program;
-				bindProgram(p.program);
-				gl.bindBuffer(gl.ARRAY_BUFFER, particles.buffer);
-				const a = attribute(p.program, 'samplePoint', 3, 28, 0),
-					b = attribute(p.program, 'sampleColour', 4, 28, 12);
-				commonUniforms(p.uniforms, s, now);
-				gl.uniform1f(p.uniforms.amount, amount);
-				gl.uniform1f(p.uniforms.push, speed * scrollValues[1]);
-				gl.uniform1f(p.uniforms.pointLimit, pointLimit);
-				gl.uniform1f(p.uniforms.opacity, smoothstep(0.003, 0.09, amount));
-				gl.uniform1f(p.uniforms.particleSize, s.particleSize);
-				gl.enable(gl.BLEND);
-				gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-				gl.drawArrays(gl.POINTS, 0, particles.count);
-				gl.disable(gl.BLEND);
-				gl.disableVertexAttribArray(a);
-				gl.disableVertexAttribArray(b);
-			}
 		} catch (error) {
 			loaded = false;
 			onReady(false);
@@ -279,7 +190,6 @@ export function mountDepthEffect({ canvas, host, getSettings, onReady }: Rendere
 		cursor = [(event.clientX - r.left) / r.width, (event.clientY - r.top) / r.height];
 		cursorActive = 1;
 		target = cursor.map(v => Math.max(-1, Math.min(1, v * 2 - 1)));
-		if (press && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 8) press.drag = true;
 	}
 	host.addEventListener('pointermove', track, { signal: events.signal });
 	host.addEventListener(
@@ -287,7 +197,6 @@ export function mountDepthEffect({ canvas, host, getSettings, onReady }: Rendere
 		() => {
 			target = [0, 0];
 			cursorActive = 0;
-			press = null;
 		},
 		{ signal: events.signal }
 	);
@@ -305,7 +214,6 @@ export function mountDepthEffect({ canvas, host, getSettings, onReady }: Rendere
 		event => {
 			if (ignored(event) || !event.isPrimary || event.button !== 0) return;
 			track(event);
-			press = { x: event.clientX, y: event.clientY, id: event.pointerId, drag: false };
 			if (event.pointerType === 'touch') touchY = event.clientY;
 		},
 		{ signal: events.signal }
@@ -322,22 +230,7 @@ export function mountDepthEffect({ canvas, host, getSettings, onReady }: Rendere
 	);
 	host.addEventListener(
 		'pointerup',
-		event => {
-			const s = getSettings();
-			if (
-				press &&
-				!press.drag &&
-				press.id === event.pointerId &&
-				!ignored(event) &&
-				loaded &&
-				s.pulseOn &&
-				!s.depth
-			) {
-				const r = canvas.getBoundingClientRect();
-				pulseCentre = [(event.clientX - r.left) / r.width, (event.clientY - r.top) / r.height];
-				pulseStart = performance.now();
-			}
-			press = null;
+		() => {
 			touchY = null;
 		},
 		{ signal: events.signal }
@@ -345,7 +238,6 @@ export function mountDepthEffect({ canvas, host, getSettings, onReady }: Rendere
 	host.addEventListener(
 		'pointercancel',
 		() => {
-			press = null;
 			touchY = null;
 		},
 		{ signal: events.signal }
@@ -376,7 +268,6 @@ export function mountDepthEffect({ canvas, host, getSettings, onReady }: Rendere
 		() => {
 			lost = false;
 			buffers.length = textures.length = programs.length = 0;
-			particles = undefined;
 			resetMotion();
 			initialize();
 		},
@@ -402,10 +293,6 @@ export function mountDepthEffect({ canvas, host, getSettings, onReady }: Rendere
 				'glowFX',
 				'scrollFX[0]',
 				'scrollVelocity',
-				'pulseCentre',
-				'pulseAge',
-				'pulseStrength',
-				'pulseSize',
 			]);
 			quad = makeBuffer(new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]));
 			texture(image, 0);

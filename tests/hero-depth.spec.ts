@@ -29,17 +29,36 @@ test('hero renders without prototype chrome or a settings download', async ({ pa
 	expect(errors).toEqual([]);
 });
 
-test('explicit query loads working controls and saved defaults', async ({ page }) => {
+test('explicit query loads scroll zoom controls without particles', async ({ page }, testInfo) => {
 	await page.goto('/?heroSettings=1');
 	await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
 	const panel = page.getByRole('region', { name: 'Hero effect settings' });
 	await expect(panel).toBeVisible();
-	await expect(panel.getByRole('slider', { name: /^Particle size/ })).toHaveValue('5');
-	await expect(panel.getByRole('checkbox', { name: 'Scroll particles', exact: true })).toBeChecked();
+	await expect(panel.getByRole('slider', { name: 'Scroll zoom strength', exact: true })).toHaveValue('1.1');
+	await expect(panel.getByRole('checkbox', { name: 'Scroll depth zoom', exact: true })).toBeChecked();
+	await expect(panel.getByText(/particles|click pulse/i)).toHaveCount(0);
 	await expect(panel.getByRole('checkbox', { name: 'Blue wireframe', exact: true })).not.toBeChecked();
-	await panel.getByRole('slider', { name: /^Particle size/ }).fill('2');
+	await panel.getByRole('slider', { name: 'Scroll zoom strength', exact: true }).fill('2');
 	await panel.getByRole('button', { name: 'Preview downward scroll' }).click();
 	await page.waitForTimeout(350);
+	const zoomState = await page
+		.getByTestId('hero-depth')
+		.locator('canvas')
+		.evaluate(element => {
+			const gl = (element as HTMLCanvasElement).getContext('webgl');
+			if (!gl) throw new Error('WebGL unavailable');
+			const program = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram;
+			const velocity = gl.getUniformLocation(program, 'scrollVelocity');
+			const zoom = gl.getUniformLocation(program, 'scrollFX[1]');
+			if (!velocity || !zoom) throw new Error('Scroll zoom uniforms missing');
+			return {
+				velocity: gl.getUniform(program, velocity) as number,
+				zoom: gl.getUniform(program, zoom) as number,
+			};
+		});
+	expect(zoomState.velocity).toBeGreaterThan(0.01);
+	expect(zoomState.zoom).toBe(2);
+	await page.screenshot({ path: testInfo.outputPath('scroll-zoom.png') });
 	expect(
 		await page
 			.getByTestId('hero-depth')
@@ -47,7 +66,7 @@ test('explicit query loads working controls and saved defaults', async ({ page }
 			.evaluate(element => (element as HTMLCanvasElement).getContext('webgl')?.getError())
 	).toBe(0);
 	await panel.getByRole('button', { name: 'Reset saved defaults' }).click();
-	await expect(panel.getByRole('slider', { name: /^Particle size/ })).toHaveValue('5');
+	await expect(panel.getByRole('slider', { name: 'Scroll zoom strength', exact: true })).toHaveValue('1.1');
 });
 
 test('reduced motion keeps a static portrait and skips WebGL textures', async ({ page }) => {
