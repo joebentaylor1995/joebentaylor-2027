@@ -1,0 +1,47 @@
+// Property Documentation
+// ------------
+
+// NOTE • This file exports the colors object, the colors object is used to store all the colors for the application.
+
+// REVIEW — Usage: color: var(--brand-c1);  or  alpha(--brand-c1, 50) for opacity (SCSS)
+
+// Imports
+// ------------
+import { toVarRefs } from '@theme/cssVariables';
+
+// SECTION • Raw Color Values
+// NOTE • The single source of truth — emitted as CSS custom properties on
+// :root in the generated src/css/tokens.css, named --{group}-{name} (e.g. --brand-c1).
+// Override any of them at runtime (e.g. html[data-theme='dark']) to retheme.
+export const baseColors = {
+	brand: {
+		c1: '#8000FF',
+		c2: '#380377',
+		c3: '#210048',
+		c4: '#F7F7F7',
+		c5: '#838383',
+	},
+
+	global: {
+		white: '#ffffff',
+		black: '#000000',
+	},
+
+	feedback: {
+		positive: '#3adb76',
+		negative: '#cc4b37',
+		warning: '#face10',
+	},
+};
+
+// Exports
+// ------------
+// SECTION • Color Tokens
+// NOTE • Each color is a plain var() reference resolved by the browser.
+// Need opacity? alpha(--brand-c1, 50) in SCSS, alpha('--brand-c1', 50) in JS —
+// both emit color-mix(in srgb, var(--brand-c1) 50%, transparent)
+export const colors = {
+	brand: toVarRefs('brand', baseColors.brand),
+	global: toVarRefs('global', baseColors.global),
+	feedback: toVarRefs('feedback', baseColors.feedback),
+};

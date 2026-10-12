@@ -1,0 +1,46 @@
+{
+	"name": "tackl",
+	"version": "2.5.0",
+	"description": "Scaffold a Tackl project into the current directory — Next.js, SCSS CSS Modules, Waffl grid, DatoCMS/Sanity adapters",
+	"type": "module",
+	"bin": {
+		"tackl": "bin/tackl.js"
+	},
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"keywords": [
+		"nextjs",
+		"react",
+		"starter",
+		"template",
+		"grid",
+		"css",
+		"scss",
+		"css-modules",
+		"typescript"
+	],
+	"author": "joebentaylor1995",
+	"license": "MIT",
+	"engines": {
+		"node": ">=20.0.0"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/12-Studio/Tackl.git"
+	},
+	"homepage": "https://github.com/12-Studio/Tackl",
+	"bugs": {
+		"url": "https://github.com/12-Studio/Tackl/issues"
+	},
+	"files": [
+		"bin/",
+		"README.md"
+	],
+	"dependencies": {
+		"picocolors": "^1.1.1",
+		"prompts": "^2.4.2",
+		"tar": "^7.5.22"
+	}
+}

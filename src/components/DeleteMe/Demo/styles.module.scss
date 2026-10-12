@@ -1,0 +1,64 @@
+@use '../keynote' as *;
+
+.jacket {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-m);
+	margin-bottom: var(--gap-l);
+}
+
+// SECTION • Column overlay
+.overlay {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+
+	// NOTE • One full-height row of cells; any beyond the column count wrap
+	// into zero-height rows and are clipped, so the overlay always matches
+	// the grid's columns — whatever they are
+	waffl-grid {
+		grid-template-rows: 100%;
+		grid-auto-rows: 0;
+		height: 100%;
+		overflow: hidden;
+	}
+}
+
+.column {
+	grid-column: auto;
+	border-radius: 0.6rem;
+	background: alpha(--brand-c1, 9);
+}
+
+// SECTION • Stage
+.stage {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-s);
+	padding-block: var(--gap-m);
+}
+
+.cell {
+	display: grid;
+	place-items: center;
+	min-height: 6.4rem;
+	padding: var(--gap-xs);
+	border-radius: $inner-radius;
+	font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+	font-size: 1.2rem;
+	text-align: center;
+	color: var(--global-white);
+	background: linear-gradient(135deg, var(--brand-c1), var(--brand-c2));
+
+	&[data-tone='soft'] {
+		background: alpha(--global-white, 10);
+	}
+}
+
+.caption {
+	@include captionS;
+
+	color: alpha(--global-white, 62);
+}

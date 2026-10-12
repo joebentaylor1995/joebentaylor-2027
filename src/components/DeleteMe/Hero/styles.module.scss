@@ -1,0 +1,88 @@
+@use '../keynote' as *;
+
+// NOTE • Sticky: the hero stays put while the page content (a later
+// sibling, stacked above it) slides up over it
+.jacket {
+	position: sticky;
+	top: 0;
+	z-index: 0;
+	display: flex;
+	align-items: center;
+	min-height: 100svh;
+	padding-block: var(--gap-uber);
+	overflow: hidden;
+}
+
+.content {
+	position: relative;
+}
+
+.inner {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+}
+
+.eyebrow {
+	@include eyebrow;
+	@include bodyS;
+
+	font-weight: var(--weight-semi);
+}
+
+.title {
+	margin-block: var(--gap-s) var(--gap-m);
+	font-family: var(--font-heading);
+	font-weight: var(--weight-semi);
+	font-size: 26vw;
+	line-height: 0.9;
+	letter-spacing: -0.06em;
+	// NOTE • Opaque all the way down — the grey matches 55% white on black,
+	// but letters zooming over each other mustn't show through
+	background: linear-gradient(
+		180deg,
+		var(--global-white) 35%,
+		color-mix(in srgb, var(--global-white) 55%, var(--global-black))
+	);
+	background-clip: text;
+	color: transparent;
+
+	@include bp(l) {
+		font-size: min(19vw, 27.2rem);
+	}
+}
+
+// NOTE • Each letter is its own box so it can zoom at its own depth. The
+// title's gradient text (background-clip: text) can't paint through a
+// transformed child, so each letter inherits it and clips it to itself.
+.letter {
+	display: inline-block;
+	background: inherit;
+}
+
+.tagline {
+	@include bodyL;
+	@include secondary;
+
+	max-width: 28ch;
+	font-weight: var(--weight-medium);
+	text-wrap: balance;
+
+	@include bp(l) {
+		font-size: 2.8rem;
+	}
+}
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	gap: var(--gap-m) var(--gap-l);
+	margin-top: var(--gap-xl);
+}
+
+.link {
+	@include chevronLink;
+}

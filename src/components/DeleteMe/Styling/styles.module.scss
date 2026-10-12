@@ -1,0 +1,15 @@
+@use '../keynote' as *;
+
+.title {
+	@include tileTitle;
+}
+
+.text {
+	@include body;
+
+	code {
+		@include mono;
+
+		color: var(--global-white);
+	}
+}

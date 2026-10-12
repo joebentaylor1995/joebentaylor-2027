@@ -1,0 +1,18 @@
+@use '../keynote' as *;
+
+.index {
+	@include eyebrow;
+}
+
+.title {
+	@include tileTitle;
+}
+
+.text {
+	@include body;
+}
+
+.code {
+	flex: 1;
+	margin-top: var(--gap-s);
+}

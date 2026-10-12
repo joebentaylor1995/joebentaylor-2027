@@ -1,0 +1,32 @@
+@use '../../keynote' as *;
+
+.jacket {
+	// NOTE • Stacked grids sit a gutter apart, like the rows inside them
+	// stylelint-disable-next-line csstools/value-no-unknown-custom-properties -- set on every <waffl-grid> by the grid layer
+	margin-bottom: var(--grid-gutter);
+}
+
+.copy {
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-s);
+	max-width: 64rem;
+}
+
+.title {
+	@include tileTitle;
+}
+
+.text {
+	@include body;
+
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-s);
+
+	code {
+		@include mono;
+
+		color: var(--global-white);
+	}
+}

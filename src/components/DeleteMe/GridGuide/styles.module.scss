@@ -1,0 +1,83 @@
+@use '../keynote' as *;
+
+// SECTION • Viewport readout
+// NOTE • Only the line for the current breakpoint shows
+.viewport {
+	@include captionL;
+
+	align-self: center;
+	padding: var(--gap-xs) var(--gap-m);
+	white-space: nowrap;
+	border-radius: var(--br-round);
+	background: alpha(--global-white, 8);
+	color: var(--global-white);
+}
+
+.breakpoint {
+	display: none;
+
+	&[data-bp='s'] {
+		display: inline;
+
+		@include bp(m) {
+			display: none;
+		}
+	}
+
+	&[data-bp='m'] {
+		@include bp(m) {
+			display: inline;
+		}
+
+		@include bp(l) {
+			display: none;
+		}
+	}
+
+	&[data-bp='l'] {
+		@include bp(l) {
+			display: inline;
+		}
+	}
+}
+
+// SECTION • Demos
+.plain {
+	@include bodyS;
+
+	display: grid;
+	place-items: center;
+	min-height: 8rem;
+	padding: var(--gap-m);
+	border-radius: $inner-radius;
+	text-align: center;
+	background: alpha(--global-white, 10);
+}
+
+.nested {
+	outline: 1px dashed alpha(--global-white, 30);
+	outline-offset: 6px;
+	border-radius: $inner-radius;
+}
+
+// SECTION • Playground
+.playground {
+	// NOTE • Stacked grids sit a gutter apart, like the rows inside them
+	// stylelint-disable-next-line csstools/value-no-unknown-custom-properties -- set on every <waffl-grid> by the grid layer
+	margin-bottom: var(--grid-gutter);
+}
+
+.playgroundCopy {
+	@include body;
+
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-s);
+	max-width: 64rem;
+}
+
+.playgroundTitle {
+	@include tileTitle;
+
+	color: var(--global-white);
+}
