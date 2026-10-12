@@ -5,6 +5,7 @@
 import Image from 'next/image';
 import { type ComponentType, useEffect, useRef, useState } from 'react';
 import { type DepthSettings, defaultSettings, portraitUrl } from './effect-settings';
+
 // Styles + Interfaces
 // ------------
 import type * as I from './interface';

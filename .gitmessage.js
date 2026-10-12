@@ -4,12 +4,33 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const args = process.argv.slice(2);
-const hookMode = args[0] === '--hook';
-const hookFile = hookMode ? args[1] : null;
+const gitArgs = process.argv.slice(2);
+
+const hasExplicitMessage = gitArgs.some(
+	arg =>
+		arg === '-m' ||
+		arg === '--message' ||
+		arg === '-F' ||
+		arg === '--file' ||
+		arg.startsWith('--message=') ||
+		arg.startsWith('--file=')
+);
+
+const commit = args => {
+	execFileSync('git', ['commit', ...args], { stdio: 'inherit' });
+};
 
 (async () => {
 	try {
+		// A message was already provided — don't prompt, and don't open an editor.
+		if (hasExplicitMessage) {
+			commit(gitArgs);
+			return;
+		}
+
+		const args = gitArgs;
+		const hookMode = args[0] === '--hook';
+		const hookFile = hookMode ? args[1] : null;
 		const root = execFileSync('git', ['rev-parse', '--show-toplevel'], {
 			encoding: 'utf8',
 		}).trim();
@@ -104,12 +125,11 @@ const hookFile = hookMode ? args[1] : null;
 			fs.writeFileSync(hookFile, commitMessage);
 			return;
 		}
-
 		const msgFile = path.join(os.tmpdir(), `tackl-commit-${process.pid}.txt`);
 		fs.writeFileSync(msgFile, commitMessage);
 
 		try {
-			execFileSync('git', ['commit', '-F', msgFile], { stdio: 'inherit' });
+			commit(['-F', msgFile, ...gitArgs]);
 		} finally {
 			fs.rmSync(msgFile, { force: true });
 		}
