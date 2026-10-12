@@ -54,8 +54,8 @@ import type * as I from './interface';
 import s from './styles.module.scss';
 
 const Example = ({ isOpen, className }: I.ExampleProps) => (
-	<section className={cx(s.jacket, className)} data-state={isOpen ? 'open' : 'closed'} data-pad>
-		<h2 className={cx(s.title, 't-headlineL')}>Title</h2>
+	<section className={cn(s.jacket, className)} data-state={isOpen ? 'open' : 'closed'} data-pad>
+		<h2 className={cn(s.title, 't-headlineL')}>Title</h2>
 	</section>
 );
 ```

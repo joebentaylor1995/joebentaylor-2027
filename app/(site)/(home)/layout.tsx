@@ -1,6 +1,7 @@
 // Imports
 // ------------
 // import type { Metadata } from 'next';
+import PageTransition from '@parts/PageTransition';
 
 // SEO
 // ------------
@@ -22,7 +23,7 @@
 // Component
 // ------------
 const Layout = ({ children }: { children: React.ReactNode }) => {
-	return children;
+	return <PageTransition>{children}</PageTransition>;
 };
 
 // Exports

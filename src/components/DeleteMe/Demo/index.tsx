@@ -1,8 +1,8 @@
 // Imports
 // ------------
 import { theme } from '@theme';
-import { cx } from '@utils/cx';
 import Grid, { Col } from '@waffl';
+import { cn } from '@/utils/cn';
 
 // Styles + Interfaces
 // ------------
@@ -22,7 +22,7 @@ const OVERLAY_CELLS = Math.max(MAX_DEMO_COLUMNS, ...Object.values(theme.grid.col
 // NOTE • A live grid demo: the real <Grid> drawn over a column overlay that
 // is itself a <Grid>, so both line up at every breakpoint
 const Demo = ({ children, hasOverlay = true, caption, className, style }: I.DemoProps) => (
-	<figure className={cx(s.jacket, className)} style={style}>
+	<figure className={cn(s.jacket, className)} style={style}>
 		{hasOverlay && (
 			<div className={s.overlay} aria-hidden='true'>
 				<Grid $isFixed>
@@ -47,7 +47,7 @@ const Demo = ({ children, hasOverlay = true, caption, className, style }: I.Demo
 // NOTE • A labelled block on the demo grid — a <Col>, so it takes the same
 // `as` and span props as anything you'd build
 export const Cell = ({ label, as = 'div', tone = 'brand', className, ...spans }: I.CellProps) => (
-	<Col as={as} {...spans} className={cx(s.cell, className)} data-tone={tone}>
+	<Col as={as} {...spans} className={cn(s.cell, className)} data-tone={tone}>
 		{label}
 	</Col>
 );

@@ -125,7 +125,7 @@ import s from './styles.module.scss';
 const Card = ({ title, body, isActive, className }: I.CardProps) => {
 	// Render
 	return (
-		<article className={cx(s.jacket, className)} data-state={isActive ? 'active' : undefined}>
+		<article className={cn(s.jacket, className)} data-state={isActive ? 'active' : undefined}>
 			<h3 className={s.title}>{title}</h3>
 			<p className={s.body}>{body}</p>
 		</article>
@@ -224,7 +224,7 @@ Each attribute takes one kind of value. Mixing them up doesn't throw an error �
 | A type style as a class | `className='t-headlineS'` | `className='headlineS'` |
 | A type style as an attribute | `data-type='headlineS'` | `data-type='t-headlineS'` |
 | Your module's own class | `className={s.body}` | `className='s.body'`, `data-type={s.body}`, `data-type='s.body'` |
-| A module class **and** a type class | `className={cx(s.title, 't-headlineS')}` | two `className` props |
+| A module class **and** a type class | `className={cn(s.title, 't-headlineS')}` | two `className` props |
 
 - `t-` is the class prefix only — `data-type` takes the bare style name.
 - `s.something` is a JavaScript value: it goes in `className={…}` with braces and no quotes, never in `data-type`.
@@ -288,7 +288,7 @@ Anywhere else the span props are simply ignored. `Col` renders a `div` by defaul
 ```tsx
 import { cx } from '@utils/cx';
 
-<h2 className={cx(s.title, 't-headlineL', isActive && s.active, className)} />
+<h2 className={cn(s.title, 't-headlineL', isActive && s.active, className)} />
 ```
 
 Prefer a `data-*` attribute over a conditional class when the change is a state of the same element.

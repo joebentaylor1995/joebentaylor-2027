@@ -12,10 +12,10 @@ import { toVarRefs } from '@theme/cssVariables';
 // SECTION • Raw Space Values
 // NOTE • Emitted as --space-{key} on :root in the generated src/css/tokens.css
 export const spaceValues = {
-	s: '4.8rem',
-	m: '6rem',
-	l: '10rem',
-	xl: '12rem',
+	s: '2.4rem',
+	m: '3.2rem',
+	l: '4rem',
+	xl: '4.8rem',
 	col: 'calc(8.333vw + 1.8rem)',
 };
 

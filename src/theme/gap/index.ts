@@ -12,16 +12,16 @@ import { toVarRefs } from '@theme/cssVariables';
 // SECTION • Raw Gap Values
 // NOTE • Emitted as --gap-{key} on :root in the generated src/css/tokens.css
 export const gapValues = {
-	xxs: '0.3rem',
+	xxs: '0.2rem',
 	xs: '0.4rem',
 	s: '0.8rem',
-	sm: '1.2rem',
-	m: '1.6rem',
-	l: '2.4rem',
-	xl: '3.2rem',
-	xxl: '4rem',
-	huge: '4.8rem',
-	uber: '6.4rem',
+	sm: '1.6rem',
+	m: '2.4rem',
+	l: '3.2rem',
+	xl: '4rem',
+	xxl: '4.8rem',
+	huge: '6.4rem',
+	uber: '8rem',
 };
 
 // Exports

@@ -15,11 +15,11 @@ import { toVarRefs } from '@theme/cssVariables';
 // Override any of them at runtime (e.g. html[data-theme='dark']) to retheme.
 export const baseColors = {
 	brand: {
-		c1: '#8000FF',
-		c2: '#380377',
-		c3: '#210048',
-		c4: '#F7F7F7',
-		c5: '#838383',
+		c1: '#1653FF',
+		c2: '#B0C4FF',
+		c3: '#212121',
+		c4: '#121212',
+		c5: '#F0EDED',
 	},
 
 	global: {

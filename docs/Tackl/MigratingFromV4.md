@@ -58,7 +58,7 @@ Work on a dedicated branch, one phase per commit. Coming from v3? Do [MigratingF
 Combine module classes with global utility classes and a `className` prop using `cx()` from `@utils/cx`:
 
 ```tsx
-<h2 className={cx(s.title, 't-headlineL', isActive && s.active, className)} />
+<h2 className={cn(s.title, 't-headlineL', isActive && s.active, className)} />
 ```
 
 ### Before / after

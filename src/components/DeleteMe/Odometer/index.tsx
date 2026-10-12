@@ -1,9 +1,9 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 // Imports
 // ------------
-import { cx } from '@utils/cx';
-import { useEffect, useRef, useState } from 'react';
+import { cn } from '@/utils/cn';
 
 // Styles + Interfaces
 // ------------
@@ -73,7 +73,7 @@ const Odometer = ({ value, className }: I.OdometerProps) => {
 	let column = rollingCount;
 
 	return (
-		<span ref={jacketRef} className={cx(s.jacket, className)} data-state={state}>
+		<span ref={jacketRef} className={cn(s.jacket, className)} data-state={state}>
 			<span className={s.label}>{value}</span>
 			<span className={s.digits} aria-hidden='true'>
 				{chars.map((char, index) => {

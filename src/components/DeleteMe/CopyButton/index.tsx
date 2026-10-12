@@ -1,9 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 // Imports
 // ------------
-import { cx } from '@utils/cx';
-import { useEffect, useState } from 'react';
+import { cn } from '@/utils/cn';
 
 // Styles + Interfaces
 // ------------
@@ -46,10 +46,10 @@ const CopyButton = ({ text, label, className }: I.CopyButtonProps) => {
 		</button>
 	);
 
-	if (label) return <div className={cx(s.jacket, s.solo, className)}>{button}</div>;
+	if (label) return <div className={cn(s.jacket, s.solo, className)}>{button}</div>;
 
 	return (
-		<div className={cx(s.jacket, className)}>
+		<div className={cn(s.jacket, className)}>
 			<code className={s.command}>
 				<span className={s.prompt} aria-hidden='true'>
 					$

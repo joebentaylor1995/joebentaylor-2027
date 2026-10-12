@@ -19,7 +19,7 @@
 
 // Imports
 // ------------
-import { cx } from '@utils/cx';
+import { cn } from '@utils/cn';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { getConsent, noConsent, OPTIONAL_CATEGORIES, onOpenCookieSettings, saveConsent } from './consent';
@@ -155,7 +155,7 @@ const CookieBar = ({
 
 	return (
 		<section
-			className={cx(s.jacket, className)}
+			className={cn(s.jacket, className)}
 			aria-labelledby={titleId}
 			data-reopened={isReopened || undefined}
 			onKeyDown={handleKeyDown}

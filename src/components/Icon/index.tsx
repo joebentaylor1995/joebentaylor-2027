@@ -1,7 +1,8 @@
 // Imports
 // ------
-import { cx } from '@utils/cx';
 import { memo } from 'react';
+import { cn } from '@/utils/cn';
+
 // Interfaces
 // ------------
 import type { IconProps } from './interface';
@@ -70,7 +71,7 @@ const Icon = memo(({ type, className, onClick }: IconProps) => {
 		width: '24',
 		height: '24',
 		xmlns: 'http://www.w3.org/2000/svg',
-		className: cx(s.jacket, className),
+		className: cn(s.jacket, className),
 		onClick,
 		viewBox: iconConfig.viewBox,
 	};

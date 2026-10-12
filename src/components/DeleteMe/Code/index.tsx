@@ -1,6 +1,6 @@
 // Imports
 // ------------
-import { cx } from '@utils/cx';
+import { cn } from '@/utils/cn';
 
 // Styles + Interfaces
 // ------------
@@ -13,7 +13,7 @@ import s from './styles.module.scss';
 // NOTE • A labelled, syntax-highlighted snippet. Highlighting is plain string
 // work, so it runs on the server — or in the client for live code
 const Code = ({ label, code, language = inferLanguage(label), className }: I.CodeProps) => (
-	<figure className={cx(s.jacket, className)}>
+	<figure className={cn(s.jacket, className)}>
 		{label && <figcaption className={s.label}>{label}</figcaption>}
 		<pre className={s.pre}>
 			<code data-language={language}>

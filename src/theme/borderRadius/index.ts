@@ -12,10 +12,10 @@ import { toVarRefs } from '@theme/cssVariables';
 // SECTION • Raw Border Radius Values
 // NOTE • Emitted as --br-{key} on :root in the generated src/css/tokens.css
 export const borderRadiusValues = {
-	xs: '0.3rem',
-	s: '0.6rem',
-	m: '1.2rem',
-	l: '1.8rem',
+	xs: '0.4rem',
+	s: '0.8rem',
+	m: '1.6rem',
+	l: '2.4rem',
 	round: '999rem',
 };
 

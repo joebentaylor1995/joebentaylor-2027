@@ -1,11 +1,11 @@
 'use client';
 
-// Imports
-// ------------
-import { cx } from '@utils/cx';
 import { gsap } from 'gsap';
 import Image from 'next/image';
 import { useEffect, useRef } from 'react';
+// Imports
+// ------------
+import { cn } from '@/utils/cn';
 
 // Styles + Interfaces
 // ------------
@@ -289,7 +289,7 @@ const ParticleImage = ({ image, sizes = '100vw', className }: I.ParticleImagePro
 
 	// Render
 	return (
-		<div className={cx(s.jacket, className)}>
+		<div className={cn(s.jacket, className)}>
 			<canvas ref={canvasRef} className={s.canvas} />
 			<Image src={image} alt='' sizes={sizes} placeholder='blur' className={s.fallback} />
 		</div>

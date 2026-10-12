@@ -1,7 +1,8 @@
 // Imports
 // ------------
-import { cx } from '@utils/cx';
+
 import { Col } from '@waffl';
+import { cn } from '@/utils/cn';
 import ParticleImage from '../ParticleImage';
 
 // Styles + Interfaces
@@ -21,7 +22,7 @@ const Tile = ({
 	className,
 	...props
 }: I.TileProps) => (
-	<Col as={as} {...props} className={cx(s.jacket, className)} data-tone={tone} data-image={image ? '' : undefined}>
+	<Col as={as} {...props} className={cn(s.jacket, className)} data-tone={tone} data-image={image ? '' : undefined}>
 		{image && <ParticleImage image={image} sizes={imageSizes} className={s.image} />}
 		{children}
 	</Col>

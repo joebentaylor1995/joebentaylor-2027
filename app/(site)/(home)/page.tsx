@@ -1,8 +1,7 @@
 // Imports
 // ------------
 // import { fetchContent, GET_HOME } from '@cms';
-import DeleteMe from '@parts/DeleteMe';
-import PageTransition from '@parts/PageTransition';
+import Hero from '@parts/Hero';
 
 // Data fetching at build time
 // ------------
@@ -18,9 +17,20 @@ const Page = async () => {
 	// const data = await getHomeData();
 
 	return (
-		<PageTransition>
-			<DeleteMe />
-		</PageTransition>
+		<>
+			<Hero
+				heading='Digital Narrative Architect'
+				desc='Building brands and digital worlds where logic meets emotion, craft meets code, and meaningful stories are made to be felt, not just seen.'
+			/>
+
+			{/*  */}
+			{/*  */}
+			{/*  */}
+			{/*  */}
+			{/*  */}
+			{/*  */}
+			{/*  */}
+		</>
 	);
 };
 

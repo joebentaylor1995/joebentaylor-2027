@@ -11,7 +11,7 @@ Tackl has no element-wrapper components. Tags are plain JSX elements — `<secti
 import s from './styles.module.scss';
 
 <section className={s.jacket} data-pad>
-	<h1 className={cx(s.title, 't-displayL')}>Heading</h1>
+	<h1 className={cn(s.title, 't-displayL')}>Heading</h1>
 	<p className={s.intro}>…</p>
 </section>
 ```
