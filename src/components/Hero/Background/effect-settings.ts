@@ -36,4 +36,4 @@ export type BooleanSetting = {
 }[keyof DepthSettings];
 export const scrollKeys = ['drag', 'push', 'trails', 'focus', 'wire'] as const;
 export const portraitUrl = '/images/hero-depth/portrait.png';
-export const depthUrl = '/images/hero-depth/depth.png';
+export const depthUrl = '/images/hero-depth/depth.webp';

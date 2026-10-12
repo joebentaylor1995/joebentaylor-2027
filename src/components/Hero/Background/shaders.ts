@@ -10,14 +10,8 @@ vec4 premultSample(vec2 uv){vec4 t=portrait(uv);return vec4(t.rgb*t.a,t.a);}
 float tipLight(vec2 uv,vec2 cursorUV,vec2 tip){return exp(-dot((uv-tip)*vec2(1.4455,1.),(uv-tip)*vec2(1.4455,1.))*2100.)*(1.-smoothstep(.025,.10,length((cursorUV-tip)*vec2(1.4455,1.))));}
 
 float box(vec2 p,vec2 lo,vec2 hi){vec2 d=max(lo-p,p-hi);return max(d.x,d.y);}
-// Locally flatten the nose toward the surrounding face depth.
-float adjustedDepth(vec2 uv){
- float z=texture2D(depthMask,uv).r;
- vec2 nose=(uv-vec2(.460,.322))/vec2(.026,.052);
- float weight=(1.-smoothstep(.35,1.,length(nose)))*.85;
- float face=(texture2D(depthMask,vec2(.426,uv.y)).r+texture2D(depthMask,vec2(.493,uv.y)).r)*.5;
- return z-max(z-face,0.)*weight;
-}
+// The nose correction is baked into depthMask on the CPU (see bakeDepth in renderer.ts).
+float adjustedDepth(vec2 uv){return texture2D(depthMask,uv).r;}
 float depthAt(vec2 uv){float z=adjustedDepth(uv);return (z*.42+smoothstep(.55,.94,z)*lift*.27)*texture2D(photo,uv).a;}
 void main(){
 vec2 q=vec2(v.x,1.-v.y);float aspect=resolution.x/resolution.y;vec2 size=vec2(1.,aspect/1.4455);if(size.y<1.)size=vec2(1.4455/aspect,1.);size*=zoom;
@@ -38,11 +32,11 @@ offset.y+=scrollSigned*scrollFX[1]*.018;
 float scrollDepthScale=clamp(scrollSigned*scrollFX[1]*.18,-.65,.65);
 vec2 uv=plane;
 // Front-to-back ray intersection preserves sharp occlusion boundaries.
-float nearZ=1.02;float farZ=0.;bool hit=false;
+float nearZ=1.02;float farZ=0.;
 for(int i=0;i<48;i++){
  float z=1.02-float(i)*(1.02/47.);
  vec2 sampleUV=(plane-offset*z-.5)/(1.+scrollDepthScale*z)+.5;
- if(!hit && depthAt(sampleUV)>=z){farZ=z;nearZ=z+1.02/47.;hit=true;}
+ if(depthAt(sampleUV)>=z){farZ=z;nearZ=z+1.02/47.;break;}
 }
 for(int i=0;i<5;i++){float z=(nearZ+farZ)*.5;vec2 trial=(plane-offset*z-.5)/(1.+scrollDepthScale*z)+.5;if(depthAt(trial)>=z)farZ=z;else nearZ=z;}
 uv=(plane-offset*farZ-.5)/(1.+scrollDepthScale*farZ)+.5;

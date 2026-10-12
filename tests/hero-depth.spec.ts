@@ -76,5 +76,5 @@ test('reduced motion keeps a static portrait and skips WebGL textures', async ({
 	await page.goto('/');
 	await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'false');
 	await expect(page.getByTestId('hero-depth').locator('img')).toBeVisible();
-	expect(requests.some(url => url.includes('/hero-depth/depth.png'))).toBe(false);
+	expect(requests.some(url => url.includes('/hero-depth/depth.webp'))).toBe(false);
 });

@@ -13,11 +13,16 @@ import { type DepthController, mountDepthEffect } from './renderer';
 import type { SettingsProps } from './Settings/interface';
 import s from './styles.module.scss';
 
+// NOTE • The portrait covers the hero, so on tall screens its width follows the
+// height (portrait aspect 1.4455) — lets the srcset pick a texture that stays sharp
+const PORTRAIT_SIZES = 'max(100vw, 144.55vh)';
+
 // Component
 // ------------
 const Background = ({ className }: I.BackgroundProps) => {
 	// Refs
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const photoRef = useRef<HTMLImageElement>(null);
 	const controllerRef = useRef<DepthController | null>(null);
 	const settingsRef = useRef<DepthSettings>({ ...defaultSettings });
 
@@ -29,9 +34,10 @@ const Background = ({ className }: I.BackgroundProps) => {
 	// Effects
 	useEffect(() => {
 		const canvas = canvasRef.current,
+			photo = photoRef.current,
 			host = canvas?.closest('section');
 
-		if (!canvas || !host) return;
+		if (!canvas || !photo || !host) return;
 
 		const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 		const start = () => {
@@ -41,6 +47,7 @@ const Background = ({ className }: I.BackgroundProps) => {
 			if (!motion.matches)
 				controllerRef.current = mountDepthEffect({
 					canvas,
+					photo,
 					host,
 					getSettings: () => settingsRef.current,
 					onReady: setReady,
@@ -84,7 +91,16 @@ const Background = ({ className }: I.BackgroundProps) => {
 				data-ready={ready}
 				data-testid='hero-depth'
 			>
-				<Image className={s.fallback} src={portraitUrl} alt='' fill sizes='100vw' priority unoptimized />
+				<Image
+					ref={photoRef}
+					className={s.fallback}
+					src={portraitUrl}
+					alt=''
+					fill
+					sizes={PORTRAIT_SIZES}
+					loading='eager'
+					fetchPriority='high'
+				/>
 				<canvas ref={canvasRef} className={s.canvas} />
 			</aside>
 			{Controls ? (
