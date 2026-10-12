@@ -1,8 +1,23 @@
 // Background Styles
 // ------------
 
-.background {
+.jacket {
     position: absolute;
     inset: 0;
     overflow: clip;
+    z-index: 0;
+    pointer-events: none;
+
+    .fallback { object-fit: cover; }
+
+    .canvas {
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+    }
+
+    &[data-ready='true'] {
+        .canvas { opacity: 1; }
+        .fallback { visibility: hidden; }
+    }
 }

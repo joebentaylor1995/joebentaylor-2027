@@ -34,7 +34,7 @@
 		"build-storybook": "bun run styles && storybook build",
 		"serve": "serve ./out",
 		"commit": "node .gitmessage.js",
-		"prepare": "husky",
+		"prepare": "husky && git config --local core.editor \"$(git rev-parse --show-toplevel)/.husky/commit-editor\"",
 		"test": "playwright test",
 		"lighthouse": "bun run build && lhci autorun",
 		"outdated": "bunx npm-check-updates"

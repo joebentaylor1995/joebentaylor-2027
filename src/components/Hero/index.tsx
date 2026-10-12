@@ -11,9 +11,11 @@ import s from './styles.module.scss';
 // ------------
 const Hero = ({ heading, desc }: I.HeroProps) => {
 	return (
-		<section className={s.hero}>
-			{heading}
-			{desc}
+		<section className={s.jacket}>
+			<div className={s.content}>
+				<h1>{heading}</h1>
+				<p>{desc}</p>
+			</div>
 			<Background />
 		</section>
 	);
