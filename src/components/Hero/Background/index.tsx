@@ -19,15 +19,19 @@ const Background = ({ className }: I.BackgroundProps) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const controllerRef = useRef<DepthController | null>(null);
 	const settingsRef = useRef<DepthSettings>({ ...defaultSettings });
+
 	// State
 	const [settings, setSettings] = useState<DepthSettings>({ ...defaultSettings });
 	const [ready, setReady] = useState(false);
 	const [Controls, setControls] = useState<ComponentType<SettingsProps> | null>(null);
+
 	// Effects
 	useEffect(() => {
 		const canvas = canvasRef.current,
 			host = canvas?.closest('section');
+
 		if (!canvas || !host) return;
+
 		const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 		const start = () => {
 			controllerRef.current?.destroy();
@@ -41,14 +45,17 @@ const Background = ({ className }: I.BackgroundProps) => {
 					onReady: setReady,
 				});
 		};
+
 		start();
 		motion.addEventListener('change', start);
+
 		return () => {
 			motion.removeEventListener('change', start);
 			controllerRef.current?.destroy();
 			controllerRef.current = null;
 		};
 	}, []);
+
 	useEffect(() => {
 		let active = true;
 		if (new URLSearchParams(window.location.search).get('heroSettings') === '1') {
@@ -60,11 +67,13 @@ const Background = ({ className }: I.BackgroundProps) => {
 			active = false;
 		};
 	}, []);
+
 	// Handlers
 	const update = (next: DepthSettings) => {
 		settingsRef.current = next;
 		setSettings(next);
 	};
+
 	// Render
 	return (
 		<>

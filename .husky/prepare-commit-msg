@@ -1,0 +1,8 @@
+# Tackl commit prompt. Skip when a message is already supplied (-m / -F), or for
+# merges, squashes, and amends.
+case "$2" in
+	message|merge|squash|commit) exit 0 ;;
+esac
+
+exec < /dev/tty
+node .gitmessage.js --hook "$1"

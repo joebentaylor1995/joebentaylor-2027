@@ -1,9 +1,20 @@
 const prompts = require('prompts');
-const { execSync } = require('node:child_process');
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const args = process.argv.slice(2);
+const hookMode = args[0] === '--hook';
+const hookFile = hookMode ? args[1] : null;
 
 (async () => {
 	try {
+		const root = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+			encoding: 'utf8',
+		}).trim();
+		process.chdir(root);
+
 		console.log('Starting commit message prompts...');
 
 		const onCancel = () => {
@@ -56,17 +67,15 @@ const fs = require('node:fs');
 			}
 		);
 
-		// Check if we have all required fields
 		if (!response.description || !response.type) {
 			console.error('Commit cancelled: Required fields missing');
 			process.exit(1);
 		}
 
-		// Only run build check if user confirms
 		if (response.buildCheck) {
 			console.log('\nRunning build check...');
 			try {
-				execSync('npm run build', { stdio: 'inherit' });
+				execFileSync('bun', ['run', 'build'], { stdio: 'inherit' });
 				console.log('✅ Build successful!');
 			} catch {
 				console.error('\n❌ Build failed. Please fix errors before committing.');
@@ -90,11 +99,23 @@ const fs = require('node:fs');
 			`Build: ${response.buildCheck ? '✅ Verified' : '⏩ Skipped'}\n` +
 			(response.notes ? `\nNotes: ${response.notes}` : '');
 
-		// Write to Git commit message file
-		fs.writeFileSync('.git/COMMIT_EDITMSG', commitMessage);
-		console.log('\nCommit message created successfully!');
-		process.exit(0);
+		// Called by .husky/prepare-commit-msg — write the message and let that commit finish.
+		if (hookMode) {
+			fs.writeFileSync(hookFile, commitMessage);
+			return;
+		}
+
+		const msgFile = path.join(os.tmpdir(), `tackl-commit-${process.pid}.txt`);
+		fs.writeFileSync(msgFile, commitMessage);
+
+		try {
+			execFileSync('git', ['commit', '-F', msgFile], { stdio: 'inherit' });
+		} finally {
+			fs.rmSync(msgFile, { force: true });
+		}
 	} catch (err) {
+		const status = err && typeof err === 'object' && 'status' in err ? err.status : null;
+		if (typeof status === 'number' && status !== 0) process.exit(status);
 		console.error('Error during commit:', err);
 		process.exit(1);
 	}

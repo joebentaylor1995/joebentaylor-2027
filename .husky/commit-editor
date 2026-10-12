@@ -1,0 +1,3 @@
+#!/bin/sh
+# The message was written by prepare-commit-msg. Accept it and do not open Vim.
+exit 0
