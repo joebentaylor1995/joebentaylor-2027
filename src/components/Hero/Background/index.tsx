@@ -66,7 +66,7 @@ const Background = ({ className }: I.BackgroundProps) => {
 
 	useEffect(() => {
 		let active = true;
-		if (new URLSearchParams(window.location.search).get('heroSettings') === '1') {
+		if (new URLSearchParams(window.location.search).has('heroSettings')) {
 			void import('./Settings').then(module => {
 				if (active) setControls(() => module.default);
 			});

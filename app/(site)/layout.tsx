@@ -5,7 +5,7 @@ import Analytics from '@parts/Analytics';
 import { consentScript } from '@parts/CookieBar/consent';
 import Header from '@parts/Header';
 import SmoothScroll from '@parts/SmoothScroll';
-import { inter } from '@theme/fonts';
+import { ppNeueMontreal, sequel } from '@theme/fonts';
 import type { Metadata, Viewport } from 'next';
 import { isSiteUrlConfigured, siteUrl } from '@/config';
 import Providers from './Providers';
@@ -21,10 +21,10 @@ import '@css/global.scss';
 export const metadata: Metadata = {
 	metadataBase: new URL(siteUrl),
 	title: {
-		default: 'Tackl',
-		template: '%s — Tackl',
+		default: 'Joe Ben Taylor',
+		template: '%s — Joe Ben Taylor',
 	},
-	description: 'The ultimate Next.js starter kit',
+	description: 'Digital Narrative Architect',
 	// NOTE • Indexing is gated on a real site URL — a deploy that forgot
 	// NEXT_PUBLIC_SITE_URL can't be indexed under the tackl.netlify.app fallback
 	robots: {
@@ -36,8 +36,8 @@ export const metadata: Metadata = {
 	// opengraph-image.tsx beside its page.tsx (see src/utils/ogImage.tsx)
 	openGraph: {
 		type: 'website',
-		siteName: 'Tackl',
-		images: [{ url: '/og.jpg', width: 1200, height: 630, alt: 'Tackl — The ultimate Next.js starter kit' }],
+		siteName: 'Joe Ben Taylor',
+		images: [{ url: '/og.jpg', width: 1200, height: 630, alt: 'Joe Ben Taylor — Digital Narrative Architect' }],
 	},
 	twitter: {
 		card: 'summary_large_image',
@@ -48,14 +48,14 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
 	width: 'device-width',
 	initialScale: 1,
-	themeColor: '#000000',
+	themeColor: '#1653FF',
 };
 
 // Component
 // ------------
 const RootLayout = ({ children }: { children: React.ReactNode }) => {
 	return (
-		<html lang='en' className={inter.variable} suppressHydrationWarning>
+		<html lang='en' className={`${ppNeueMontreal.variable} ${sequel.variable}`} suppressHydrationWarning>
 			<head>
 				{/* NOTE • Marks returning visitors' cookie choice before first paint, so the server-rendered CookieBar never flashes (src/components/CookieBar/consent.ts) */}
 				{/* biome-ignore lint/security/noDangerouslySetInnerHtml: static inline script built from constants — no user input */}

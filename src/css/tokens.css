@@ -38,10 +38,10 @@
 	--time-s: 0.15s;
 	--time-m: 0.3s;
 	--time-l: 0.6s;
-	--font-heading: var(--inter), Arial, sans-serif;
-	--font-body: var(--inter), Arial, sans-serif;
-	--font-mono: var(--inter), Arial, sans-serif;
-	--font-script: var(--inter), Arial, sans-serif;
+	--font-heading: var(--sequel), Arial, sans-serif;
+	--font-body: var(--pp-neue-montreal), Arial, sans-serif;
+	--font-mono: var(--pp-neue-montreal), Arial, sans-serif;
+	--font-script: var(--pp-neue-montreal), Arial, sans-serif;
 	--font-serif: Georgia, 'Times New Roman', serif;
 	--weight-light: 300;
 	--weight-regular: 400;

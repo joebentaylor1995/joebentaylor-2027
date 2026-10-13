@@ -1,7 +1,7 @@
 // Imports
 // ------------
 import StatusPage, { actionClass } from '@parts/StatusPage';
-import { inter } from '@theme/fonts';
+import { ppNeueMontreal, sequel } from '@theme/fonts';
 import type { Metadata } from 'next';
 
 // Styles
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 // layout to build a 404 from — hence experimental.globalNotFound in
 // next.config.js. A plain <a> on purpose: the site's router isn't mounted here.
 const GlobalNotFound = () => (
-	<html lang='en' className={inter.variable}>
+	<html lang='en' className={`${ppNeueMontreal.variable} ${sequel.variable}`}>
 		<body>
 			<StatusPage
 				code='404'

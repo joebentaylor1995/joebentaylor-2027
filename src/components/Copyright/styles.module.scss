@@ -1,0 +1,44 @@
+// Styles: Copyright
+// ---------------
+
+.copyright {
+    --offset: var(--gap-m);
+    --width: 100%;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gap-s);
+
+	position: absolute;
+    z-index: 2;
+	inset: auto auto var(--offset) 50%;
+    transform: translateX(-50%);
+
+    width: var(--width);
+    text-align: center;
+
+    pointer-events: none;
+    user-select: none;
+
+    @include bp(m) {
+        --offset: var(--gap-l);
+    }
+
+    @include bp(l) {
+        --offset: var(--gap-xl);
+        --width: calc((100vw - 7 * var(--gap-xl)) / 6);
+    }
+
+    em {
+        display: inline-block;
+        font-style: normal;
+        color: alpha(var(--global-white), 60);
+    }
+
+    span {
+        flex: 1;
+        height: 1px;
+        background: alpha(var(--global-white), 20);
+    }
+}

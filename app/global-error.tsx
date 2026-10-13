@@ -3,7 +3,7 @@
 // Imports
 // ------------
 import StatusPage, { actionClass } from '@parts/StatusPage';
-import { inter } from '@theme/fonts';
+import { ppNeueMontreal, sequel } from '@theme/fonts';
 import { useEffect } from 'react';
 
 // Styles
@@ -32,7 +32,7 @@ const GlobalError = ({ error, retry }: GlobalErrorProps) => {
 
 	// Render
 	return (
-		<html lang='en' className={inter.variable}>
+		<html lang='en' className={`${ppNeueMontreal.variable} ${sequel.variable}`}>
 			<body>
 				<title>Something went wrong — Tackl</title>
 				<StatusPage

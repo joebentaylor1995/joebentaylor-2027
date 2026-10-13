@@ -14,7 +14,7 @@ test('hero renders without prototype chrome or a settings download', async ({ pa
 	await expect(page.locator('[data-hero-settings]')).toHaveCount(0);
 	await expect(page.getByText('Depth study', { exact: true })).toHaveCount(0);
 	expect(
-		(await Promise.all(downloadedScripts)).some(source => source.includes('Only loaded with ?heroSettings=1'))
+		(await Promise.all(downloadedScripts)).some(source => source.includes('Only loaded with ?heroSettings.'))
 	).toBe(false);
 	const canvas = effect.locator('canvas');
 	await canvas.evaluate(element => {
@@ -30,14 +30,14 @@ test('hero renders without prototype chrome or a settings download', async ({ pa
 });
 
 test('explicit query loads scroll zoom controls without particles', async ({ page }, testInfo) => {
-	await page.goto('/?heroSettings=1');
+	await page.goto('/?heroSettings');
 	await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
 	const panel = page.getByRole('region', { name: 'Hero effect settings' });
 	await expect(panel).toBeVisible();
 	await expect(panel.getByRole('slider', { name: 'Scroll zoom strength', exact: true })).toHaveValue('1.1');
 	await expect(panel.getByRole('checkbox', { name: 'Scroll depth zoom', exact: true })).toBeChecked();
 	await expect(panel.getByText(/particles|click pulse/i)).toHaveCount(0);
-	await expect(panel.getByRole('checkbox', { name: 'Blue wireframe', exact: true })).not.toBeChecked();
+	await expect(panel.getByText(/wireframe/i)).toHaveCount(0);
 	await panel.getByRole('slider', { name: 'Scroll zoom strength', exact: true }).fill('2');
 	await panel.getByRole('button', { name: 'Preview downward scroll' }).click();
 	await page.waitForTimeout(350);

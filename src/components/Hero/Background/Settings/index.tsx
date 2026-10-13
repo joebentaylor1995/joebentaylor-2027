@@ -26,7 +26,6 @@ const ranges: [NumericSetting, string, number, number, number][] = [
 	['push', 'Scroll zoom strength', 0, 2, 0.05],
 	['trails', 'Motion trails', 0, 2, 0.05],
 	['focus', 'Focus pull', 0, 2, 0.05],
-	['wire', 'Wireframe strength', 0, 2, 0.05],
 ];
 const toggles: [BooleanSetting, string][] = [
 	['chromaOn', 'Blue cursor edges'],
@@ -35,7 +34,6 @@ const toggles: [BooleanSetting, string][] = [
 	['pushOn', 'Scroll depth zoom'],
 	['trailsOn', 'Scroll motion trails'],
 	['focusOn', 'Scroll focus pull'],
-	['wireOn', 'Blue wireframe'],
 	['auto', 'Automatic movement'],
 	['depth', 'View depth map'],
 ];
@@ -59,7 +57,7 @@ export default function Settings({ settings, onChange, onPreview }: SettingsProp
 			{open ? (
 				<section id='hero-effect-controls' aria-label='Hero effect settings' className={s.panel}>
 					<h2>Hero effect settings</h2>
-					<p>Only loaded with ?heroSettings=1. Changes are temporary.</p>
+					<p>Only loaded with ?heroSettings. Changes are temporary.</p>
 					<button type='button' onClick={onPreview}>
 						Preview downward scroll
 					</button>

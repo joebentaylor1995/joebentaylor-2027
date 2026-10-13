@@ -11,26 +11,25 @@
 
 // SECTION • Display — hero headlines, one or two per page
 @mixin displayL {
-	font-family: var(--font-heading);
-	font-weight: var(--weight-regular);
-	font-size: 4.8rem;
-	line-height: 1.1;
-	letter-spacing: -1px;
+	font-family: var(--font-body);
+	font-weight: var(--weight-light);
+	font-size: 6rem;
+	line-height: 1.12;
+	letter-spacing: -0.125em;
 
-	@include bp(xl) {
-		font-size: clamp(9.6rem, 8.333vw, 12rem);
-		letter-spacing: -2px;
+	@include bp(l) {
+		font-size: 12rem;
 	}
 }
 
 @mixin displayS {
-	font-family: var(--font-heading);
+	font-family: var(--font-body);
 	font-weight: var(--weight-regular);
 	font-size: 4rem;
 	line-height: 1.1;
 	letter-spacing: -1px;
 
-	@include bp(xl) {
+	@include bp(l) {
 		font-size: 7.2rem;
 		letter-spacing: -2px;
 	}
@@ -38,24 +37,24 @@
 
 // SECTION • Headline — section titles and major headings
 @mixin headlineL {
-	font-family: var(--font-heading);
+	font-family: var(--font-body);
 	font-weight: var(--weight-regular);
 	font-size: 3.6rem;
 	line-height: 1.15;
 
-	@include bp(xl) {
+	@include bp(l) {
 		font-size: 6rem;
 		letter-spacing: -0.2rem;
 	}
 }
 
 @mixin headlineS {
-	font-family: var(--font-heading);
+	font-family: var(--font-body);
 	font-weight: var(--weight-regular);
 	font-size: 3rem;
 	line-height: 1.2;
 
-	@include bp(xl) {
+	@include bp(l) {
 		font-size: 4.8rem;
 		letter-spacing: -0.1rem;
 	}
@@ -63,24 +62,25 @@
 
 // SECTION • Title — component-level titles, labels, nav items
 @mixin titleL {
-	font-family: var(--font-heading);
+	font-family: var(--font-body);
 	font-weight: var(--weight-regular);
-	font-size: 2.6rem;
-	line-height: 1.2;
+	font-size: 3.2rem;
+	line-height: 1.32;
+	letter-spacing: -0.0625em; // 1px relative to font size
 
-	@include bp(xl) {
-		font-size: 3.6rem;
+	@include bp(l) {
+		font-size: 4.8rem;
 	}
 }
 
 @mixin titleS {
-	font-family: var(--font-heading);
+	font-family: var(--font-body);
 	font-weight: var(--weight-regular);
 	font-size: 2.2rem;
-	line-height: 1.25;
+	line-height: 1.32;
 
-	@include bp(xl) {
-		font-size: 2.8rem;
+	@include bp(l) {
+		font-size: 3.2rem;
 	}
 }
 
@@ -88,45 +88,72 @@
 @mixin bodyL {
 	font-family: var(--font-body);
 	font-weight: var(--weight-regular);
-	font-size: 2rem;
-	line-height: 1.4;
+	font-size: 1.8rem;
+	line-height: 1.32;
 
-	@include bp(xl) {
-		font-size: 2.4rem;
+	@include bp(l) {
+		font-size: 26rem;
+	}
+}
+
+@mixin bodyM {
+	font-family: var(--font-body);
+	font-weight: var(--weight-regular);
+	font-size: 1.6rem;
+	line-height: 1.32;
+	letter-spacing: 0.0313em; // 0.5px relative to font size
+
+	@include bp(l) {
+		font-size: 1.8rem;
 	}
 }
 
 @mixin bodyS {
 	font-family: var(--font-body);
 	font-weight: var(--weight-regular);
-	font-size: 1.6rem;
-	line-height: 1.4;
+	font-size: 1.2rem;
+	line-height: 1.32;
+	letter-spacing: 0.0313em; // 0.5px relative to font size
 
-	@include bp(xl) {
-		font-size: 1.8rem;
+	@include bp(l) {
+		font-size: 1.4rem;
 	}
 }
 
 // SECTION • Caption — meta, captions, legal, microcopy
 @mixin captionL {
-	font-family: var(--font-body);
-	font-weight: var(--weight-regular);
-	font-size: 1.4rem;
-	line-height: 1.5;
+	font-family: var(--font-heading);
+	font-weight: var(--weight-medium);
+	text-transform: uppercase;
 
-	@include bp(xl) {
-		font-size: 1.6rem;
+	
+	line-height: 1.2;
+	font-size: 0.8rem;
+	letter-spacing: 0.0625em; // 1px relative to font size
+
+	@include bp(m) {
+		font-size: 0.9rem;
+	}
+
+	@include bp(l) {
+		font-size: 1rem;
 	}
 }
 
 @mixin captionS {
 	font-family: var(--font-body);
-	font-weight: var(--weight-regular);
-	font-size: 1.2rem;
-	line-height: 1.5;
+	font-weight: var(--weight-medium);
+	
+	line-height: 1.2;
+	font-size: 0.8rem;
+	letter-spacing: 0.025em;
 
-	@include bp(xl) {
-		font-size: 1.3rem;
+	@include bp(m) {
+		font-size: 0.9rem;
+	}
+
+	@include bp(l) {
+		font-size: 1rem;
 	}
 }
 

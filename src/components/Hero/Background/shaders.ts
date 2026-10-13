@@ -4,7 +4,7 @@ export const fragment = `precision highp float;
 varying vec2 v;uniform sampler2D photo;uniform sampler2D depthMask;uniform vec2 resolution;uniform vec2 motion;uniform float intensity;uniform float lift;uniform float debug;uniform vec2 positionShift;uniform float rotation;uniform float zoom;
 uniform vec2 cursorPos;uniform float cursorOn;uniform float cursorSpeed;
 uniform float chromaFX;uniform float glowFX;
-uniform float scrollFX[5];uniform float scrollVelocity;
+uniform float scrollFX[4];uniform float scrollVelocity;
 vec4 portrait(vec2 uv){float ok=step(0.,uv.x)*step(uv.x,1.)*step(0.,uv.y)*step(uv.y,1.);return texture2D(photo,clamp(uv,vec2(.001),vec2(.999)))*ok;}
 vec4 premultSample(vec2 uv){vec4 t=portrait(uv);return vec4(t.rgb*t.a,t.a);}
 float tipLight(vec2 uv,vec2 cursorUV,vec2 tip){return exp(-dot((uv-tip)*vec2(1.4455,1.),(uv-tip)*vec2(1.4455,1.))*2100.)*(1.-smoothstep(.025,.10,length((cursorUV-tip)*vec2(1.4455,1.))));}
@@ -83,20 +83,6 @@ if(scrollFX[2]*scrollSpeed>.0001){
 float halo=clamp(glow*.20,0.,.65)*(1.-alpha);
 premul+=vec3(.20,.55,1.)*halo;alpha+=halo;
 result=alpha>.0001?premul/alpha:vec3(0.);
-// The triangular lattice is attached to the reprojected depth surface.
-float wireAmount=smoothstep(0.,.42,scrollSpeed*scrollFX[4]);
-if(wireAmount>.0001){
- vec2 mesh=(uv+vec2(.035,-.10)*rawDepth)*vec2(100.,69.);vec2 cell=fract(mesh);
- float lineDistance=min(min(min(cell.x,1.-cell.x),min(cell.y,1.-cell.y)),abs(cell.x-cell.y)*.7071);
- float lineWidth=clamp(70./(resolution.y*size.y),.022,.13);
- float line=1.-smoothstep(lineWidth*.30,lineWidth,lineDistance);
- float surface=texel.a*valid;
- float shading=dot(texel.rgb,vec3(.299,.587,.114));
- vec3 blue=mix(vec3(.008,.07,.28),vec3(.05,.53,1.),clamp(rawDepth*.35+shading*.75,0.,1.));
- float meshAlpha=surface*line;
- vec3 blended=mix(result*alpha,blue*meshAlpha,wireAmount);
- alpha=mix(alpha,meshAlpha,wireAmount);result=blended/max(alpha,.0001);
-}
 if(debug>.5){float z=adjustedDepth(debugP);float mapBounds=1.-smoothstep(-aa,aa,box(debugP,vec2(0.),vec2(1.)));result=vec3(z);alpha=mapBounds;}
 gl_FragColor=vec4(result*alpha,alpha);
 }`;

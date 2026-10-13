@@ -1,9 +1,9 @@
 // Saved prototype defaults (shared with the optional settings panel)
 // ------------
 export const defaultSettings = {
-	intensity: 1,
-	horizontal: 1,
-	vertical: 0.65,
+	intensity: 0.4,
+	horizontal: 2,
+	vertical: 1,
 	lift: 1.15,
 	smooth: 0.82,
 	rotation: 0,
@@ -18,12 +18,10 @@ export const defaultSettings = {
 	push: 1.1,
 	trails: 0.5,
 	focus: 0.3,
-	wire: 1.2,
 	dragOn: true,
 	pushOn: true,
 	trailsOn: true,
 	focusOn: true,
-	wireOn: false,
 	auto: false,
 	depth: false,
 };
@@ -34,6 +32,6 @@ export type NumericSetting = {
 export type BooleanSetting = {
 	[K in keyof DepthSettings]: DepthSettings[K] extends boolean ? K : never;
 }[keyof DepthSettings];
-export const scrollKeys = ['drag', 'push', 'trails', 'focus', 'wire'] as const;
+export const scrollKeys = ['drag', 'push', 'trails', 'focus'] as const;
 export const portraitUrl = '/images/hero-depth/portrait.png';
 export const depthUrl = '/images/hero-depth/depth.webp';

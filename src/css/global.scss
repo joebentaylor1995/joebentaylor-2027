@@ -17,8 +17,9 @@
 		margin: 0;
 		padding: 0;
 		box-sizing: border-box;
-		-webkit-font-smoothing: antialiased; // Matched pair with the -moz value below — consistent rendering across engines
+		-webkit-font-smoothing: subpixel-antialiased; // Matched pair with the -moz value below — consistent rendering across engines
 		-moz-osx-font-smoothing: grayscale;
+		text-rendering: geometricprecision;
 	}
 
 	article,
@@ -57,6 +58,7 @@
 	// Hide scrollbars everywhere — scrolling is driven by Lenis
 	* {
 		scrollbar-width: none;
+		-ms-overflow-style: none;
 	}
 
 	*::-webkit-scrollbar {
@@ -78,6 +80,7 @@
 	body {
 		height: 100%;
 		overflow: hidden;
+		overscroll-behavior: none; // Stop the Safari rubber-band on the locked viewport
 	}
 
 	body {
@@ -133,7 +136,6 @@
 			overflow: visible;
 		}
 	}
-
 }
 
 // SECTION • Waffl Grid
@@ -173,13 +175,13 @@
 		@include bp(m) {
 			--grid-columns: repeat(#{map.get($columns, m)}, 1fr);
 			--grid-gutter: #{map.get($gutters, m)};
-			--grid-margin: calc(var(--grid-gutter) / 2);
+			--grid-margin: calc(var(--grid-gutter));
 		}
 
 		@include bp(l) {
 			--grid-columns: repeat(#{map.get($columns, l)}, 1fr);
 			--grid-gutter: #{map.get($gutters, l)};
-			--grid-margin: calc(var(--grid-gutter) / 2);
+			--grid-margin: calc(var(--grid-gutter));
 		}
 
 		&[data-no-gutter] {

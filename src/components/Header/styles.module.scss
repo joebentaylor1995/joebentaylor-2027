@@ -1,5 +1,79 @@
-.jacket {
+// Styles: Header
+// ---------------
+
+.header {
 	position: fixed;
-	z-index: 999;
+	z-index: 12;
 	inset: 0 0 auto;
+
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: var(--gap-m);
+
+	@include bp(sm) {
+		padding: var(--gap-l);
+	}
+
+	@include bp(l) {
+		padding: var(--gap-xl);
+	}
+}
+
+.left {
+	display: flex;
+	align-items: center;
+	gap: var(--gap-m);
+
+	> div {
+		display: none;
+		flex-direction: column;
+		gap: var(--gap-xxs);
+
+		pointer-events: none;
+		user-select: none;
+
+		@include bp(m) { display: flex }
+
+		em {
+			display: flex;
+			align-items: center;
+			gap: var(--gap-xs);
+			font-style: normal;
+			color: var(--brand-c4);
+
+			&::before {
+				--size: 0.4rem;
+
+				content: '';
+				display: block;
+				width: var(--size);
+				height: var(--size);
+				border-radius: 50%;
+				background-color: var(--brand-c1);
+				transform: translateY(0.5px);
+			}
+		}
+
+		span { color: alpha(var(--brand-c4), 40) }
+	}
+}
+
+.right {
+	--pad: calc(var(--gap-m) / 2);
+
+	display: flex;
+	align-items: center;
+	transform: translateX(var(--pad));
+
+	button,
+	a {
+		cursor: pointer;
+		user-select: none;
+
+		display: flex;
+		padding: var(--pad);
+
+		color: var(--brand-c4);
+	}
 }

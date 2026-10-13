@@ -100,7 +100,7 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 		held = 0;
 	let bakedDepth: ReturnType<typeof bakeDepth>;
 	let main: ReturnType<typeof makeProgram>;
-	const scrollValues = new Float32Array(5);
+	const scrollValues = new Float32Array(scrollKeys.length);
 
 	function resetMotion() {
 		impulse = rate = speed = held = 0;

@@ -1,0 +1,68 @@
+// Styles: Logo Marquee
+// ---------------
+// https://ryanmulligan.dev/blog/css-marquee/
+
+@keyframes scroll {
+	from {
+		transform: translateX(0);
+	}
+
+	to {
+		transform: translateX(calc(-100% - var(--gap)));
+	}
+}
+
+
+
+.marquee {
+	--gap: var(--gap-xl);
+
+	position: absolute;
+	z-index: -1;
+	right: 0;
+	bottom: 0;
+	left: 0;
+
+	display: flex;
+	gap: var(--gap);
+	overflow: hidden;
+	padding-block: var(--gap-l);
+	user-select: none;
+
+	// &:hover .track {
+	// 	animation-play-state: paused;
+	// }
+}
+
+.track {
+	flex-shrink: 0;
+	display: flex;
+	justify-content: space-around;
+	gap: var(--gap);
+	min-width: 100%;
+	margin: 0;
+	padding: 0;
+
+	list-style: none;
+	animation: scroll 48s linear infinite;
+
+	@media (prefers-reduced-motion: reduce) {
+		animation: none;
+	}
+}
+
+.logo {
+	display: flex;
+	flex: none;
+	align-items: center;
+
+	img {
+		--logo-ratio: 3.5;
+
+		filter: invert(1);
+		opacity: 0.4;
+		width: auto;
+		height: clamp(1.8rem, calc(4.6rem / sqrt(var(--logo-ratio))), 3.6rem);
+		object-fit: contain;
+	}
+}

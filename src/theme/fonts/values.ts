@@ -10,17 +10,17 @@
 // name, value is the CSS variable it exposes on <html>. Add new fonts here
 // and reference their variable in the font stacks below.
 export const fontVariables = {
-	inter: '--inter',
+	ppNeueMontreal: '--pp-neue-montreal',
 };
 
 // SECTION • Raw Font Stacks
 // NOTE • Emitted as --font-{key} on :root in the generated tokens.css.
 // --inter is set on <html> by next/font (see app/(site)/layout.tsx)
 export const fontFamilies = {
-	heading: `var(--inter), Arial, sans-serif`,
-	body: `var(--inter), Arial, sans-serif`,
-	mono: `var(--inter), Arial, sans-serif`,
-	script: `var(--inter), Arial, sans-serif`,
+	heading: `var(--sequel), Arial, sans-serif`,
+	body: `var(--pp-neue-montreal), Arial, sans-serif`,
+	mono: `var(--pp-neue-montreal), Arial, sans-serif`,
+	script: `var(--pp-neue-montreal), Arial, sans-serif`,
 	// NOTE • A system stack — no font download (used by the CookieBar heading)
 	serif: `Georgia, 'Times New Roman', serif`,
 };
