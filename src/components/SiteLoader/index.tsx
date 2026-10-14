@@ -6,7 +6,7 @@ import Logo from '@parts/Logo';
 import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
 import { useId, useRef } from 'react';
-import { revealScene } from './events';
+import { revealScene, settleLoader } from './events';
 
 // Styles
 // ------------
@@ -45,6 +45,7 @@ const SiteLoader = () => {
 				onComplete: () => {
 					finished.current = true;
 					root.dataset.complete = 'true';
+					settleLoader();
 				},
 			});
 			if (reduced) {
