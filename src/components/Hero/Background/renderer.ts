@@ -110,7 +110,7 @@ export function mountDepthEffect({
 	const scroll = new ScrollMotion(getSettings);
 	let colourImage: HTMLImageElement | null = null;
 	let bakedDepth: ReturnType<typeof bakeDepth>;
-	let main: ReturnType<typeof makeProgram>;
+	let main: Awaited<ReturnType<typeof makeProgram>>;
 	const scrollValues = new Float32Array(scrollKeys.length);
 	let liquid: LiquidLayer | null = null;
 	let quad: WebGLBuffer;
@@ -194,7 +194,8 @@ export function mountDepthEffect({
 		scroll.add(delta);
 		dirty = true;
 	}
-	function makeProgram(v: string, f: string, names: string[]) {
+	async function makeProgram(v: string, f: string, names: string[]) {
+		const parallel = gl.getExtension('KHR_parallel_shader_compile');
 		const program = gl.createProgram();
 		if (!program) throw new Error('Unable to create depth program');
 		programs.push(program);
@@ -206,15 +207,14 @@ export function mountDepthEffect({
 			if (!shader) throw new Error('Unable to create depth shader');
 			gl.shaderSource(shader, source);
 			gl.compileShader(shader);
-			if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-				const message = gl.getShaderInfoLog(shader);
-				gl.deleteShader(shader);
-				throw new Error(message || 'Depth shader compilation failed');
-			}
 			gl.attachShader(program, shader);
 			gl.deleteShader(shader);
 		}
 		gl.linkProgram(program);
+		do {
+			await new Promise(resolve => setTimeout(resolve, 16));
+			if (disposed || lost) throw new Error('Depth initialization cancelled');
+		} while (parallel && !gl.getProgramParameter(program, parallel.COMPLETION_STATUS_KHR));
 		if (!gl.getProgramParameter(program, gl.LINK_STATUS))
 			throw new Error(gl.getProgramInfoLog(program) || 'Depth program link failed');
 		const uniforms: Uniforms = {};
@@ -505,13 +505,15 @@ export function mountDepthEffect({
 			lost = false;
 			buffers.length = textures.length = programs.length = 0;
 			resetMotion();
-			initialize();
+			void initialize();
 		},
 		{ signal: events.signal }
 	);
-	function initialize() {
+	async function initialize() {
+		const current = ++generation;
+		loaded = false;
 		try {
-			main = makeProgram(vertex, fragment, [
+			const compiled = await makeProgram(vertex, fragment, [
 				'photo',
 				'colourPhoto',
 				'colourMix',
@@ -533,6 +535,8 @@ export function mountDepthEffect({
 				'scrollFX[0]',
 				'scrollVelocity',
 			]);
+			if (disposed || lost || current !== generation) return;
+			main = compiled;
 			quad = makeBuffer(new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]));
 			photoTexture = texture(0, () => gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, photo));
 			colourTexture = texture(2, () =>
@@ -557,6 +561,7 @@ export function mountDepthEffect({
 			if (loaded) onReady(true);
 			if (loaded) void startLiquid();
 		} catch (error) {
+			if (disposed || lost || current !== generation) return;
 			loaded = false;
 			onReady(false);
 			console.error('Hero depth initialization:', error);
@@ -580,13 +585,13 @@ export function mountDepthEffect({
 	Promise.all([
 		photoReady.then(() => photo.decode()),
 		load(depthUrl),
-		load('/images/hero-depth/portrait-colour.png').catch(() => null),
+		load('/images/hero-depth/portrait-colour.webp').catch(() => null),
 	])
 		.then(([, depth, colour]) => {
 			if (disposed) return;
 			colourImage = colour;
 			bakedDepth = bakeDepth(depth);
-			initialize();
+			void initialize();
 		})
 		.catch(() => {
 			if (!disposed) onReady(false);

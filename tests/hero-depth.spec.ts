@@ -12,6 +12,14 @@ test('settled animation does not query shader attributes on every frame', async 
 	});
 	await page.goto('/');
 	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
+	const colourRequests = await page.evaluate(() =>
+		performance
+			.getEntriesByType('resource')
+			.map(entry => entry.name)
+			.filter(url => url.includes('portrait-colour'))
+	);
+	expect(colourRequests).toHaveLength(1);
+	expect(colourRequests[0]).toContain('/portrait-colour.webp');
 	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete');
 	await page.waitForTimeout(300);
 	const count = await page.locator('html').getAttribute('data-attribute-queries');

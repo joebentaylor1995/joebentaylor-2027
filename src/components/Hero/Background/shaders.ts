@@ -39,6 +39,8 @@ offset.y+=scrollSigned*scrollFX[1]*.018;
 float scrollDepthScale=clamp(scrollSigned*scrollFX[1]*.18,-.65,.65);
 vec2 uv=plane;
 // Front-to-back ray intersection preserves sharp occlusion boundaries.
+// At rest the intersection maps back to plane exactly, so no depth search is needed.
+if(dot(offset,offset)>0. || scrollDepthScale!=0.){
 float nearZ=1.02;float farZ=0.;
 for(int i=0;i<48;i++){
  float z=1.02-float(i)*(1.02/47.);
@@ -47,6 +49,7 @@ for(int i=0;i<48;i++){
 }
 for(int i=0;i<5;i++){float z=(nearZ+farZ)*.5;vec2 trial=(plane-offset*z-.5)/(1.+scrollDepthScale*z)+.5;if(depthAt(trial)>=z)farZ=z;else nearZ=z;}
 uv=(plane-offset*farZ-.5)/(1.+scrollDepthScale*farZ)+.5;
+}
 float rawDepth=adjustedDepth(uv);
 vec4 texel=portrait(uv);
 // Downward scrolling focuses the hands. Premultiplied blur preserves transparent edges.
@@ -75,7 +78,8 @@ vec4 blueSample=portrait(uv-channelShift);
 if(dot(channelShift,channelShift)>.000000001){result.b=max(col.b,mix(col.b,blueSample.b,blueSample.a));}
 
 
-float contact=tipLight(uv,cursorUV,vec2(.574,.065))+tipLight(uv,cursorUV,vec2(.651,.035))+tipLight(uv,cursorUV,vec2(.764,.114))+tipLight(uv,cursorUV,vec2(.531,.156))+tipLight(uv,cursorUV,vec2(.581,.514))+tipLight(uv,cursorUV,vec2(.225,.836))+tipLight(uv,cursorUV,vec2(.300,.850))+tipLight(uv,cursorUV,vec2(.369,.811))+tipLight(uv,cursorUV,vec2(.461,.705));
+float contact=0.;
+if(cursorOn*glowFX>0.)contact=tipLight(uv,cursorUV,vec2(.574,.065))+tipLight(uv,cursorUV,vec2(.651,.035))+tipLight(uv,cursorUV,vec2(.764,.114))+tipLight(uv,cursorUV,vec2(.531,.156))+tipLight(uv,cursorUV,vec2(.581,.514))+tipLight(uv,cursorUV,vec2(.225,.836))+tipLight(uv,cursorUV,vec2(.300,.850))+tipLight(uv,cursorUV,vec2(.369,.811))+tipLight(uv,cursorUV,vec2(.461,.705));
 float glow=contact*glowFX*cursorOn;
 result+=vec3(.25,.60,1.)*glow*.7;
 vec3 premul=result*alpha;
