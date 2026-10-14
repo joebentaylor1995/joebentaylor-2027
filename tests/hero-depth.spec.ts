@@ -90,7 +90,21 @@ test('early hover does not interrupt intro and a slow ripple keeps updating with
 	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
 });
 
-test('depth responds after the ripple while the text entrance is still running', async ({ page }) => {
+test('depth and water cursor respond together after the ripple while text is still entering', async ({ page }) => {
+	await page.addInitScript(() => {
+		const amounts = new WeakSet<WebGLUniformLocation>();
+		const getLocation = WebGLRenderingContext.prototype.getUniformLocation;
+		const setVector = WebGLRenderingContext.prototype.uniform3fv;
+		WebGLRenderingContext.prototype.getUniformLocation = function (program, name) {
+			const location = getLocation.call(this, program, name);
+			if (location && name === 'amount') amounts.add(location);
+			return location;
+		};
+		WebGLRenderingContext.prototype.uniform3fv = function (location, value) {
+			if (location && amounts.has(location)) document.documentElement.dataset.waterStroke = 'true';
+			return setVector.call(this, location, value);
+		};
+	});
 	await page.goto('/?heroSettings');
 	const content = page.locator('[data-hero-content]');
 	await expect(content).toHaveAttribute('data-entrance', 'complete');
@@ -98,6 +112,8 @@ test('depth responds after the ripple while the text entrance is still running',
 	await expect(page.locator('[data-scene-cover]')).toHaveAttribute('data-complete', 'true');
 	await expect(content).toHaveAttribute('data-entrance', 'running');
 	await page.mouse.move(100, 300);
+	await page.mouse.move(350, 350, { steps: 5 });
+	await expect(page.locator('html')).toHaveAttribute('data-water-stroke', 'true', { timeout: 750 });
 	await expect
 		.poll(
 			() =>

@@ -385,7 +385,7 @@ export function mountDepthEffect({
 		);
 	}
 	function track(event: PointerEvent) {
-		// Depth is available as soon as the ripple lands, independently of text timing.
+		// Depth and water cursor become available together once the ripple lands.
 		if ((sceneIntros.get(host)?.waterReveal ?? 1) < 1) {
 			liquid?.resetPointer();
 			return;
@@ -396,9 +396,7 @@ export function mountDepthEffect({
 		if (!wasActive) previousCursor = [...cursor];
 		cursorActive = 1;
 		target = cursor.map(v => Math.max(-1, Math.min(1, v * 2 - 1)));
-		// Keep fluid strokes off the moving text until its entrance has completed.
-		const textEntering = host.querySelector('[data-hero-content]')?.getAttribute('data-entrance') === 'running';
-		if (!textEntering && event.pointerType !== 'touch' && !ignored(event)) liquid?.move(cursor[0], cursor[1]);
+		if (event.pointerType !== 'touch' && !ignored(event)) liquid?.move(cursor[0], cursor[1]);
 		else liquid?.resetPointer();
 		dirty = true;
 	}
