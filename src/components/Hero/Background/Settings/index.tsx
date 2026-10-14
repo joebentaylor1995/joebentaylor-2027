@@ -31,6 +31,7 @@ const ranges: [NumericSetting, string, number, number, number][] = [
 	['positionX', 'X position', -100, 100, 1],
 	['positionY', 'Y position', -100, 100, 1],
 	['zoom', 'Scale', 0.3, 2.5, 0.01],
+	['maxWidth', 'Portrait max viewport width (px)', 640, 3840, 10],
 	['chroma', 'Blue edge strength', 0, 2, 0.05],
 	['glow', 'Fingertip glow strength', 0, 2, 0.05],
 	['drag', 'Blue scroll drag', 0, 2, 0.05],
@@ -282,8 +283,8 @@ export default function Settings({
 						['Scroll response', 0, 4],
 						['Colour transition', 4, 6],
 						['Depth pulse', 6, 10],
-						['Portrait & cursor', 10, 19],
-						['Light & scroll effects', 19, 25],
+						['Portrait & cursor', 10, 20],
+						['Light & scroll effects', 20, 26],
 					].map(([title, start, end]) => (
 						<details className={s.group} key={title}>
 							<summary>{title}</summary>

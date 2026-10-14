@@ -2,6 +2,8 @@
 
 ## Intro and tuning
 
+The portrait's width-driven sizing stops at a 1440px viewport by default. `Portrait max viewport width (px)` under Portrait & cursor changes this cap and is included as `portrait.maxWidth` in exports. Height-driven cover sizing on tall screens remains intact. The same cap applies throughout the intro scale animation; the WebGL canvas, text and marquee still span the full viewport.
+
 The scene opens through one refracting ripple from a brand-c4 screen. The portrait starts at scale 2.06 and settles to its configured scale by 90% of the ripple progress with cinematic easing. `scene-intro.ts` stores the intro defaults. The settings export includes `portrait`, `liquid`, and `intro`, and Replay rebuilds the entrance from the current controls.
 
 Pointer-driven parallax and liquid strokes wait until the entrance finishes, then start from a fresh cursor sample. Hovering during the intro cannot inject a stale stroke or interrupt the animated layout. The portrait cache remains invalid until both its entrance and ripple finish, including at slow ripple speeds.

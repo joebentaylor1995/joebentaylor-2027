@@ -1,5 +1,32 @@
 import { expect, test } from '@playwright/test';
 
+test('portrait width stops growing past the configurable viewport cap', async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await page.goto('/?heroSettings');
+	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
+	const canvas = page.getByTestId('hero-depth').locator('canvas');
+	const portraitWidth = () =>
+		canvas.evaluate(element => {
+			const gl = (element as HTMLCanvasElement).getContext('webgl');
+			if (!gl) throw new Error('Missing WebGL');
+			const program = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram;
+			const zoom = gl.getUniformLocation(program, 'zoom');
+			if (!zoom) throw new Error('Missing zoom');
+			const bounds = element.getBoundingClientRect();
+			return Math.max(bounds.width, bounds.height * 1.4455) * (gl.getUniform(program, zoom) as number);
+		});
+	for (const width of [1440, 1920, 2560]) {
+		await page.setViewportSize({ width, height: 900 });
+		await expect.poll(portraitWidth).toBeCloseTo(1440 * 1.12, 1);
+	}
+	await page.getByRole('button', { name: 'Expand all', exact: true }).click();
+	await page.getByLabel('Portrait max viewport width (px) value', { exact: true }).fill('1600');
+	await expect.poll(portraitWidth).toBeCloseTo(1600 * 1.12, 1);
+	expect(JSON.parse(await page.getByLabel('All hero settings JSON').inputValue()).portrait.maxWidth).toBe(1600);
+	await page.setViewportSize({ width: 1280, height: 800 });
+	await expect.poll(portraitWidth).toBeCloseTo(1280 * 1.12, 1);
+});
+
 test('early hover does not interrupt intro and a slow ripple keeps updating without input', async ({ page }) => {
 	await page.goto('/?heroSettings');
 	const content = page.locator('[data-hero-content]');

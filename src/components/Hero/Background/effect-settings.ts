@@ -21,6 +21,7 @@ export const defaultSettings = {
 	positionX: 3,
 	positionY: 3,
 	zoom: 1.12,
+	maxWidth: 1440,
 	chroma: 0.65,
 	glow: 0.65,
 	chromaOn: true,

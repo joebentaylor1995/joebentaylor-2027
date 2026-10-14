@@ -332,7 +332,16 @@ export function mountDepthEffect({
 			const introConfig = introSettings.get(host) ?? introDefaults;
 			const settleProgress = Math.min(1, reveal / (introConfig.portraitFinish / 100));
 			const scaleEase = gsap.parseEase(introConfig.portraitEase)(settleProgress);
-			gl.uniform1f(u.zoom, introConfig.portraitScale + (s.zoom - introConfig.portraitScale) * scaleEase);
+			// Freeze width-driven cover sizing at the configured CSS viewport width.
+			// Height-driven cover sizing stays intact on tall screens.
+			const portraitAspect = 1.4455;
+			const coverWidth = Math.max(cssWidth, cssHeight * portraitAspect);
+			const cappedWidth = Math.max(Math.min(cssWidth, s.maxWidth), cssHeight * portraitAspect);
+			const widthScale = cappedWidth / coverWidth;
+			gl.uniform1f(
+				u.zoom,
+				(introConfig.portraitScale + (s.zoom - introConfig.portraitScale) * scaleEase) * widthScale
+			);
 			gl.uniform1f(u.entrance, entrance);
 			gl.uniform2f(u.cursorPos, cursor[0], cursor[1]);
 			gl.uniform1f(u.cursorOn, cursorActive);
