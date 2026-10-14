@@ -1,5 +1,25 @@
 import { expect, test } from '@playwright/test';
 
+test('settled animation does not query shader attributes on every frame', async ({ page }) => {
+	await page.addInitScript(() => {
+		const original = WebGLRenderingContext.prototype.getAttribLocation;
+		WebGLRenderingContext.prototype.getAttribLocation = function (...args) {
+			document.documentElement.dataset.attributeQueries = String(
+				Number(document.documentElement.dataset.attributeQueries || 0) + 1
+			);
+			return original.apply(this, args);
+		};
+	});
+	await page.goto('/');
+	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
+	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete');
+	await page.waitForTimeout(300);
+	const count = await page.locator('html').getAttribute('data-attribute-queries');
+	expect(Number(count)).toBeGreaterThan(0);
+	await page.waitForTimeout(500);
+	expect(await page.locator('html').getAttribute('data-attribute-queries')).toBe(count);
+});
+
 test('portrait width stops growing past the configurable viewport cap', async ({ page }) => {
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await page.goto('/?heroSettings');

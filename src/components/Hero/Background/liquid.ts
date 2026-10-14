@@ -32,13 +32,15 @@ export interface LiquidLayer {
 
 // Renderer
 // ------------
-export function createLiquidLayer(
+export async function createLiquidLayer(
 	gl: WebGLRenderingContext,
 	canvas: HTMLCanvasElement,
 	host: HTMLElement,
-	settings: LiquidSettings
-): LiquidLayer {
+	settings: LiquidSettings,
+	isCancelled = () => false
+): Promise<LiquidLayer> {
 	const bindProgram = gl.useProgram.bind(gl);
+	const parallel = gl.getExtension('KHR_parallel_shader_compile');
 	if (!gl.getExtension('OES_texture_float') || !gl.getExtension('OES_texture_float_linear')) {
 		throw new Error('Liquid glass requires filtered float textures');
 	}
@@ -85,9 +87,8 @@ export function createLiquidLayer(
 		gl.deleteBuffer(buffer);
 		targets.clear();
 		textures.clear();
-		delete host.dataset.liquidReady;
 	}
-	function makeProgram(body: string): Program {
+	async function makeProgram(body: string): Promise<Program> {
 		const program = gl.createProgram();
 		if (!program) throw new Error('Unable to allocate liquid program');
 		programs.push(program);
@@ -99,15 +100,15 @@ export function createLiquidLayer(
 			if (!shader) throw new Error('Unable to allocate liquid shader');
 			gl.shaderSource(shader, source);
 			gl.compileShader(shader);
-			if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-				const error = gl.getShaderInfoLog(shader);
-				gl.deleteShader(shader);
-				throw new Error(error || 'Liquid shader failed');
-			}
 			gl.attachShader(program, shader);
 			gl.deleteShader(shader);
 		}
 		gl.linkProgram(program);
+		// Give the GPU time to compile without synchronously blocking the page.
+		do {
+			await new Promise(resolve => setTimeout(resolve, 16));
+			if (isCancelled() || gl.isContextLost()) throw new Error('Liquid initialization cancelled');
+		} while (parallel && !gl.getProgramParameter(program, parallel.COMPLETION_STATUS_KHR));
 		if (!gl.getProgramParameter(program, gl.LINK_STATUS))
 			throw new Error(gl.getProgramInfoLog(program) || 'Liquid link failed');
 		const uniforms: Program['uniforms'] = {};
@@ -180,17 +181,38 @@ export function createLiquidLayer(
 	try {
 		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
-		const passes = {
-			advect: makeProgram(shaders.advect),
-			splat: makeProgram(shaders.splat),
-			curl: makeProgram(shaders.curl),
-			vorticity: makeProgram(shaders.vorticity),
-			divergence: makeProgram(shaders.divergence),
-			pressure: makeProgram(shaders.pressure),
-			gradient: makeProgram(shaders.gradient),
-			composite: makeProgram(shaders.composite),
-			display: makeProgram(shaders.display),
-		};
+		const names = [
+			'advect',
+			'splat',
+			'curl',
+			'vorticity',
+			'divergence',
+			'pressure',
+			'gradient',
+			'composite',
+			'display',
+		] as const;
+		const results = await Promise.allSettled(
+			[
+				shaders.advect,
+				shaders.splat,
+				shaders.curl,
+				shaders.vorticity,
+				shaders.divergence,
+				shaders.pressure,
+				shaders.gradient,
+				shaders.composite,
+				shaders.display,
+			].map(makeProgram)
+		);
+		const compiled = results.map(result => {
+			if (result.status === 'rejected') throw result.reason;
+			return result.value;
+		});
+		const passes = Object.fromEntries(names.map((name, index) => [name, compiled[index]])) as Record<
+			(typeof names)[number],
+			Program
+		>;
 		const logos = { texture: texture() };
 		const decoration = { texture: texture() };
 		let labelGesture = 0;

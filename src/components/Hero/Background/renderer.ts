@@ -130,7 +130,7 @@ export function mountDepthEffect({
 	function bindPortrait() {
 		bindProgram(main.program);
 		gl.bindBuffer(gl.ARRAY_BUFFER, quad);
-		const position = gl.getAttribLocation(main.program, 'position');
+		const position = main.position;
 		gl.enableVertexAttribArray(position);
 		gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
 		gl.activeTexture(gl.TEXTURE0);
@@ -164,7 +164,18 @@ export function mountDepthEffect({
 			await document.fonts.ready;
 			if (disposed || lost || current !== generation) return;
 			stopLiquid();
-			liquid = createLiquidLayer(gl, canvas, host, liquidSettings);
+			const layer = await createLiquidLayer(
+				gl,
+				canvas,
+				host,
+				liquidSettings,
+				() => disposed || lost || current !== generation
+			);
+			if (disposed || lost || current !== generation) {
+				layer.destroy();
+				return;
+			}
+			liquid = layer;
 			dirty = true;
 		} catch {
 			// The enhancement is optional: retain the portrait and HTML marquee on failure.
@@ -208,7 +219,7 @@ export function mountDepthEffect({
 			throw new Error(gl.getProgramInfoLog(program) || 'Depth program link failed');
 		const uniforms: Uniforms = {};
 		for (const name of names) uniforms[name] = gl.getUniformLocation(program, name);
-		return { program, uniforms };
+		return { program, uniforms, position: gl.getAttribLocation(program, 'position') };
 	}
 	function makeBuffer(data: Float32Array) {
 		const buffer = gl.createBuffer();
@@ -290,7 +301,6 @@ export function mountDepthEffect({
 			previousCursor = [...cursor];
 			scroll.step(dt);
 			const settled =
-				!entering &&
 				(sceneIntros.get(host)?.waterReveal ?? 1) === 1 &&
 				(sceneIntros.get(host)?.portrait ?? 1) === 1 &&
 				!s.auto &&
@@ -535,7 +545,7 @@ export function mountDepthEffect({
 			});
 			// Initialise the portrait attributes before the optional liquid passes.
 			bindProgram(main.program);
-			const position = gl.getAttribLocation(main.program, 'position');
+			const position = main.position;
 			gl.enableVertexAttribArray(position);
 			gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
 			gl.uniform1i(main.uniforms.photo, 0);

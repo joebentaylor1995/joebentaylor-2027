@@ -87,6 +87,7 @@
 		filter: invert(1);
 		opacity: 0.4;
 		width: auto;
+		height: 2.5rem;
 		height: clamp(1.8rem, calc(4.6rem / sqrt(var(--logo-ratio))), 3.6rem);
 		object-fit: contain;
 	}
