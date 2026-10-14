@@ -1,5 +1,19 @@
 import { expect, test } from '@playwright/test';
 
+test('pulse consumes the opaque logo with its expanding wavefront', async ({ page }) => {
+	await page.goto('/?loaderConcepts');
+	await page.getByRole('combobox').nth(1).selectOption('0.5');
+	await page.getByRole('button', { name: 'Replay concept', exact: true }).click();
+	await page.waitForFunction(() => Number(document.querySelector('[data-logo-wash]')?.getAttribute('r')) > 12);
+	const state = await page.locator('[data-loader-mark]').evaluate(mark => ({
+		opacity: getComputedStyle(mark).opacity,
+		radius: Number(mark.querySelector('[data-logo-wash]')?.getAttribute('r')),
+	}));
+	expect(state.opacity).toBe('1');
+	expect(state.radius).toBeGreaterThan(12);
+	await expect(page.locator('[data-loader-overlay]')).toBeHidden({ timeout: 10_000 });
+});
+
 test('loader gallery is opt-in and belongs to the shared layout', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByRole('heading', { level: 1 })).toBeVisible();

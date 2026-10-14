@@ -37,6 +37,7 @@ const Gallery = () => {
 			const line = root.querySelector('[data-loader-line]');
 			const rings = root.querySelectorAll('[data-loader-ring]');
 			const displacement = root.querySelector('feDisplacementMap');
+			const logoWash = root.querySelector('[data-logo-wash]');
 			const w = window.innerWidth,
 				h = window.innerHeight;
 			const radius = Math.hypot(w, h);
@@ -53,6 +54,7 @@ const Gallery = () => {
 			gsap.set(line, { scaleX: 0, opacity: 0 });
 			gsap.set(rings, { scale: 0, opacity: 0 });
 			gsap.set(displacement, { attr: { scale: 0 } });
+			gsap.set(logoWash, { attr: { r: 0 } });
 			const release = () => window.dispatchEvent(new Event(LOADER_REVEAL));
 			const tl = gsap.timeline({ onComplete: () => setStatus('Ready to replay') });
 			timeline.current = tl;
@@ -69,14 +71,36 @@ const Gallery = () => {
 				tl.to(rings[0], { opacity: 0, duration: 0.4 }, at + 0.9);
 			};
 			switch (selected) {
-				case 0:
-					tl.to(mark, { scale: 1.08, duration: 0.2, ease: 'sine.inOut' }, 0.35).to(
-						mark,
-						{ scale: 0.94, opacity: 0, duration: 0.35 },
-						0.6
+				case 0: {
+					// One wavefront reveals the scene and consumes the mark from its centre.
+					// Keep the logo opaque: its disappearance comes from the travelling mask.
+					const wave = { radius: 0 };
+					const setScale = gsap.quickSetter(mark, 'scale');
+					const setRingScale = gsap.quickSetter(rings[0], 'scale');
+					tl.set(rings[0], { opacity: 0.45 }, 0.65);
+					tl.to(
+						wave,
+						{
+							radius,
+							duration: 1.35,
+							ease: 'power2.inOut',
+							onUpdate: () => {
+								const pressure = Math.exp(
+									-(((wave.radius - logoWidth * 0.3) / (logoWidth * 0.25)) ** 2)
+								);
+								const scale = 1 + pressure * 0.22;
+								setScale(scale);
+								setRingScale(wave.radius / 100);
+								circle?.setAttribute('r', String(wave.radius));
+								logoWash?.setAttribute('r', String(wave.radius / ((logoWidth / 68) * scale)));
+								displacement?.setAttribute('scale', String(pressure * 14));
+							},
+						},
+						0.65
 					);
-					openWater();
+					tl.to(rings[0], { opacity: 0, duration: 0.45 }, 1.55);
 					break;
+				}
 				case 1:
 					tl.to(displacement, { attr: { scale: 28 }, duration: 0.35 }, 0.3)
 						.to(displacement, { attr: { scale: 0 }, duration: 0.5 }, 0.65)
@@ -211,8 +235,33 @@ const Gallery = () => {
 				<div className={s.centre}>
 					<div data-loader-mark className={s.mark}>
 						<svg className={s.filteredLogo} viewBox='0 0 68 26' aria-hidden='true'>
-							<g filter={`url(#${id}-glass)`}>
-								<Logo className={s.logo} />
+							<defs>
+								<filter id={`${id}-wash-edge`} x='-50%' y='-50%' width='200%' height='200%'>
+									<feGaussianBlur stdDeviation='1.2' />
+								</filter>
+								<mask
+									id={`${id}-wash`}
+									maskUnits='userSpaceOnUse'
+									x='-68'
+									y='-68'
+									width='204'
+									height='162'
+								>
+									<rect x='-68' y='-68' width='204' height='162' fill='white' />
+									<circle
+										data-logo-wash
+										cx='34'
+										cy='13'
+										r='0'
+										fill='black'
+										filter={`url(#${id}-wash-edge)`}
+									/>
+								</mask>
+							</defs>
+							<g mask={`url(#${id}-wash)`}>
+								<g filter={`url(#${id}-glass)`}>
+									<Logo className={s.logo} />
+								</g>
 							</g>
 						</svg>
 					</div>
