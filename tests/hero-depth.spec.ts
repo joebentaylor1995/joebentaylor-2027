@@ -90,6 +90,35 @@ test('early hover does not interrupt intro and a slow ripple keeps updating with
 	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
 });
 
+test('depth responds after the ripple while the text entrance is still running', async ({ page }) => {
+	await page.goto('/?heroSettings');
+	const content = page.locator('[data-hero-content]');
+	await expect(content).toHaveAttribute('data-entrance', 'complete');
+	await page.getByRole('button', { name: 'Replay introduction', exact: true }).click();
+	await expect(page.locator('[data-scene-cover]')).toHaveAttribute('data-complete', 'true');
+	await expect(content).toHaveAttribute('data-entrance', 'running');
+	await page.mouse.move(100, 300);
+	await expect
+		.poll(
+			() =>
+				page
+					.getByTestId('hero-depth')
+					.locator('canvas')
+					.evaluate(element => {
+						const gl = (element as HTMLCanvasElement).getContext('webgl');
+						if (!gl) throw new Error('Missing WebGL');
+						const program = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram;
+						const location = gl.getUniformLocation(program, 'motion');
+						if (!location) throw new Error('Missing motion uniform');
+						const motion = gl.getUniform(program, location) as Float32Array;
+						return Math.abs(motion[0]);
+					}),
+			{ timeout: 750 }
+		)
+		.toBeGreaterThan(0.01);
+	await expect(content).toHaveAttribute('data-entrance', 'running');
+});
+
 test('intro controls export and replay repeatedly with changed timing', async ({ page }) => {
 	await page.goto('/?heroSettings');
 	const content = page.locator('[data-hero-content]');

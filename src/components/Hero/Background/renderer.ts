@@ -278,7 +278,7 @@ export function mountDepthEffect({
 				lastSettings = s;
 				dirty = true;
 			}
-			const entering = host.querySelector('[data-hero-content]')?.getAttribute('data-entrance') === 'running';
+			const entering = (sceneIntros.get(host)?.waterReveal ?? 1) < 1;
 			if (entering) {
 				target = [0, 0];
 				pointer = [0, 0];
@@ -385,9 +385,8 @@ export function mountDepthEffect({
 		);
 	}
 	function track(event: PointerEvent) {
-		// Do not collect pointer impulses against moving intro geometry. The first
-		// post-intro event starts a fresh fluid stroke rather than joining a stale point.
-		if (host.querySelector('[data-hero-content]')?.getAttribute('data-entrance') === 'running') {
+		// Depth is available as soon as the ripple lands, independently of text timing.
+		if ((sceneIntros.get(host)?.waterReveal ?? 1) < 1) {
 			liquid?.resetPointer();
 			return;
 		}
@@ -397,7 +396,9 @@ export function mountDepthEffect({
 		if (!wasActive) previousCursor = [...cursor];
 		cursorActive = 1;
 		target = cursor.map(v => Math.max(-1, Math.min(1, v * 2 - 1)));
-		if (event.pointerType !== 'touch' && !ignored(event)) liquid?.move(cursor[0], cursor[1]);
+		// Keep fluid strokes off the moving text until its entrance has completed.
+		const textEntering = host.querySelector('[data-hero-content]')?.getAttribute('data-entrance') === 'running';
+		if (!textEntering && event.pointerType !== 'touch' && !ignored(event)) liquid?.move(cursor[0], cursor[1]);
 		else liquid?.resetPointer();
 		dirty = true;
 	}
