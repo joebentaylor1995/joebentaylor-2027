@@ -1,7 +1,7 @@
 export const concepts = [
 	{
 		name: 'Logo becomes the ripple',
-		description: 'The pulse bends and washes the logo away from the centre as it opens the scene.',
+		description: 'The logo stays still, then the pulse washes it away from the centre as it opens the scene.',
 		ripple: true,
 	},
 	{

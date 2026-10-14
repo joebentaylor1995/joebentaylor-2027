@@ -41,7 +41,7 @@ const Gallery = () => {
 			const w = window.innerWidth,
 				h = window.innerHeight;
 			const radius = Math.hypot(w, h);
-			const logoWidth = Math.min(204, w * 0.38);
+			const logoWidth = Math.min(136, w * 0.25);
 			setStatus(reduced ? 'Reduced motion — simple fade' : 'Playing');
 			window.dispatchEvent(new CustomEvent(LOADER_PREPARE, { detail: { ripple: concept.ripple, speed } }));
 			gsap.set(overlay, { autoAlpha: 1 });
@@ -75,7 +75,6 @@ const Gallery = () => {
 					// One wavefront reveals the scene and consumes the mark from its centre.
 					// Keep the logo opaque: its disappearance comes from the travelling mask.
 					const wave = { radius: 0 };
-					const setScale = gsap.quickSetter(mark, 'scale');
 					const setRingScale = gsap.quickSetter(rings[0], 'scale');
 					tl.set(rings[0], { opacity: 0.45 }, 0.65);
 					tl.to(
@@ -85,15 +84,9 @@ const Gallery = () => {
 							duration: 1.35,
 							ease: 'power2.inOut',
 							onUpdate: () => {
-								const pressure = Math.exp(
-									-(((wave.radius - logoWidth * 0.3) / (logoWidth * 0.25)) ** 2)
-								);
-								const scale = 1 + pressure * 0.22;
-								setScale(scale);
 								setRingScale(wave.radius / 100);
 								circle?.setAttribute('r', String(wave.radius));
-								logoWash?.setAttribute('r', String(wave.radius / ((logoWidth / 68) * scale)));
-								displacement?.setAttribute('scale', String(pressure * 14));
+								logoWash?.setAttribute('r', String(wave.radius / (logoWidth / 68)));
 							},
 						},
 						0.65

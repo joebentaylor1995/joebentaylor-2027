@@ -7,9 +7,15 @@ test('pulse consumes the opaque logo with its expanding wavefront', async ({ pag
 	await page.waitForFunction(() => Number(document.querySelector('[data-logo-wash]')?.getAttribute('r')) > 12);
 	const state = await page.locator('[data-loader-mark]').evaluate(mark => ({
 		opacity: getComputedStyle(mark).opacity,
+		width: mark.getBoundingClientRect().width,
+		scale: new DOMMatrix(getComputedStyle(mark).transform).a,
+		displacement: Number(document.querySelector('feDisplacementMap')?.getAttribute('scale')),
 		radius: Number(mark.querySelector('[data-logo-wash]')?.getAttribute('r')),
 	}));
 	expect(state.opacity).toBe('1');
+	expect(state.width).toBeLessThanOrEqual(136);
+	expect(state.scale).toBe(1);
+	expect(state.displacement).toBe(0);
 	expect(state.radius).toBeGreaterThan(12);
 	await expect(page.locator('[data-loader-overlay]')).toBeHidden({ timeout: 10_000 });
 });
