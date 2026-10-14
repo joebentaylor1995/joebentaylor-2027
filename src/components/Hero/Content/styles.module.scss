@@ -1,0 +1,55 @@
+// Styles: Hero/Content
+// ---------------
+.content {
+    [data-liquid-ready="true"] & {
+        opacity: 0;
+    }
+    position: relative;
+    z-index: 1;
+
+    display: flex;
+    align-items: flex-end;
+
+    padding-bottom: var(--gap-xl);
+    width: 100%;
+    height: 50svh;
+
+    hgroup {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap-sm);
+        max-width: 50rem;
+    }
+
+    h1 {
+        color: var(--brand-c4);
+    }
+
+    p {
+        color: alpha(var(--brand-c4), 60);
+        text-wrap: balance;
+    }
+}
+
+.heading {
+    position: relative;
+    width: fit-content;
+}
+
+.wipe {
+    position: absolute;
+    inset: 0;
+    background: var(--brand-c4);
+    transform: scaleX(0);
+    pointer-events: none;
+}
+
+.wordMask {
+    display: inline-block;
+    overflow: clip;
+    vertical-align: top;
+}
+
+.word {
+    display: inline-block;
+}

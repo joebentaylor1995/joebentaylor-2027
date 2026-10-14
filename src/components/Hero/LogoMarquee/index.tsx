@@ -24,8 +24,12 @@ const LogoMarquee = ({ logos }: I.LogoMarqueeProps) => {
 		));
 
 	return (
-		<section className={s.marquee}>
-			<ul className={s.track}>{items(false)}</ul>
+		<section className={s.marquee} data-logo-marquee>
+			<h2 data-type='captionL'>Trusted by</h2>
+
+			<ul className={s.track} data-logo-track>
+				{items(false)}
+			</ul>
 			<ul className={s.track} aria-hidden='true'>
 				{items(true)}
 			</ul>

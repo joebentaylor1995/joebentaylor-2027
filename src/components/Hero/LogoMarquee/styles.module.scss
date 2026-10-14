@@ -25,13 +25,34 @@
 
 	display: flex;
 	gap: var(--gap);
-	overflow: hidden;
 	padding-block: var(--gap-l);
 	user-select: none;
+
+	border-top: 1px solid alpha(var(--brand-c4), 5);
+
+	// Keep semantic logo names available while the GPU owns their visible pixels.
+	:global([data-liquid-ready='true']) & {
+		opacity: 0;
+
+		.track { animation-play-state: paused; }
+	}
 
 	// &:hover .track {
 	// 	animation-play-state: paused;
 	// }
+
+	h2 {
+		--offset: var(--gap-s);
+
+		position: absolute;
+		top: 0;
+		left: var(--gap-xl);
+		translate: calc(-1 * var(--offset)) -50%;
+
+		color: alpha(var(--brand-c4), 40);
+		background: var(--brand-c5);
+		padding: var(--offset);
+	}
 }
 
 .track {
@@ -48,6 +69,10 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		animation: none;
+	}
+
+	@include bp(l) {
+		animation-play-state: paused;
 	}
 }
 

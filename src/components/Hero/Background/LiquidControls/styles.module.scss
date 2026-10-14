@@ -1,0 +1,40 @@
+.jacket {
+  margin-top: var(--gap-s);
+
+  h2 {
+    font-size: 15px;
+    font-weight: 600;
+  }
+}
+
+.control {
+  display: grid;
+  grid-template-columns: 1fr 72px;
+  align-items: center;
+  gap: 8px;
+  margin-block: 16px;
+
+  input[type="range"] {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  input[type="number"] {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 5px;
+    border: 1px solid alpha(var(--brand-c4), 15);
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+  }
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-block: 7px;
+}

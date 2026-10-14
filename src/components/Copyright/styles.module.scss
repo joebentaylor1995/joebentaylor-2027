@@ -36,9 +36,36 @@
         color: alpha(var(--global-white), 60);
     }
 
-    span {
+    .line {
         flex: 1;
         height: 1px;
         background: alpha(var(--global-white), 20);
+    }
+
+    .digitClip {
+        display: inline-block;
+        overflow: clip;
+        vertical-align: top;
+    }
+
+    .digit {
+        display: inline-block;
+    }
+
+    @each $side in left, right {
+        @for $digit from 0 through 3 {
+            [data-copyright-year='#{$side}'] .digitClip:nth-child(#{$digit + 2}) .digit {
+                transform: translateY(var(--#{$side}-#{$digit}, 0%));
+            }
+        }
+    }
+
+    .yearText {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
     }
 }

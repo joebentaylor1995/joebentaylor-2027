@@ -3,6 +3,7 @@
 
 import Copyright from '@parts/Copyright';
 import Background from './Background';
+import Content from './Content';
 
 // Styles + Interfaces
 // ------------
@@ -15,12 +16,11 @@ import s from './styles.module.scss';
 const Hero = ({ heading, desc, logos }: I.HeroProps) => {
 	return (
 		<section className={s.jacket}>
-			<div className={s.content}>
-				<h1>{heading}</h1>
-				<p>{desc}</p>
-			</div>
+			<div className={s.introCover} data-scene-cover aria-hidden='true' />
 
 			<Background />
+
+			<Content heading={heading} description={desc} />
 
 			<LogoMarquee logos={logos} />
 

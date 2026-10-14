@@ -5,7 +5,14 @@ varying vec2 v;uniform sampler2D photo;uniform sampler2D depthMask;uniform vec2 
 uniform vec2 cursorPos;uniform float cursorOn;uniform float cursorSpeed;
 uniform float chromaFX;uniform float glowFX;
 uniform float scrollFX[4];uniform float scrollVelocity;
-vec4 portrait(vec2 uv){float ok=step(0.,uv.x)*step(uv.x,1.)*step(0.,uv.y)*step(uv.y,1.);return texture2D(photo,clamp(uv,vec2(.001),vec2(.999)))*ok;}
+uniform sampler2D colourPhoto;uniform float colourMix,entrance;
+vec4 portrait(vec2 uv){float ok=step(0.,uv.x)*step(uv.x,1.)*step(0.,uv.y)*step(uv.y,1.);
+vec2 p=clamp(uv,vec2(.001),vec2(.999));vec4 original=texture2D(photo,p);
+// Use generated chroma only: original luminance and alpha retain detail and registration.
+vec3 colour=texture2D(colourPhoto,p).rgb;
+float light=dot(colour,vec3(.299,.587,.114));
+vec3 tint=colour-vec3(light);
+original.rgb=clamp(original.rgb+tint*colourMix,0.,1.);return original*ok;}
 vec4 premultSample(vec2 uv){vec4 t=portrait(uv);return vec4(t.rgb*t.a,t.a);}
 float tipLight(vec2 uv,vec2 cursorUV,vec2 tip){return exp(-dot((uv-tip)*vec2(1.4455,1.),(uv-tip)*vec2(1.4455,1.))*2100.)*(1.-smoothstep(.025,.10,length((cursorUV-tip)*vec2(1.4455,1.))));}
 
@@ -63,7 +70,7 @@ float alpha=texel.a*valid;vec3 result=col;
 vec2 channelShift=vec2(.004,0.)*chromaFX*cursorSpeed*smoothstep(.60,.90,rawDepth);
 channelShift.y+=scrollSigned*scrollFX[0]*.014;
 
-vec4 blueSample=texture2D(photo,clamp(uv-channelShift,vec2(.001),vec2(.999)));
+vec4 blueSample=portrait(uv-channelShift);
 // Add only the displaced blue highlight. Never subtract blue: that creates a yellow fringe.
 if(dot(channelShift,channelShift)>.000000001){result.b=max(col.b,mix(col.b,blueSample.b,blueSample.a));}
 
@@ -84,5 +91,5 @@ float halo=clamp(glow*.20,0.,.65)*(1.-alpha);
 premul+=vec3(.20,.55,1.)*halo;alpha+=halo;
 result=alpha>.0001?premul/alpha:vec3(0.);
 if(debug>.5){float z=adjustedDepth(debugP);float mapBounds=1.-smoothstep(-aa,aa,box(debugP,vec2(0.),vec2(1.)));result=vec3(z);alpha=mapBounds;}
-gl_FragColor=vec4(result*alpha,alpha);
+gl_FragColor=vec4(result*alpha,alpha)*entrance;
 }`;

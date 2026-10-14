@@ -2,6 +2,10 @@
 // ------------
 import { gsap } from 'gsap';
 import { type DepthSettings, depthUrl, scrollKeys } from './effect-settings';
+import type { LiquidLayer } from './liquid';
+import type { LiquidSettings } from './liquid-settings';
+import { introDefaults, introSettings, sceneIntros } from './scene-intro';
+import { ScrollMotion } from './scroll-motion';
 import { fragment, vertex } from './shaders';
 
 type Uniforms = Record<string, WebGLUniformLocation | null>;
@@ -9,6 +13,8 @@ interface RendererOptions {
 	canvas: HTMLCanvasElement;
 	photo: HTMLImageElement;
 	host: HTMLElement;
+	liquidEnabled: boolean;
+	liquidSettings: LiquidSettings;
 	getSettings: () => DepthSettings;
 	onReady: (ready: boolean) => void;
 }
@@ -65,7 +71,15 @@ function bakeDepth(source: HTMLImageElement) {
 
 // Renderer lifecycle
 // ------------
-export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: RendererOptions): DepthController {
+export function mountDepthEffect({
+	canvas,
+	photo,
+	host,
+	liquidEnabled,
+	liquidSettings,
+	getSettings,
+	onReady,
+}: RendererOptions): DepthController {
 	const context = canvas.getContext('webgl', {
 		alpha: true,
 		premultipliedAlpha: true,
@@ -92,27 +106,81 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 		cursor = [0.5, 0.5],
 		previousCursor = [0.5, 0.5];
 	let cursorActive = 0,
-		cursorSpeed = 0,
-		impulse = 0,
-		rate = 0,
-		speed = 0,
-		idle = Infinity,
-		held = 0;
+		cursorSpeed = 0;
+	const scroll = new ScrollMotion(getSettings);
+	let colourImage: HTMLImageElement | null = null;
 	let bakedDepth: ReturnType<typeof bakeDepth>;
 	let main: ReturnType<typeof makeProgram>;
 	const scrollValues = new Float32Array(scrollKeys.length);
+	let liquid: LiquidLayer | null = null;
+	let quad: WebGLBuffer;
+	let photoTexture: WebGLTexture, depthTexture: WebGLTexture;
+	let colourTexture: WebGLTexture;
+	let generation = 0;
+	let liquidResize = false;
+
+	function stopLiquid() {
+		liquid?.destroy();
+		liquid = null;
+		delete host.dataset.liquidReady;
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		gl.viewport(0, 0, canvas.width, canvas.height);
+		dirty = true;
+	}
+	function bindPortrait() {
+		bindProgram(main.program);
+		gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+		const position = gl.getAttribLocation(main.program, 'position');
+		gl.enableVertexAttribArray(position);
+		gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+		gl.activeTexture(gl.TEXTURE0);
+		gl.bindTexture(gl.TEXTURE_2D, photoTexture);
+		gl.activeTexture(gl.TEXTURE1);
+		gl.bindTexture(gl.TEXTURE_2D, depthTexture);
+		gl.activeTexture(gl.TEXTURE2);
+		gl.bindTexture(gl.TEXTURE_2D, colourTexture);
+	}
+	async function startLiquid() {
+		if (!liquidEnabled) return;
+		const current = ++generation;
+		try {
+			const images = Array.from(host.querySelectorAll<HTMLImageElement>('[data-logo-track] img'));
+			// The desktop strip needs offscreen logos too; mobile retains native lazy loading.
+			for (const image of images) image.loading = 'eager';
+			await Promise.all(
+				images.map(image =>
+					image.complete && image.naturalWidth
+						? image.decode()
+						: new Promise<void>((resolve, reject) => {
+								image.addEventListener('load', () => resolve(), { once: true, signal: events.signal });
+								image.addEventListener('error', () => reject(new Error('Logo image failed')), {
+									once: true,
+									signal: events.signal,
+								});
+							})
+				)
+			);
+			const { createLiquidLayer } = await import('./liquid');
+			await document.fonts.ready;
+			if (disposed || lost || current !== generation) return;
+			stopLiquid();
+			liquid = createLiquidLayer(gl, canvas, host, liquidSettings);
+			dirty = true;
+		} catch {
+			// The enhancement is optional: retain the portrait and HTML marquee on failure.
+			if (!disposed && !lost && current === generation) stopLiquid();
+		}
+	}
 
 	function resetMotion() {
-		impulse = rate = speed = held = 0;
-		idle = Infinity;
+		liquid?.resetPointer();
+		scroll.reset();
 		target = [0, 0];
 		dirty = true;
 	}
 	function kick(delta: number) {
-		if (!Number.isFinite(delta) || delta <= 0 || !visible || document.hidden) return;
-		if (idle > 0.4) held = 0;
-		idle = 0;
-		impulse += delta;
+		if (!visible || document.hidden) return;
+		scroll.add(delta);
 		dirty = true;
 	}
 	function makeProgram(v: string, f: string, names: string[]) {
@@ -161,6 +229,7 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 		upload();
+		return t;
 	}
 	function commonUniforms(u: Uniforms, s: DepthSettings) {
 		gl.uniform2f(u.resolution, canvas.width, canvas.height);
@@ -182,6 +251,16 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 				canvas.width = w;
 				canvas.height = h;
 				gl.viewport(0, 0, w, h);
+				liquidResize = true;
+				dirty = true;
+			}
+			if (liquid && liquidResize) {
+				try {
+					liquid.resize();
+				} catch {
+					stopLiquid();
+				}
+				liquidResize = false;
 				dirty = true;
 			}
 			if (s !== lastSettings) {
@@ -196,25 +275,26 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 				cursorSpeed * Math.exp(-dt * 7)
 			);
 			previousCursor = [...cursor];
-			const input = Math.max(0, impulse);
-			impulse = 0;
-			rate += (input / dt - rate) * (1 - Math.exp(-dt / 0.1));
-			const measured = rate / (3200 + Math.abs(rate));
-			idle = input > 0 ? 0 : idle + dt;
-			if (idle <= 0.4) held = Math.max(held, measured);
-			else held = 0;
-			const goal = idle <= 0.4 ? held : measured;
-			speed = Math.max(0, speed + (goal - speed) * (1 - Math.exp(-dt / (goal > speed ? 0.1 : 0.24))));
-			if (rate < 0.01 && speed < 0.00001) rate = speed = 0;
+			scroll.step(dt);
 			const settled =
+				(sceneIntros.get(host)?.portrait ?? 1) === 1 &&
 				!s.auto &&
-				rate === 0 &&
-				speed === 0 &&
+				scroll.settled &&
 				cursorSpeed < CURSOR_SPEED_EPSILON &&
 				Math.abs(pointer[0] - dest[0]) < SETTLE_EPSILON &&
 				Math.abs(pointer[1] - dest[1]) < SETTLE_EPSILON;
 			// Idle frames are identical, so skip them; one last draw lands the snapped rest pose
-			if (settled && !dirty) return;
+			if (settled && !dirty) {
+				if (liquid) {
+					try {
+						liquid.draw(dt, scroll.velocity, scroll.gesture);
+					} catch {
+						stopLiquid();
+					}
+					bindPortrait();
+				}
+				return;
+			}
 			dirty = !settled;
 			if (settled) {
 				pointer = [...dest];
@@ -224,7 +304,21 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 				scrollValues[i] = !s.depth && s[`${key}On`] ? s[key] : 0;
 			});
 			const u = main.uniforms;
+			bindPortrait();
+			if (liquid) liquid.beginPortrait();
+			else {
+				gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+				gl.viewport(0, 0, canvas.width, canvas.height);
+			}
 			commonUniforms(u, s);
+			const entrance = sceneIntros.get(host)?.portrait ?? 1;
+			const reveal = sceneIntros.get(host)?.waterReveal ?? 1;
+			// Let the portrait land softly while the ripple continues out to the edges.
+			const introConfig = introSettings.get(host) ?? introDefaults;
+			const settleProgress = Math.min(1, reveal / (introConfig.portraitFinish / 100));
+			const scaleEase = gsap.parseEase(introConfig.portraitEase)(settleProgress);
+			gl.uniform1f(u.zoom, introConfig.portraitScale + (s.zoom - introConfig.portraitScale) * scaleEase);
+			gl.uniform1f(u.entrance, entrance);
 			gl.uniform2f(u.cursorPos, cursor[0], cursor[1]);
 			gl.uniform1f(u.cursorOn, cursorActive);
 			gl.uniform1f(u.cursorSpeed, cursorSpeed);
@@ -232,9 +326,19 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 			gl.uniform1f(u.glowFX, s.glowOn ? s.glow : 0);
 			gl.uniform1f(u.debug, s.depth ? 1 : 0);
 			gl.uniform1fv(u['scrollFX[0]'], scrollValues);
-			gl.uniform1f(u.scrollVelocity, speed);
+			gl.uniform1f(u.scrollVelocity, scroll.pulse);
+			gl.uniform1f(u.colourMix, colourImage ? scroll.colour : 0);
 			gl.drawArrays(gl.TRIANGLES, 0, 6);
+			if (liquid) {
+				try {
+					liquid.draw(dt, scroll.velocity, scroll.gesture);
+				} catch {
+					stopLiquid();
+				}
+				bindPortrait();
+			}
 		} catch (error) {
+			stopLiquid();
 			loaded = false;
 			onReady(false);
 			console.error('Hero depth effect:', error);
@@ -243,7 +347,7 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 	function ignored(event: Event) {
 		return (
 			event.target instanceof Element &&
-			!!event.target.closest('a, button, input, textarea, select, [data-hero-settings]')
+			!!event.target.closest('a, button, input, textarea, select, [data-hero-settings], [data-liquid-controls]')
 		);
 	}
 	function track(event: PointerEvent) {
@@ -251,6 +355,8 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 		cursor = [(event.clientX - r.left) / r.width, (event.clientY - r.top) / r.height];
 		cursorActive = 1;
 		target = cursor.map(v => Math.max(-1, Math.min(1, v * 2 - 1)));
+		if (event.pointerType !== 'touch' && !ignored(event)) liquid?.move(cursor[0], cursor[1]);
+		else liquid?.resetPointer();
 		dirty = true;
 	}
 	host.addEventListener('pointermove', track, { signal: events.signal });
@@ -259,6 +365,7 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 		() => {
 			target = [0, 0];
 			cursorActive = 0;
+			liquid?.resetPointer();
 			dirty = true;
 		},
 		{ signal: events.signal }
@@ -323,11 +430,29 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 		cssHeight = entry.contentRect.height;
 	});
 	resizer.observe(canvas);
+	const decorationResizer = new ResizeObserver(() => {
+		liquidResize = true;
+	});
+	if (liquidEnabled) {
+		for (const element of host.querySelectorAll(
+			'[data-logo-marquee], [data-logo-marquee] h2, [data-logo-track], [data-hero-content], [data-hero-content] *'
+		))
+			decorationResizer.observe(element);
+		document.fonts.addEventListener(
+			'loadingdone',
+			() => {
+				liquidResize = true;
+			},
+			{ signal: events.signal }
+		);
+	}
 	canvas.addEventListener(
 		'webglcontextlost',
 		event => {
 			event.preventDefault();
 			lost = true;
+			generation++;
+			stopLiquid();
 			onReady(false);
 		},
 		{ signal: events.signal }
@@ -346,6 +471,9 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 		try {
 			main = makeProgram(vertex, fragment, [
 				'photo',
+				'colourPhoto',
+				'colourMix',
+				'entrance',
 				'depthMask',
 				'resolution',
 				'motion',
@@ -363,24 +491,29 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 				'scrollFX[0]',
 				'scrollVelocity',
 			]);
-			makeBuffer(new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]));
-			texture(0, () => gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, photo));
-			texture(1, () => {
+			quad = makeBuffer(new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]));
+			photoTexture = texture(0, () => gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, photo));
+			colourTexture = texture(2, () =>
+				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, colourImage || photo)
+			);
+			depthTexture = texture(1, () => {
 				const { depth, width, height } = bakedDepth;
 				gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 				gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, width, height, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, depth);
 			});
-			// The only program and buffer on this context, so bind them once
+			// Initialise the portrait attributes before the optional liquid passes.
 			bindProgram(main.program);
 			const position = gl.getAttribLocation(main.program, 'position');
 			gl.enableVertexAttribArray(position);
 			gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
 			gl.uniform1i(main.uniforms.photo, 0);
+			gl.uniform1i(main.uniforms.colourPhoto, 2);
 			gl.uniform1i(main.uniforms.depthMask, 1);
 			loaded = true;
 			dirty = true;
 			draw(0, 16);
 			if (loaded) onReady(true);
+			if (loaded) void startLiquid();
 		} catch (error) {
 			loaded = false;
 			onReady(false);
@@ -402,9 +535,14 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 					photo.addEventListener('load', () => resolve(), { once: true, signal: events.signal });
 					photo.addEventListener('error', reject, { once: true, signal: events.signal });
 				});
-	Promise.all([photoReady.then(() => photo.decode()), load(depthUrl)])
-		.then(([, depth]) => {
+	Promise.all([
+		photoReady.then(() => photo.decode()),
+		load(depthUrl),
+		load('/images/hero-depth/portrait-colour.png').catch(() => null),
+	])
+		.then(([, depth, colour]) => {
 			if (disposed) return;
+			colourImage = colour;
 			bakedDepth = bakeDepth(depth);
 			initialize();
 		})
@@ -412,6 +550,43 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 			if (!disposed) onReady(false);
 		});
 	gsap.ticker.add(draw);
+	// CMS/React changes to the shared logo markup refresh the desktop texture too.
+	const logoTrack = host.querySelector('[data-logo-marquee]');
+	const logoObserver = new MutationObserver(() => {
+		if (loaded && !lost) void startLiquid();
+	});
+	if (liquidEnabled && logoTrack)
+		logoObserver.observe(logoTrack, {
+			childList: true,
+			subtree: true,
+			attributes: true,
+			characterData: true,
+			attributeFilter: ['src', 'srcset', 'width', 'height', 'class', 'style'],
+		});
+	const themeObserver = new MutationObserver(records => {
+		if (
+			records.every(
+				record =>
+					record.type === 'attributes' &&
+					record.attributeName === 'style' &&
+					(record.target as Element).closest('[data-entrance="running"]')
+			)
+		)
+			return;
+		liquidResize = true;
+	});
+	const content = host.querySelector('[data-hero-content]');
+	if (liquidEnabled && content)
+		themeObserver.observe(content, {
+			subtree: true,
+			childList: true,
+			characterData: true,
+			attributes: true,
+			attributeFilter: ['class', 'style', 'data-type', 'd'],
+		});
+	if (liquidEnabled)
+		for (const element of [document.documentElement, document.body, host])
+			themeObserver.observe(element, { attributes: true, attributeFilter: ['class', 'style'] });
 	return {
 		preview() {
 			resetMotion();
@@ -419,6 +594,11 @@ export function mountDepthEffect({ canvas, photo, host, getSettings, onReady }: 
 		},
 		destroy() {
 			disposed = true;
+			generation++;
+			stopLiquid();
+			logoObserver.disconnect();
+			decorationResizer.disconnect();
+			themeObserver.disconnect();
 			gsap.ticker.remove(draw);
 			events.abort();
 			observer.disconnect();

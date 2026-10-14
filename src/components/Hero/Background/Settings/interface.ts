@@ -1,6 +1,16 @@
+import type { ReactNode } from 'react';
 import type { DepthSettings } from '../effect-settings';
+import type { LiquidSettings } from '../liquid-settings';
+import type { IntroSettings } from '../scene-intro';
 export interface SettingsProps {
+	intro: IntroSettings;
+	onIntroChange: (settings: IntroSettings) => void;
+	onReplay: () => void;
+	liquid: LiquidSettings;
+	onLiquidChange: (settings: LiquidSettings) => void;
+	children?: ReactNode;
 	settings: DepthSettings;
 	onChange: (settings: DepthSettings) => void;
 	onPreview: () => void;
+	exportSettings: string;
 }
