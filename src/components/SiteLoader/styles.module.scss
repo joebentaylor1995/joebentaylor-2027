@@ -1,0 +1,130 @@
+.jacket { position: relative; }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  pointer-events: none;
+  visibility: hidden;
+  overflow: hidden;
+}
+
+.veil {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.dark { fill: var(--brand-c4); }
+
+.centre {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.mark {
+  width: min(204px, 38vw);
+  will-change: transform, opacity;
+}
+
+.filteredLogo {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+.mark .logo {
+  width: 68px;
+  height: 26px;
+  fill: var(--global-white);
+}
+
+.jacket .cutout {
+  width: 68px;
+  height: 26px;
+  fill: black;
+}
+
+.ring {
+  position: absolute;
+  top: calc(50% - 100px);
+  left: calc(50% - 100px);
+  width: 200px;
+  height: 200px;
+  border: 1px solid var(--global-white);
+  border-radius: 50%;
+  box-shadow: inset 0 0 12px alpha(var(--global-white), 25), 0 0 12px alpha(var(--global-white), 15);
+}
+
+.line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: var(--global-white);
+}
+
+.chooser {
+  position: fixed;
+  bottom: var(--gap-m);
+  left: var(--gap-m);
+  z-index: 4000;
+  width: min(380px, calc(100vw - 2 * var(--gap-m)));
+  max-height: 75vh;
+  overflow: auto;
+  color: var(--global-white);
+  background: var(--brand-c4);
+  border: 1px solid alpha(var(--global-white), 25);
+  border-radius: 12px;
+  box-shadow: 0 12px 50px alpha(var(--brand-c4), 25);
+  font-size: 14px;
+  font-family: var(--font-body);
+}
+
+.toggle {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 16px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.controls {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 16px;
+
+  label {
+    display: grid;
+    gap: 6px;
+  }
+
+  select, button {
+    color: var(--global-white);
+    background: alpha(var(--global-white), 10);
+    border: 1px solid alpha(var(--global-white), 25);
+    border-radius: 6px;
+    padding: 9px;
+    cursor: pointer;
+  }
+
+  option { background: var(--brand-c4); }
+
+  p, small {
+    line-height: 1.5;
+    opacity: 0.75;
+  }
+
+  small { font-size: 11px; }
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  gap: 8px;
+}

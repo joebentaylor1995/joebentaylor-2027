@@ -76,7 +76,7 @@ export function useAnimation(
 
 		mm.add(mergedBreakpoints, (context: { conditions?: MatchMediaConditions }) => {
 			// context.conditions is optional, so provide a fallback
-			animationCallback(context.conditions ?? {});
+			return animationCallback(context.conditions ?? {});
 		});
 
 		// Clean up matchMedia on unmount

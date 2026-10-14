@@ -4,6 +4,7 @@
 import Analytics from '@parts/Analytics';
 import { consentScript } from '@parts/CookieBar/consent';
 import Header from '@parts/Header';
+import SiteLoader from '@parts/SiteLoader';
 import SmoothScroll from '@parts/SmoothScroll';
 import { ppNeueMontreal, sequel } from '@theme/fonts';
 import type { Metadata, Viewport } from 'next';
@@ -64,6 +65,7 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
 			<body>
 				<Providers>
 					<Header />
+					<SiteLoader />
 
 					<main id='page'>
 						<SmoothScroll>{children}</SmoothScroll>
