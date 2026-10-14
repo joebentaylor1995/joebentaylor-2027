@@ -106,7 +106,7 @@ const SiteLoader = () => {
 				<defs>
 					<mask id={`${id}-scene`} maskUnits='userSpaceOnUse'>
 						<rect width='100%' height='100%' fill='white' />
-						<circle data-circle-aperture r='0' fill='black' />
+						<circle data-circle-aperture cx='0' cy='0' r='0' fill='black' />
 					</mask>
 				</defs>
 				<rect width='100%' height='100%' className={s.dark} mask={`url(#${id}-scene)`} />

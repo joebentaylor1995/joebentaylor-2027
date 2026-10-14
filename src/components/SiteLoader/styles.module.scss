@@ -4,6 +4,10 @@
   z-index: 3000;
   overflow: hidden;
   animation: fail-open 0s 6s forwards;
+
+  &[data-complete='true'] {
+    display: none;
+  }
 }
 
 // Fail open even if hydration fails.

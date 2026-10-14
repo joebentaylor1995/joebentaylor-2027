@@ -20,6 +20,7 @@ import s from './styles.module.scss';
 // ------------
 const Content = ({ heading, description }: I.ContentProps) => {
 	const ref = useRef<HTMLElement>(null);
+	const entered = useRef(false);
 	useAnimation(
 		({ reduced }) => {
 			const root = ref.current;
@@ -54,6 +55,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				}
 			};
 			if (reduced) {
+				entered.current = true;
 				gsap.set(cover, { opacity: 0 });
 				if (cover) cover.dataset.complete = 'true';
 				root.dataset.entrance = 'complete';
@@ -73,6 +75,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				delay: 0.15,
 				onUpdate: tick,
 				onComplete: () => {
+					entered.current = true;
 					root.dataset.entrance = 'complete';
 					tick();
 				},
@@ -140,7 +143,9 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				}
 			};
 			buildTimeline();
-			if (isLoaderPending()) tl.pause(0);
+			// Responsive contexts rebuild their tweens; retain the revealed scene.
+			if (entered.current) tl.progress(1).pause();
+			else if (isLoaderPending()) tl.pause(0);
 			const replayIntro = () => {
 				tl.pause(0);
 				tl.clear();
