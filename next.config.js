@@ -34,6 +34,7 @@ const contentSecurityPolicy = {
 		"'unsafe-inline'",
 		...(isDev ? ["'unsafe-eval'"] : []),
 		...(hasGoogleAnalytics ? googleAnalytics.script : []),
+		'https://app.cal.com',
 	],
 	'style-src': ["'self'", "'unsafe-inline'"],
 	// NOTE • https: covers CMS images and media served straight from their CDNs
@@ -41,7 +42,12 @@ const contentSecurityPolicy = {
 	'media-src': ["'self'", 'blob:', 'https:'],
 	'font-src': ["'self'"],
 	'connect-src': ["'self'", ...(hasGoogleAnalytics ? googleAnalytics.connect : [])],
-	'frame-src': ["'self'", ...(isNetlifyPreview ? ['https://app.netlify.com'] : [])],
+	'frame-src': [
+		"'self'",
+		'https://cal.com',
+		'https://app.cal.com',
+		...(isNetlifyPreview ? ['https://app.netlify.com'] : []),
+	],
 	'object-src': ["'none'"],
 	'base-uri': ["'self'"],
 	'form-action': ["'self'"],

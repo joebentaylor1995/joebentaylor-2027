@@ -1,8 +1,8 @@
 'use client';
 
-import { mq } from '@tackl';
 // Imports
 // ------------
+import { mq } from '@tackl';
 import Image from 'next/image';
 import { type ComponentType, useEffect, useRef, useState } from 'react';
 import { type DepthSettings, defaultSettings, portraitUrl } from './effect-settings';

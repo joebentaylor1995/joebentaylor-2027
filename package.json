@@ -40,6 +40,7 @@
 		"outdated": "bunx npm-check-updates"
 	},
 	"dependencies": {
+		"@calcom/embed-react": "^1.5.3",
 		"@datocms/cda-client": "^0.3.2",
 		"@gsap/react": "^2.1.2",
 		"@sanity/vision": "^6.18.0",

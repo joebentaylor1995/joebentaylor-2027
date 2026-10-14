@@ -5,11 +5,14 @@
 // paint. Grow suites in tests/ as the project grows.
 import { defineConfig, devices } from '@playwright/test';
 
+const port = Number(process.env.PLAYWRIGHT_PORT || 3000);
+const baseURL = `http://localhost:${port}`;
+
 export default defineConfig({
 	testDir: './tests',
 	timeout: 60_000,
 	use: {
-		baseURL: 'http://localhost:3000',
+		baseURL,
 		// NOTE • Sandboxed environments (agent containers, locked-down CI) often
 		// ship a system Chromium instead of allowing downloads — point
 		// PLAYWRIGHT_CHROMIUM_PATH at it to skip `playwright install` entirely
@@ -20,8 +23,8 @@ export default defineConfig({
 	webServer: {
 		// CI builds in an earlier step; locally, build fresh so the test
 		// always exercises what would actually ship
-		command: process.env.CI ? 'bun run start' : 'bun run build && bun run start',
-		url: 'http://localhost:3000',
+		command: process.env.CI ? `bun run start --port ${port}` : `bun run build && bun run start --port ${port}`,
+		url: baseURL,
 		reuseExistingServer: !process.env.CI,
 		timeout: 180_000,
 	},

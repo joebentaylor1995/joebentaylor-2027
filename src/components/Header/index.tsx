@@ -1,5 +1,6 @@
 'use client';
 
+import ContactModal from '@parts/ContactModal';
 // Imports
 // ------------
 import Logo from '@parts/Logo';
@@ -7,7 +8,7 @@ import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
 import Link from 'next/link';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 // Styles + Interfaces
 // ------------
@@ -17,6 +18,8 @@ import s from './styles.module.scss';
 // Component
 // ------------
 const Header = (_props: I.HeaderProps) => {
+	// State
+	const [contactOpen, setContactOpen] = useState(false);
 	// Refs
 	const ref = useRef<HTMLElement>(null);
 	const entered = useRef(false);
@@ -68,30 +71,40 @@ const Header = (_props: I.HeaderProps) => {
 
 	// Render
 	return (
-		<header ref={ref} className={s.header}>
-			<nav className={s.left} aria-label='Homepage navigation'>
-				<Link href='/' aria-label='Go to home page'>
-					<Logo />
-				</Link>
+		<>
+			<header ref={ref} className={s.jacket}>
+				<nav className={s.left} aria-label='Homepage navigation'>
+					<Link href='/' aria-label='Go to home page'>
+						<Logo />
+					</Link>
 
-				<div>
-					<em data-type='captionS'>Available for hire</em>
-					<span data-type='captionS'>Based in Doncaster, UK</span>
-				</div>
-			</nav>
+					<div>
+						<em data-type='captionS'>Available for hire</em>
+						<span data-type='captionS'>Based in Doncaster, UK</span>
+					</div>
+				</nav>
 
-			<nav className={s.right} aria-label='Page navigation'>
-				<button type='button' aria-label='Open Profile' data-type='bodyS'>
-					Profile
-				</button>
-				<Link href='/projects' aria-label='Go to Projects page' data-type='bodyS'>
-					Projects
-				</Link>
-				<button type='button' aria-label='Open Booking Form' data-type='bodyS'>
-					Let's Talk
-				</button>
-			</nav>
-		</header>
+				<nav className={s.right} aria-label='Page navigation'>
+					<button type='button' aria-label='Open Profile' data-type='bodyS'>
+						Profile
+					</button>
+					<Link href='/projects' aria-label='Go to Projects page' data-type='bodyS'>
+						Projects
+					</Link>
+					<button
+						type='button'
+						aria-label='Open Booking Form'
+						aria-haspopup='dialog'
+						aria-expanded={contactOpen}
+						onClick={() => setContactOpen(true)}
+						data-type='bodyS'
+					>
+						Let's Talk
+					</button>
+				</nav>
+			</header>
+			{contactOpen && <ContactModal onClose={() => setContactOpen(false)} />}
+		</>
 	);
 };
 
