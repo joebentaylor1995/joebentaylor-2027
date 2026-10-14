@@ -1,19 +1,17 @@
-# Global loader concepts
+# Global loader
 
-Open `/?loaderConcepts` to compare ten logo entrances. The chooser supports replay,
-half speed, skip, and a collapsed view. These are concept previews; none is selected
-as the production entrance. Normal visits do not import the gallery.
+The shared site layout renders the pulse loader on each initial document load.
+Client-side navigation keeps that layout and does not replay the loader. There
+are no preview concepts, query switches or chooser controls.
 
-`SiteLoader` lives in the shared site layout, outside page content and the scrolling
-container. The animation uses the existing Logo, `--brand-c4` and `--global-white`.
-It does not import or depend on the homepage hero.
+The existing Logo is white on brand-c4, at 120px maximum width (22vw on small
+screens). It stays stationary while a single expanding wave masks it away and
+reveals the page. Reduced motion uses a short fade.
 
-Pages can listen for `site-loader:prepare` and `site-loader:reveal` to reset and start
-their own entrance. The homepage adapter coordinates its ripple and text entrance;
-other pages can implement their own adapter or simply appear behind the reveal.
-Reduced motion uses a short fade.
+The loader waits for fonts and eager/high-priority images to decode, with a
+1.5-second deadline. A CSS failsafe hides the overlay after six seconds if
+hydration fails; JavaScript-disabled visits hide it immediately.
 
-After a concept is selected, connect the chosen entrance to initial page readiness
-and remove the comparison UI from that path. Keep the full loader for the initial
-visit and use the existing page transitions during navigation. Asset readiness and
-first-visit policy are deliberately not simulated by the concept gallery.
+Pages can use isLoaderPending() and site-loader:reveal to coordinate their
+entrances. The homepage pauses its intro until that signal; pages mounted after
+the initial reveal start immediately. The loader has no dependency on the hero.

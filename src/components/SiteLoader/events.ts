@@ -1,7 +1,8 @@
-// Pages can prepare and reveal their own entrance without coupling the loader to a hero.
-export const LOADER_PREPARE = 'site-loader:prepare';
+// Persistent layout: reveal once per document, then let route entrances start immediately.
 export const LOADER_REVEAL = 'site-loader:reveal';
-export interface LoaderPreparation {
-	ripple: boolean;
-	speed: number;
-}
+let pending = true;
+export const isLoaderPending = () => pending;
+export const revealScene = () => {
+	pending = false;
+	window.dispatchEvent(new Event(LOADER_REVEAL));
+};

@@ -1,68 +1,47 @@
 import { expect, test } from '@playwright/test';
 
-test('pulse consumes the opaque logo with its expanding wavefront', async ({ page }) => {
-	await page.goto('/?loaderConcepts');
-	await page.getByRole('combobox').nth(1).selectOption('0.5');
-	await page.getByRole('button', { name: 'Replay concept', exact: true }).click();
-	await page.waitForFunction(() => Number(document.querySelector('[data-logo-wash]')?.getAttribute('r')) > 12);
-	const state = await page.locator('[data-loader-mark]').evaluate(mark => ({
-		opacity: getComputedStyle(mark).opacity,
-		width: mark.getBoundingClientRect().width,
-		scale: new DOMMatrix(getComputedStyle(mark).transform).a,
-		displacement: Number(document.querySelector('feDisplacementMap')?.getAttribute('scale')),
-		radius: Number(mark.querySelector('[data-logo-wash]')?.getAttribute('r')),
-	}));
-	expect(state.opacity).toBe('1');
-	expect(state.width).toBeLessThanOrEqual(136);
-	expect(state.scale).toBe(1);
-	expect(state.displacement).toBe(0);
-	expect(state.radius).toBeGreaterThan(12);
-	await expect(page.locator('[data-loader-overlay]')).toBeHidden({ timeout: 10_000 });
-});
-
-test('loader gallery is opt-in and belongs to the shared layout', async ({ page }) => {
-	await page.goto('/');
-	await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-	await expect(page.locator('[data-loader-concept]')).toHaveCount(0);
-	await page.goto('/?loaderConcepts');
-	await expect(page.getByRole('complementary', { name: 'Global loader concepts' })).toBeVisible();
-	await expect(page.locator('main [data-loader-concept]')).toHaveCount(0);
-	await expect(page.getByRole('combobox').nth(0).locator('option')).toHaveCount(10);
-});
-
-test('all ten concepts release the scene and can be replayed or skipped', async ({ page }) => {
-	test.setTimeout(90_000);
+test('global pulse washes away a stationary small logo and releases the homepage', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', error => errors.push(error.message));
-	await page.goto('/?loaderConcepts');
-	const select = page.getByRole('combobox').nth(0);
-	await expect(select).toBeVisible();
-	for (let index = 0; index < 10; index++) {
-		await select.selectOption(String(index));
-		await page.getByRole('button', { name: 'Replay concept', exact: true }).click();
-		await expect(page.getByRole('status')).toContainText('Ready to replay', { timeout: 10_000 });
-		await expect(page.locator('[data-loader-overlay]')).toBeHidden();
-		await expect(page.locator('[data-entrance]')).toHaveAttribute('data-entrance', 'complete', { timeout: 10_000 });
-	}
-	await page.getByRole('combobox').nth(1).selectOption('0.5');
-	await select.selectOption('3');
-	await select.selectOption('5');
-	await page.getByRole('button', { name: 'Skip preview' }).click();
-	await expect(page.locator('[data-loader-overlay]')).toBeHidden();
-	await expect(page.locator('[data-entrance]')).toHaveAttribute('data-entrance', 'complete', { timeout: 15_000 });
+	await page.goto('/');
+	const loader = page.locator('[data-site-loader]');
+	await expect(loader).toBeVisible();
+	await expect(page.locator('main [data-site-loader]')).toHaveCount(0);
+	const mark = page.locator('[data-loader-mark]');
+	const bounds = await mark.boundingBox();
+	if (!bounds) throw new Error('Missing loader logo');
+	expect(bounds.width).toBeLessThanOrEqual(120);
+	await page.waitForFunction(() => Number(document.querySelector('[data-logo-wash]')?.getAttribute('r')) > 12);
+	await expect(mark).toHaveCSS('opacity', '1');
+	await expect(mark).toHaveCSS('transform', 'none');
+	await expect(loader).toHaveAttribute('data-complete', 'true', { timeout: 8000 });
+	await expect(loader).toBeHidden();
+	await expect(page.locator('[data-entrance]')).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
+	await page.setViewportSize({ width: 390, height: 844 });
+	await expect(loader).toBeHidden();
 	expect(errors).toEqual([]);
 });
 
-test('mobile reduced-motion preview stays usable and completes', async ({ page }) => {
-	await page.setViewportSize({ width: 390, height: 844 });
+test('old preview URL has no chooser and reduced motion completes', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/?loaderConcepts');
-	await expect(page.getByRole('status')).toContainText('Ready to replay');
-	await expect(page.locator('[data-loader-overlay]')).toBeHidden();
-	const bounds = await page.getByRole('complementary', { name: 'Global loader concepts' }).boundingBox();
-	if (!bounds) throw new Error('Loader chooser is missing');
-	expect(bounds.x).toBeGreaterThanOrEqual(0);
-	expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
-	await page.getByRole('button', { name: /10 · Global loader concepts/ }).click();
-	await expect(page.getByRole('combobox')).toHaveCount(0);
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 8000 });
+	await expect(page.getByRole('complementary', { name: 'Global loader concepts' })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Replay concept' })).toHaveCount(0);
+	await expect(page.locator('[data-entrance]')).toHaveAttribute('data-entrance', 'complete');
+});
+
+test('failed first-view image cannot trap the loader', async ({ page }) => {
+	await page.route('**/_next/image/**', route => route.abort());
+	await page.goto('/');
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 8000 });
+	await expect(page.locator('[data-site-loader]')).toBeHidden();
+});
+
+test('JavaScript-disabled visitors are not covered by the loader', async ({ browser }) => {
+	const context = await browser.newContext({ javaScriptEnabled: false });
+	const page = await context.newPage();
+	await page.goto(test.info().project.use.baseURL || 'http://localhost:3000');
+	await expect(page.locator('[data-site-loader]')).toBeHidden();
+	await context.close();
 });

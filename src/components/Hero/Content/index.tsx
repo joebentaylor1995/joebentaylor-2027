@@ -3,7 +3,7 @@
 // Imports
 // ------------
 
-import { LOADER_PREPARE, LOADER_REVEAL, type LoaderPreparation } from '@parts/SiteLoader/events';
+import { isLoaderPending, LOADER_REVEAL } from '@parts/SiteLoader/events';
 import SpecialHeading from '@parts/SpecialHeading';
 import { useAnimation } from '@utils/useAnimation';
 import Grid, { Col } from '@waffl';
@@ -85,7 +85,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 					intro,
 					{
 						waterReveal: 1,
-						duration: externalRipple ? 1 / config().speed : 0.01,
+						duration: 1 / config().speed,
 						ease: config().ease,
 						onComplete: () => {
 							if (cover) cover.dataset.complete = 'true';
@@ -139,8 +139,8 @@ const Content = ({ heading, description }: I.ContentProps) => {
 					);
 				}
 			};
-			let externalRipple = true;
 			buildTimeline();
+			if (isLoaderPending()) tl.pause(0);
 			const replayIntro = () => {
 				tl.pause(0);
 				tl.clear();
@@ -159,23 +159,13 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				tl.restart();
 			};
 			introReplays.set(host, () => {
-				externalRipple = true;
 				tl.timeScale(1);
 				replayIntro();
 			});
-			const prepareLoader = (event: Event) => {
-				const settings = (event as CustomEvent<LoaderPreparation>).detail;
-				externalRipple = settings.ripple;
-				tl.timeScale(settings.speed);
-				replayIntro();
-				tl.pause(0);
-			};
 			const revealLoader = () => tl.play();
-			window.addEventListener(LOADER_PREPARE, prepareLoader);
 			window.addEventListener(LOADER_REVEAL, revealLoader);
 			return () => {
 				introReplays.delete(host);
-				window.removeEventListener(LOADER_PREPARE, prepareLoader);
 				window.removeEventListener(LOADER_REVEAL, revealLoader);
 			};
 		},
