@@ -1,5 +1,40 @@
 import { expect, test } from '@playwright/test';
 
+test('early hover does not interrupt intro and a slow ripple keeps updating without input', async ({ page }) => {
+	await page.goto('/?heroSettings');
+	const content = page.locator('[data-hero-content]');
+	await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
+	await page.getByLabel('Ripple speed value', { exact: true }).fill('0.25');
+	const canvas = page.getByTestId('hero-depth').locator('canvas');
+	const read = () =>
+		canvas.evaluate(element => {
+			const gl = (element as HTMLCanvasElement).getContext('webgl');
+			if (!gl) throw new Error('Missing WebGL');
+			const program = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram;
+			const zoom = gl.getUniformLocation(program, 'zoom');
+			const cursor = gl.getUniformLocation(program, 'cursorOn');
+			if (!zoom || !cursor) throw new Error('Missing portrait uniforms');
+			return {
+				zoom: gl.getUniform(program, zoom) as number,
+				cursor: gl.getUniform(program, cursor) as number,
+				error: gl.getError(),
+			};
+		});
+	await page.getByRole('button', { name: 'Replay introduction', exact: true }).click();
+	await page.mouse.move(100, 330);
+	await page.mouse.move(450, 420, { steps: 10 });
+	await page.waitForTimeout(1800);
+	const early = await read();
+	expect(early.cursor).toBe(0);
+	expect(early.error).toBe(0);
+	await page.waitForTimeout(500);
+	expect((await read()).zoom).toBeLessThan(early.zoom - 0.01);
+	await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
+	await page.mouse.move(150, 350);
+	await expect.poll(async () => (await read()).cursor).toBe(1);
+	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
+});
+
 test('intro controls export and replay repeatedly with changed timing', async ({ page }) => {
 	await page.goto('/?heroSettings');
 	const content = page.locator('[data-hero-content]');

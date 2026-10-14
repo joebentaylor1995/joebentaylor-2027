@@ -4,6 +4,8 @@
 
 The scene opens through one refracting ripple from a brand-c4 screen. The portrait starts at scale 2.06 and settles to its configured scale by 90% of the ripple progress with cinematic easing. `scene-intro.ts` stores the intro defaults. The settings export includes `portrait`, `liquid`, and `intro`, and Replay rebuilds the entrance from the current controls.
 
+Pointer-driven parallax and liquid strokes wait until the entrance finishes, then start from a fresh cursor sample. Hovering during the intro cannot inject a stale stroke or interrupt the animated layout. The portrait cache remains invalid until both its entrance and ripple finish, including at slow ripple speeds.
+
 Heading and paragraph timing controls expose the heading wipe, star rotation, paragraph start, word duration and stagger. Copyright stays in HTML: its icon fades, lines grow outward, and clipped digits rise from the centre outward (1995 right-to-left, current year left-to-right). Copyright always starts at `headingStart`; its fade duration, line growth duration and digit stagger are also editable and exported. Reduced motion reveals the content immediately.
 
 The WebGL marquee label cycles through Trusted by, Loved by, Designed for, Built for, Created for, Partnered with and Chosen by on each new scroll gesture or direction reversal. The HTML/mobile label remains unchanged. Text and its rule gap continue to use computed HTML styling.

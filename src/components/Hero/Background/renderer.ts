@@ -267,7 +267,20 @@ export function mountDepthEffect({
 				lastSettings = s;
 				dirty = true;
 			}
-			const dest = s.auto ? [Math.sin(now * 0.00055) * 0.8, Math.cos(now * 0.00043) * 0.55] : target;
+			const entering = host.querySelector('[data-hero-content]')?.getAttribute('data-entrance') === 'running';
+			if (entering) {
+				target = [0, 0];
+				pointer = [0, 0];
+				cursorActive = 0;
+				cursorSpeed = 0;
+				previousCursor = [...cursor];
+				liquid?.resetPointer();
+			}
+			const dest = entering
+				? [0, 0]
+				: s.auto
+					? [Math.sin(now * 0.00055) * 0.8, Math.cos(now * 0.00043) * 0.55]
+					: target;
 			const ease = 1 - s.smooth ** (dt * 60);
 			pointer = pointer.map((v, i) => v + (dest[i] - v) * ease);
 			cursorSpeed = Math.max(
@@ -277,6 +290,8 @@ export function mountDepthEffect({
 			previousCursor = [...cursor];
 			scroll.step(dt);
 			const settled =
+				!entering &&
+				(sceneIntros.get(host)?.waterReveal ?? 1) === 1 &&
 				(sceneIntros.get(host)?.portrait ?? 1) === 1 &&
 				!s.auto &&
 				scroll.settled &&
@@ -351,8 +366,16 @@ export function mountDepthEffect({
 		);
 	}
 	function track(event: PointerEvent) {
+		// Do not collect pointer impulses against moving intro geometry. The first
+		// post-intro event starts a fresh fluid stroke rather than joining a stale point.
+		if (host.querySelector('[data-hero-content]')?.getAttribute('data-entrance') === 'running') {
+			liquid?.resetPointer();
+			return;
+		}
 		const r = canvas.getBoundingClientRect();
+		const wasActive = cursorActive;
 		cursor = [(event.clientX - r.left) / r.width, (event.clientY - r.top) / r.height];
+		if (!wasActive) previousCursor = [...cursor];
 		cursorActive = 1;
 		target = cursor.map(v => Math.max(-1, Math.min(1, v * 2 - 1)));
 		if (event.pointerType !== 'touch' && !ignored(event)) liquid?.move(cursor[0], cursor[1]);
