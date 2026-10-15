@@ -160,6 +160,8 @@
 			--col-#{$key}: initial;
 		}
 
+		// Keep an override local to this grid rather than inheriting a parent's.
+		--grid-columns-desktop: initial;
 		--grid-columns: repeat(#{map.get($columns, s)}, 1fr);
 		--grid-gutter: #{map.get($gutters, s)};
 		--grid-margin: #{map.get($gutters, s)};
@@ -179,7 +181,7 @@
 		}
 
 		@include bp(l) {
-			--grid-columns: repeat(#{map.get($columns, l)}, 1fr);
+			--grid-columns: repeat(var(--grid-columns-desktop, #{map.get($columns, l)}), 1fr);
 			--grid-gutter: #{map.get($gutters, l)};
 			--grid-margin: calc(var(--grid-gutter));
 		}

@@ -31,13 +31,16 @@ const ranges: [NumericSetting, string, number, number, number][] = [
 	['positionX', 'X position', -100, 100, 1],
 	['positionY', 'Y position', -100, 100, 1],
 	['zoom', 'Scale', 0.3, 2.5, 0.01],
-	['maxWidth', 'Portrait max viewport width (px)', 640, 3840, 10],
 	['chroma', 'Blue edge strength', 0, 2, 0.05],
 	['glow', 'Fingertip glow strength', 0, 2, 0.05],
 	['drag', 'Blue scroll drag', 0, 2, 0.05],
 	['push', 'Scroll zoom strength', 0, 2, 0.05],
 	['trails', 'Motion trails', 0, 2, 0.05],
 	['focus', 'Focus pull', 0, 2, 0.05],
+	['mobilePositionX', 'Mobile X position (%)', -100, 100, 0.01],
+	['mobilePositionY', 'Mobile bottom offset (%)', -100, 100, 0.01],
+	['mobileZoom', 'Mobile scale', 0.3, 2.5, 0.01],
+	['mobileRotation', 'Mobile rotation', -45, 45, 1],
 ];
 const toggles: [BooleanSetting, string][] = [
 	['colourOn', 'Scroll colour switching'],
@@ -280,14 +283,21 @@ export default function Settings({
 						))}
 					</details>
 					{[
+						['Mobile and compact portrait', 25, 29],
 						['Scroll response', 0, 4],
 						['Colour transition', 4, 6],
 						['Depth pulse', 6, 10],
-						['Portrait & cursor', 10, 20],
-						['Light & scroll effects', 20, 26],
+						['Portrait & cursor', 10, 19],
+						['Light & scroll effects', 19, 25],
 					].map(([title, start, end]) => (
-						<details className={s.group} key={title}>
+						<details className={s.group} key={title} open={start === 25}>
 							<summary>{title}</summary>
+							{start === 25 ? (
+								<p>
+									Used below 1283px wide. Changes last until reload; copy all hero settings when
+									ready.
+								</p>
+							) : null}
 							{ranges.slice(Number(start), Number(end)).map(([key, label, min, max, step]) => (
 								<label key={key} className={s.control}>
 									{label}

@@ -15,7 +15,7 @@
 	font-weight: var(--weight-light);
 	font-size: 6rem;
 	line-height: 1.12;
-	letter-spacing: -0.125em;
+	letter-spacing: -0.2rem;
 
 	@include bp(l) {
 		font-size: 12rem;
@@ -101,7 +101,7 @@
 	font-weight: var(--weight-regular);
 	font-size: 1.6rem;
 	line-height: 1.32;
-	letter-spacing: 0.0313em; // 0.5px relative to font size
+	letter-spacing: 0.05rem;
 
 	@include bp(l) {
 		font-size: 1.8rem;
@@ -158,4 +158,4 @@
 }
 
 // Every style above, by name — drives the .t-* classes and [data-type] selectors
-$type-styles: 'displayL', 'displayS', 'headlineL', 'headlineS', 'titleL', 'titleS', 'bodyL', 'bodyS', 'captionL', 'captionS';
+$type-styles: 'displayL', 'displayS', 'headlineL', 'headlineS', 'titleL', 'titleS', 'bodyL', 'bodyM', 'bodyS', 'captionL', 'captionS';

@@ -28,7 +28,7 @@ test('settled animation does not query shader attributes on every frame', async 
 	expect(await page.locator('html').getAttribute('data-attribute-queries')).toBe(count);
 });
 
-test('portrait width stops growing past the configurable viewport cap', async ({ page }) => {
+test('portrait continues scaling with the viewport width', async ({ page }) => {
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await page.goto('/?heroSettings');
 	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
@@ -45,14 +45,10 @@ test('portrait width stops growing past the configurable viewport cap', async ({
 		});
 	for (const width of [1440, 1920, 2560]) {
 		await page.setViewportSize({ width, height: 900 });
-		await expect.poll(portraitWidth).toBeCloseTo(1440 * 1.12, 1);
+		await expect.poll(portraitWidth).toBeCloseTo(width * 1.12, 1);
 	}
-	await page.getByRole('button', { name: 'Expand all', exact: true }).click();
-	await page.getByLabel('Portrait max viewport width (px) value', { exact: true }).fill('1600');
-	await expect.poll(portraitWidth).toBeCloseTo(1600 * 1.12, 1);
-	expect(JSON.parse(await page.getByLabel('All hero settings JSON').inputValue()).portrait.maxWidth).toBe(1600);
-	await page.setViewportSize({ width: 1280, height: 800 });
-	await expect.poll(portraitWidth).toBeCloseTo(1280 * 1.12, 1);
+	await page.setViewportSize({ width: 1283, height: 800 });
+	await expect.poll(portraitWidth).toBeCloseTo(1283 * 1.12, 1);
 });
 
 test('early hover does not interrupt intro and a slow ripple keeps updating without input', async ({ page }) => {
@@ -205,8 +201,8 @@ test('desktop hero text follows HTML content and CSS, with a mobile fallback', a
 	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
 	const content = page.locator('[data-hero-content]');
 	await expect(content).toHaveCSS('opacity', '0');
-	for (const width of [1280, 1440]) {
-		await page.setViewportSize({ width, height: 900 });
+	for (const width of [1283, 1440]) {
+		await page.setViewportSize({ width, height: 800 });
 		await content.locator('p').evaluate(element => {
 			element.textContent = 'Responsive text follows the HTML layout.';
 			(element as HTMLElement).style.color = 'rgb(0, 180, 0)';
@@ -261,14 +257,14 @@ test('desktop hero text follows HTML content and CSS, with a mobile fallback', a
 test('WebGL decoration follows CSS border and responsive spacing changes', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
-	for (const width of [1280, 1440]) {
-		await page.setViewportSize({ width, height: 900 });
+	for (const width of [1283, 1440]) {
+		await page.setViewportSize({ width, height: 800 });
 		await page.locator('[data-logo-marquee]').evaluate(
 			(element, gap) => {
 				(element as HTMLElement).style.setProperty('--gap-l', `${gap}px`);
 				(element as HTMLElement).style.borderTop = '4px solid rgb(0, 128, 0)';
 			},
-			width === 1280 ? 48 : 64
+			width === 1283 ? 48 : 64
 		);
 		await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
 		await expect
@@ -284,6 +280,9 @@ test('WebGL decoration follows CSS border and responsive spacing changes', async
 						if (!marquee) throw new Error('Marquee unavailable');
 						const bounds = canvas.getBoundingClientRect();
 						const y = marquee.getBoundingClientRect().top + 2 - bounds.top;
+						const heading = marquee.querySelector('h2');
+						if (!heading) throw new Error('Marquee heading unavailable');
+						const labelPaddingX = heading.getBoundingClientRect().right - bounds.left - 4;
 						return new Promise<number[]>(resolve => {
 							const original = gl.drawArrays.bind(gl);
 							gl.drawArrays = (mode, first, count) => {
@@ -299,17 +298,27 @@ test('WebGL decoration follows CSS border and responsive spacing changes', async
 									gl.UNSIGNED_BYTE,
 									pixel
 								);
+								const labelPixel = new Uint8Array(4);
+								gl.readPixels(
+									Math.floor((labelPaddingX * canvas.width) / bounds.width),
+									Math.floor(((bounds.height - y) * canvas.height) / bounds.height),
+									1,
+									1,
+									gl.RGBA,
+									gl.UNSIGNED_BYTE,
+									labelPixel
+								);
 								gl.drawArrays = original;
-								resolve(Array.from(pixel));
+								resolve([...pixel, ...labelPixel]);
 							};
 						});
 					})
 			)
-			.toEqual([0, 128, 0, 255]);
+			.toEqual([0, 128, 0, 255, 240, 237, 237, 255]);
 	}
 	await page.setViewportSize({ width: 390, height: 844 });
 	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(0);
-	await expect(page.getByRole('heading', { name: 'Trusted by', exact: true })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Clients include', exact: true })).toBeVisible();
 });
 
 test('liquid controls toggle, update and reset without restarting the hero', async ({ page }) => {
@@ -375,8 +384,9 @@ test('desktop liquid survives cursor input and returns to the HTML marquee on mo
 	await page.setViewportSize({ width: 390, height: 844 });
 	await expect(hero).not.toHaveAttribute('data-liquid-ready', 'true');
 	await expect(marquee).toHaveCSS('opacity', '1');
-	await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'true');
-	await page.setViewportSize({ width: 1280, height: 720 });
+	await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'false');
+	await expect(page.getByTestId('hero-depth').locator('img')).toBeVisible();
+	await page.setViewportSize({ width: 1283, height: 720 });
 	await expect(hero).toHaveAttribute('data-liquid-ready', 'true', { timeout: 30_000 });
 });
 

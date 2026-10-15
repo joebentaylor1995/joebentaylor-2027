@@ -10,7 +10,7 @@ export interface StepperProps {
 }
 
 export interface ToggleProps {
-	// NOTE • Shown in monospace — usually the prop it switches, e.g. '$noGutter'
+	// NOTE • Shown in monospace — usually the prop it switches, e.g. 'noGutter'
 	label: string;
 	isChecked: boolean;
 	onChange: () => void;

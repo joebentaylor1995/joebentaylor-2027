@@ -1,6 +1,7 @@
 'use client';
 
 import ContactModal from '@parts/ContactModal';
+import { GlobalContext } from '@parts/Contexts';
 // Imports
 // ------------
 import Logo from '@parts/Logo';
@@ -8,7 +9,7 @@ import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
 import Link from 'next/link';
-import { useRef, useState } from 'react';
+import { use, useRef, useState } from 'react';
 
 // Styles + Interfaces
 // ------------
@@ -18,6 +19,8 @@ import s from './styles.module.scss';
 // Component
 // ------------
 const Header = (_props: I.HeaderProps) => {
+	// Context
+	const { profileOpen, setProfileOpen } = use(GlobalContext);
 	// State
 	const [contactOpen, setContactOpen] = useState(false);
 	// Refs
@@ -72,7 +75,7 @@ const Header = (_props: I.HeaderProps) => {
 	// Render
 	return (
 		<>
-			<header ref={ref} className={s.jacket}>
+			<header ref={ref} className={s.jacket} data-profile={profileOpen ? 'open' : 'closed'}>
 				<nav className={s.left} aria-label='Homepage navigation'>
 					<Link href='/' aria-label='Go to home page'>
 						<Logo />
@@ -85,7 +88,15 @@ const Header = (_props: I.HeaderProps) => {
 				</nav>
 
 				<nav className={s.right} aria-label='Page navigation'>
-					<button type='button' aria-label='Open Profile' data-type='bodyS'>
+					<button
+						type='button'
+						aria-label='Open Profile'
+						aria-haspopup='dialog'
+						aria-expanded={profileOpen}
+						aria-controls='profile-panel'
+						onClick={() => setProfileOpen(true)}
+						data-type='bodyS'
+					>
 						Profile
 					</button>
 					<Link href='/projects' aria-label='Go to Projects page' data-type='bodyS'>

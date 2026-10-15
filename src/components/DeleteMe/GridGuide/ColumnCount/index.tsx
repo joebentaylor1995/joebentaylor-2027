@@ -42,10 +42,10 @@ const ColumnCount = () => {
 				className={s.jacket}
 				style={Object.fromEntries(DEVICES.map(key => [`--columns-${key}`, columns[key]]))}
 			>
-				<Grid $isFixed className={s.row}>
+				<Grid isFixed className={s.row}>
 					{Array.from({ length: widest }, (_, index) => (
 						// biome-ignore lint/suspicious/noArrayIndexKey: one numbered cell per column
-						<Cell key={index} label={`${index + 1}`} $s='span 1' />
+						<Cell key={index} label={`${index + 1}`} s='span 1' />
 					))}
 				</Grid>
 			</Demo>

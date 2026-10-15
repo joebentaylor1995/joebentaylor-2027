@@ -99,7 +99,7 @@ const GridPlayground = () => {
 				</fieldset>
 
 				<Toggle
-					label='$noGutter'
+					label='noGutter'
 					isChecked={!hasGutter}
 					onChange={() => update(() => setHasGutter(value => !value))}
 				/>

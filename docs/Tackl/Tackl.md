@@ -115,14 +115,14 @@ See [SemanticComponents.md](./SemanticComponents.md).
 ```tsx
 import Grid, { Col } from '@waffl';
 
-<Grid $isFixed>
-	<Col as='article' $m='2/6' $l='3/9'>Narrower on larger screens</Col>
+<Grid isFixed>
+	<Col as='article' m='2/6' l='3/9'>Narrower on larger screens</Col>
 	<figure>Full width by default</figure>
 </Grid>
 ```
 
-- `Grid` props become data attributes: `$isFixed` → `data-fixed` (max-width 1440px), `$noGutter`, `$noMargin`, `$isFullscreen`, `$isCenter`. It also takes span props, so a grid can sit inside another grid.
-- `Col` is polymorphic (`as`) and takes span props `$s $sm $m $l $xl $xxl $huge $uber` (grid-column values like `'2/6'`, `'1/-1'`, `'span 3'`) plus any props of the chosen tag. Each breakpoint falls back to the one below.
+- `Grid` props become data attributes: `isFixed` → `data-fixed` (max-width 1440px), `noGutter`, `noMargin`, `isFullscreen`, `isCenter`. It also takes span props, so a grid can sit inside another grid.
+- `Col` is polymorphic (`as`) and takes span props `s sm m l xl xxl huge uber` (grid-column values like `'2/6'`, `'1/-1'`, `'span 3'`) plus any props of the chosen tag. Each breakpoint falls back to the one below.
 - Columns: s 2 / m 6 / l 12.
 
 See [WafflGrid.md](./WafflGrid.md) and [GridSystemProps.md](./GridSystemProps.md).

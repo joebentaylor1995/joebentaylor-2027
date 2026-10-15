@@ -43,14 +43,15 @@ export function drawMarqueeDecoration(
 	ctx.letterSpacing = css.letterSpacing === 'normal' ? '0px' : css.letterSpacing;
 	ctx.fillStyle = css.color;
 	ctx.textBaseline = 'alphabetic';
-	let text = phrase ?? heading.textContent?.trim() ?? '';
+	// Only measure the visible responsive label, not its hidden mobile sibling.
+	const original = heading.innerText.trim();
+	let text = phrase ?? original;
 	if (css.textTransform === 'uppercase') text = text.toUpperCase();
 	else if (css.textTransform === 'lowercase') text = text.toLowerCase();
 	const left = parseFloat(css.paddingLeft) + (parseFloat(css.borderLeftWidth) || 0);
 	const top = parseFloat(css.paddingTop) + (parseFloat(css.borderTopWidth) || 0);
 	const metrics = ctx.measureText(text);
 	// Preserve the HTML's padding and responsive position as the label gets longer.
-	const original = heading.textContent?.trim() || '';
 	const originalText =
 		css.textTransform === 'uppercase'
 			? original.toUpperCase()

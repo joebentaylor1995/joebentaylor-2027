@@ -31,11 +31,11 @@ The complete list of source-level changes to apply across project components:
 | `getUtil('noscrollbars')` / `theme.utils.noscrollbars` | `${noscrollbars}` imported from `@tackl` |
 | `performRequest` from `@utils/datocms` | `fetchContent` from `@cms` |
 | `import { GET_HOME } from '@queries/...'` / `app/queries/` | `import { GET_HOME } from '@cms'` — queries live in `src/cms/<adapter>/queries/` |
-| `$s='1/-1'` span props added "to be safe" | Remove — grid children are full-width by default (global `waffl-grid > :where(*)` rule) |
+| `s='1/-1'` span props added "to be safe" | Remove — grid children are full-width by default (global `waffl-grid > :where(*)` rule) |
 | `app/layout.tsx` + `app/Client.tsx` + `app/Server.tsx` | `app/(site)/layout.tsx` (server shell) + `app/(site)/Providers.tsx` |
 | Theme values as literals (`theme.space.m === '6rem'`) | `var()` references (`'var(--space-m)'`) — plain CSS can use `var(--space-m)` directly |
 
-Values that moved but kept their meaning: spacing/gap/radius keys, breakpoint keys, `bp`/`bpd`, type styles from `@tackl/type`, spacing props (`$mar`/`$pad`…), grid span props (`$s`…`$uber`). Component-authored styles generally survive untouched except for the substitutions above.
+Values that moved but kept their meaning: spacing/gap/radius keys, breakpoint keys, `bp`/`bpd`, type styles from `@tackl/type`, spacing props (`$mar`/`$pad`…), grid span props (`s`…`uber`). Component-authored styles generally survive untouched except for the substitutions above.
 
 ---
 

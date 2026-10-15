@@ -14,7 +14,7 @@ import s from './styles.module.scss';
 // NOTE • One grid feature as a bento tile: what it does, a live demo (a
 // grid nested in the tile, with its own column overlay) and the code
 const Example = ({ id, title, children, demo, code, label = 'tsx' }: I.ExampleProps) => (
-	<Grid $isFixed className={s.jacket}>
+	<Grid isFixed className={s.jacket}>
 		<Tile aria-labelledby={id}>
 			<div className={s.copy}>
 				<h3 id={id} className={s.title}>

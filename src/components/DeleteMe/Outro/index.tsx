@@ -11,8 +11,8 @@ import s from './styles.module.scss';
 // ------------
 const Outro = () => (
 	<footer className={s.jacket} data-pad>
-		<Grid $isFixed>
-			<Col $m='2/6' $l='3/11' className={s.inner}>
+		<Grid isFixed>
+			<Col m='2/6' l='3/11' className={s.inner}>
 				<p className={s.title}>Tackl.</p>
 				<p className={s.tagline}>Start on the design, not the setup.</p>
 				<CopyButton text='bunx tackl' />

@@ -83,7 +83,7 @@ const GridExposer = () => {
 			className={s.col}
 			data-mobile={i < MOBILE_COLUMNS || undefined}
 			data-tablet={i < TABLET_COLUMNS || undefined}
-			$s={`${i + 1}`}
+			s={`${i + 1}`}
 		>
 			<span />
 		</Col>

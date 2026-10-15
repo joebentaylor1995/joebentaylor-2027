@@ -15,8 +15,8 @@ import s from './styles.module.scss';
 // section's bento tiles on the grid
 const Section = ({ id, title, intro, children, className }: I.SectionProps) => (
 	<section id={id} className={cn(s.jacket, className)} aria-labelledby={id && `${id}-title`} data-pad>
-		<Grid $isFixed>
-			<Col $m='2/6' $l='3/11' className={s.header}>
+		<Grid isFixed>
+			<Col m='2/6' l='3/11' className={s.header}>
 				<h2 id={id && `${id}-title`} className={s.title}>
 					{title}
 				</h2>

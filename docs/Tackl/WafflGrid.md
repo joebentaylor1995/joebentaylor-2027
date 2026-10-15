@@ -7,8 +7,8 @@ Waffl is Tackl's responsive column grid: a server-rendered `<waffl-grid>` elemen
 ```tsx
 import Grid, { Col } from '@waffl';
 
-<Grid $isFixed>
-	<Col as='article' $m='2/6' $l='3/9'>Narrower on larger screens</Col>
+<Grid isFixed>
+	<Col as='article' m='2/6' l='3/9'>Narrower on larger screens</Col>
 	<figure>Full width by default — no props, no component</figure>
 </Grid>
 ```
@@ -20,7 +20,7 @@ import Grid, { Col } from '@waffl';
 ```mermaid
 flowchart TD
     G["&lt;Grid&gt; → &lt;waffl-grid data-fixed&gt;\ndisplay: grid · 2 / 6 / 12 columns"]
-    G --> A["&lt;Col $m='2/6' $l='3/9'&gt;\nsets --col-m / --col-l"]
+    G --> A["&lt;Col m='2/6' l='3/9'&gt;\nsets --col-m / --col-l"]
     G --> B["&lt;figure&gt; (plain element)\nno props needed"]
     R["global.scss (@layer grid)\nwaffl-grid &gt; :where(*) { grid-column: var(--_col-…) }"] -.reads --col-*, defaults to 1 / -1.-> A
     R -.full-width default.-> B
@@ -44,18 +44,31 @@ Boolean props become data attributes on the `<waffl-grid>`:
 
 | Prop | Attribute | Effect |
 | --- | --- | --- |
-| `$isFixed` | `data-fixed` | `max-width: 1440px` (the `maxSize` token), centred |
-| `$noGutter` | `data-no-gutter` | `gap: 0` — no space between columns or rows |
-| `$noMargin` | `data-no-margin` | `padding-inline: 0` — no side margins |
-| `$isFullscreen` | `data-fullscreen` | `height: 100%` |
-| `$isCenter` | `data-center` | `align-items: center` — centres children vertically; they keep their column widths |
+| `isFixed` | `data-fixed` | `max-width: 1440px` (the `maxSize` token), centred |
+| `noGutter` | `data-no-gutter` | `gap: 0` — no space between columns or rows |
+| `noMargin` | `data-no-margin` | `padding-inline: 0` — no side margins |
+| `isFullscreen` | `data-fullscreen` | `height: 100%` |
+| `isCenter` | `data-center` | `align-items: center` — centres children vertically; they keep their column widths |
 
 ```tsx
-<Grid $isFixed $noGutter>…</Grid>
+<Grid isFixed noGutter>…</Grid>
 // → <waffl-grid data-fixed data-no-gutter>…</waffl-grid>
 ```
 
-`Grid` also accepts the span props (`$s` … `$uber`) so it can sit inside another grid, plus any HTML attribute (`className`, `id`, `data-pad`, `aria-*`…). Its `className` is where you add component-specific layout. Rows and columns share the gutter (`gap: var(--grid-gutter)`); set `row-gap` there to break from it.
+`Grid` also accepts the span props (`s` … `uber`) so it can sit inside another grid, plus any HTML attribute (`className`, `id`, `data-pad`, `aria-*`…). Its `className` is where you add component-specific layout. Rows and columns share the gutter (`gap: var(--grid-gutter)`); set `row-gap` there to break from it.
+
+## Desktop column override
+
+Use `columnsDesktop` to override the column count for one grid from `bp(l)` (1024px) upwards:
+
+```tsx
+<Grid columnsDesktop={8}>
+	<Col l='1/5'>First half</Col>
+	<Col l='5/9'>Second half</Col>
+</Grid>
+```
+
+Mobile and tablet counts stay unchanged. The value must be a positive integer; invalid values fall back to the theme's desktop count. Nested grids keep their own defaults unless they also receive the prop. Set child spans to fit the overridden count to avoid creating implicit columns.
 
 ## Full-width by default
 
@@ -72,7 +85,7 @@ Because `:where()` adds no specificity, plain elements, module-styled elements a
 
 ## Spans and the fallback cascade
 
-A span is a `grid-column` value set per breakpoint: `$m='2/6'` means "from 700px up, start at line 2 and end at line 6". Each breakpoint falls back to the one below it, and the base falls back to full width:
+A span is a `grid-column` value set per breakpoint: `m='2/6'` means "from 700px up, start at line 2 and end at line 6". Each breakpoint falls back to the one below it, and the base falls back to full width:
 
 ```
 s   → --col-s,   else 1 / -1
@@ -85,9 +98,9 @@ l   → --col-l,   else whatever m resolved to
 So you only set the breakpoints where the layout changes:
 
 ```tsx
-<Col $l='3/11'>…</Col>                 {/* full width below 1024px, cols 3–10 from l up */}
-<Col $m='1/4' $l='1/7'>…</Col>         {/* full on mobile, half on tablet, half on desktop */}
-<Col $m='2/6' $xl='4/10'>…</Col>       {/* l inherits m's 2/6 until xl */}
+<Col l='3/11'>…</Col>                 {/* full width below 1024px, cols 3–10 from l up */}
+<Col m='1/4' l='1/7'>…</Col>         {/* full on mobile, half on tablet, half on desktop */}
+<Col m='2/6' xl='4/10'>…</Col>       {/* l inherits m's 2/6 until xl */}
 ```
 
 Values, syntax and more examples: [Grid span props](./GridSystemProps.md).
@@ -97,15 +110,15 @@ Values, syntax and more examples: [Grid span props](./GridSystemProps.md).
 A grid can be a child of another grid — give the inner `Grid` span props like any other child:
 
 ```tsx
-<Grid $isFixed>
-	<Grid $l='2/12' $noMargin>
-		<Col $l='1/6'>…</Col>
-		<Col $l='6/11'>…</Col>
+<Grid isFixed>
+	<Grid l='2/12' noMargin>
+		<Col l='1/6'>…</Col>
+		<Col l='6/11'>…</Col>
 	</Grid>
 </Grid>
 ```
 
-The inner grid builds its own column tracks (2 / 6 / 12) inside the area it spans; `$noMargin` drops its side padding so it lines up with the outer content.
+The inner grid builds its own column tracks (2 / 6 / 12) inside the area it spans; `noMargin` drops its side padding so it lines up with the outer content.
 
 Spans never leak between levels. The `--col-*` properties are registered with `@property … { inherits: false }`, and each `waffl-grid` also resets them to `initial` (for browsers without `@property`). A nested grid's children start from full width, whatever the parent's spans were.
 
@@ -114,9 +127,9 @@ Spans never leak between levels. The `--col-*` properties are registered with `@
 Spans are always set through `Col`'s props — the `--col-*` variables are internal. To span a component that renders its own element (a `Link`, an `Image`), render it through `Col` with `as`, or wrap it:
 
 ```tsx
-<Col as={Link} href='/work' $m='2/6' $l='3/9'>…</Col>
+<Col as={Link} href='/work' m='2/6' l='3/9'>…</Col>
 
-<Col $m='1/4' $l='7/13'>
+<Col m='1/4' l='7/13'>
 	<Image … />
 </Col>
 ```
@@ -128,8 +141,8 @@ Spans are always set through `Col`'s props — the `--col-*` variables are inter
 
 ## Best practices
 
-- Let children default to full width; don't write `$s='1/-1'` everywhere.
+- Let children default to full width; don't write `s='1/-1'` everywhere.
 - Set spans only where the layout changes and let the cascade fill in the rest.
-- Use `$isFixed` on page-level grids to cap the content width.
+- Use `isFixed` on page-level grids to cap the content width.
 - Prefer a nested `Grid` over hand-maths when a section needs its own sub-columns.
 - Change column counts, gutters and breakpoints in `src/theme/grid/index.ts`, then run `bun run styles`.

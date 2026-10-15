@@ -11,7 +11,7 @@ import { splitSpans } from './spans';
 // ------------
 // NOTE • A grid child with responsive spans — only meaningful as a direct
 // child of <Grid>. Pick the tag with `as` (a div by default):
-//   <Col as='article' $m='2/6' $l='3/9'>…</Col>
+//   <Col as='article' m='2/6' l='3/9'>…</Col>
 // Children that span the full width don't need Col at all.
 const Col = <T extends ElementType = 'div'>({ as, style, ...props }: I.ColProps<T>) => {
 	// Derived

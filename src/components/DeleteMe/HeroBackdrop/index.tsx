@@ -29,7 +29,7 @@ const HeroBackdrop = () => {
 	return (
 		<div ref={columnsRef} className={s.jacket} aria-hidden='true'>
 			<HeroField columnsRef={columnsRef} />
-			<Grid $isFixed className={s.grid}>
+			<Grid isFixed className={s.grid}>
 				{COLUMNS.map(column => (
 					<span key={column} className={s.column} style={{ '--index': column }} />
 				))}

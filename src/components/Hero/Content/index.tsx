@@ -6,7 +6,7 @@
 import { isLoaderPending, LOADER_REVEAL } from '@parts/SiteLoader/events';
 import SpecialHeading from '@parts/SpecialHeading';
 import { useAnimation } from '@utils/useAnimation';
-import Grid, { Col } from '@waffl';
+import Grid from '@waffl';
 import { gsap } from 'gsap';
 import { Fragment, useRef } from 'react';
 import { introDefaults, introReplays, introSettings, sceneIntros } from '../Background/scene-intro';
@@ -180,7 +180,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 	return (
 		<section ref={ref} className={s.content} data-hero-content>
 			<Grid>
-				<Col as='hgroup' $l='1/5'>
+				<hgroup>
 					<div className={s.heading}>
 						<SpecialHeading text={heading} tag='h1' />
 						<span className={s.wipe} data-heading-wipe aria-hidden='true' />
@@ -201,7 +201,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 							)
 						)}
 					</p>
-				</Col>
+				</hgroup>
 			</Grid>
 		</section>
 	);

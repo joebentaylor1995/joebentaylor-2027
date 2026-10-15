@@ -1,0 +1,59 @@
+// Styles: Introduction
+// ------------
+
+.jacket {
+	// Add section styles here.
+}
+
+.header {
+	--color: var(--global-white);
+
+	display: flex;
+	height: 100svh;
+	flex-direction: column;
+	justify-content: flex-end;
+	align-items: flex-start;
+	gap: var(--gap-xl);
+	padding-block: var(--gap-xl);
+
+	h2 {
+		color: var(--color);
+	}
+
+	p {
+		display: flex;
+		flex-direction: column;
+	}
+
+	em {
+		display: none;
+		
+		@include bp(l) {
+			display: block;
+			position: absolute;
+			bottom: var(--gap-xl);
+			right: var(--gap-xl);
+			font-style: normal;
+			color: alpha(var(--color), 40);
+		}
+	}
+}
+
+.bottom {
+	position: relative;
+}
+
+.heading {
+	position: sticky;
+	bottom: var(--gap-xl); left: 0;
+	align-self: end;
+	padding-top: var(--gap-xl);
+}
+
+.text {
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-xl);
+	color: alpha(var(--global-white), 60);
+	padding-top: var(--gap-xl);
+}

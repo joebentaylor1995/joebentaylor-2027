@@ -43,5 +43,5 @@ export const toCode = (items: I.Item[], hasGutter: boolean): string => {
 			: `  <div>${item.label}</div> {/* full width by default */}`;
 	});
 
-	return [`<Grid $isFixed${hasGutter ? '' : ' $noGutter'}>`, ...children, '</Grid>'].join('\n');
+	return [`<Grid isFixed${hasGutter ? '' : ' noGutter'}>`, ...children, '</Grid>'].join('\n');
 };

@@ -25,7 +25,7 @@ const Demo = ({ children, hasOverlay = true, caption, className, style }: I.Demo
 	<figure className={cn(s.jacket, className)} style={style}>
 		{hasOverlay && (
 			<div className={s.overlay} aria-hidden='true'>
-				<Grid $isFixed>
+				<Grid isFixed>
 					{Array.from({ length: OVERLAY_CELLS }, (_, index) => (
 						// biome-ignore lint/suspicious/noArrayIndexKey: a fixed, static list of identical cells
 						<span key={index} className={s.column} />
@@ -37,7 +37,7 @@ const Demo = ({ children, hasOverlay = true, caption, className, style }: I.Demo
 		<div className={s.stage}>{children}</div>
 
 		{caption && (
-			<Grid $isFixed>
+			<Grid isFixed>
 				<figcaption className={s.caption}>{caption}</figcaption>
 			</Grid>
 		)}

@@ -16,6 +16,8 @@ export const GlobalContext = createContext({
 
 	menuOpen: false,
 	setMenuOpen: (_value: boolean) => {},
+	profileOpen: false,
+	setProfileOpen: (_value: boolean) => {},
 });
 
 // Component
@@ -26,6 +28,7 @@ const Contexts = ({ children }: I.ContextsProps) => {
 
 	// States
 	const [menuOpen, setMenuOpen] = useState<boolean>(false);
+	const [profileOpen, setProfileOpen] = useState(false);
 
 	// Context Values
 	const contextValue = useMemo(
@@ -33,8 +36,10 @@ const Contexts = ({ children }: I.ContextsProps) => {
 			lenisRef,
 			menuOpen,
 			setMenuOpen,
+			profileOpen,
+			setProfileOpen,
 		}),
-		[menuOpen]
+		[menuOpen, profileOpen]
 	);
 
 	return (

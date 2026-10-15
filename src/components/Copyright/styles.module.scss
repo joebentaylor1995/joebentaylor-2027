@@ -10,22 +10,25 @@
     justify-content: space-between;
     gap: var(--gap-s);
 
-	position: absolute;
+    position: relative;
     z-index: 2;
-	inset: auto auto var(--offset) 50%;
-    transform: translateX(-50%);
-
-    width: var(--width);
+    width: auto;
+    margin: var(--gap-sm) var(--gap-l) 0;
     text-align: center;
 
     pointer-events: none;
     user-select: none;
 
-    @include bp(m) {
+    @include heroDesktop {
         --offset: var(--gap-l);
+        position: absolute;
+        inset: auto auto var(--offset) 50%;
+        transform: translateX(-50%);
+        width: var(--width);
+        margin: 0;
     }
 
-    @include bp(l) {
+    @include heroDesktop {
         --offset: var(--gap-xl);
         --width: calc((100vw - 7 * var(--gap-xl)) / 6);
     }
@@ -33,7 +36,11 @@
     em {
         display: inline-block;
         font-style: normal;
-        color: alpha(var(--global-white), 60);
+        color: alpha(var(--global-white), 40);
+
+        @include heroDesktop {
+            color: alpha(var(--global-white), 60);
+        }
     }
 
     .line {

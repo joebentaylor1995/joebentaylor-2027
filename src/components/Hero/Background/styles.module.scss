@@ -2,13 +2,28 @@
 // ------------
 
 .jacket {
+    --mobile-portrait-x: 0%;
+    --mobile-portrait-y: 0%;
+    --mobile-portrait-scale: 1;
+    --mobile-portrait-rotation: 0deg;
+
     position: absolute;
     inset: 0;
     overflow: clip;
     z-index: 0;
     pointer-events: none;
 
-    .fallback { object-fit: cover; }
+    .fallback {
+        object-fit: cover;
+        transform-origin: center bottom;
+        transform: translate(var(--mobile-portrait-x), var(--mobile-portrait-y))
+            rotate(var(--mobile-portrait-rotation)) scale(var(--mobile-portrait-scale));
+
+        @include heroDesktop {
+            transform: none;
+            transform-origin: center;
+        }
+    }
 
     .canvas {
         width: 100%;
@@ -26,7 +41,7 @@
     display: none;
     margin-block: var(--gap-m);
 
-    @include bp(l) {
+    @include heroDesktop {
         @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
             display: block;
         }

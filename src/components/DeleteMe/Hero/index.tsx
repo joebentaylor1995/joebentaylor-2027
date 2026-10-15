@@ -214,8 +214,8 @@ const Hero = () => {
 			<HeroBackdrop />
 			<HeroTweaks />
 
-			<Grid $isFixed className={s.content}>
-				<Col $m='2/6' $l='3/11'>
+			<Grid isFixed className={s.content}>
+				<Col m='2/6' l='3/11'>
 					<div ref={innerRef} className={s.inner}>
 						<p className={s.eyebrow}>Introducing</p>
 						<h1 ref={titleRef} className={s.title} aria-label={TITLE}>

@@ -1,0 +1,219 @@
+.jacket {
+	position: relative;
+	height: 100dvh;
+	overflow: clip;
+	isolation: isolate;
+	background: var(--brand-c4);
+
+
+	@media (prefers-reduced-motion: reduce) {
+		&[data-state='closed'] {
+			height: auto;
+			min-height: 100dvh;
+			overflow: visible;
+		}
+	}
+}
+
+.scene {
+	position: relative;
+	z-index: 1;
+	width: 100%;
+	height: 100%;
+	transform: translate(0, 0);
+	transition: transform 1.2s cubic-bezier(0.76, 0, 0.24, 1);
+
+	[data-state='open'] > & {
+		transform: translateX(-50%);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		transition: none;
+
+		[data-state='closed'] > & {
+			height: auto;
+			min-height: 100dvh;
+			transform: none;
+		}
+	}
+}
+
+.panel {
+	position: absolute;
+	z-index: 3;
+	inset: 0 0 0 auto;
+	width: 100%;
+	max-width: 97.1rem;
+	transform: translateX(100%);
+	transition: transform 1.2s cubic-bezier(0.76, 0, 0.24, 1);
+	overflow: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: none;
+	background: var(--brand-c4);
+	color: var(--global-white);
+	visibility: hidden;
+
+	&::-webkit-scrollbar { display: none; }
+
+	[data-state='open'] > &,
+	[data-state='closing'] > & { visibility: visible; }
+
+	[data-state='open'] > & { transform: translateX(0); }
+
+	@media (prefers-reduced-motion: reduce) { transition: none; }
+}
+
+.panelContent {
+	display: flow-root;
+	min-height: 100%;
+}
+
+.overlay {
+	[data-cursor='close'] > & { cursor: none; }
+
+	position: absolute;
+	z-index: 2;
+	inset: 0;
+	background: alpha(--global-black, 60);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 1.2s cubic-bezier(0.76, 0, 0.24, 1);
+
+	[data-state='open'] > & {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	@media (prefers-reduced-motion: reduce) { transition: none; }
+}
+
+.toolbar {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	display: flex;
+	justify-content: flex-end;
+	padding: var(--gap-m);
+	margin-bottom: calc(-4.3rem - var(--gap-m) * 2);
+
+	@include heroDesktop {
+		justify-content: flex-start;
+		padding: var(--gap-l);
+		margin-bottom: calc(-4.3rem - var(--gap-l) * 2);
+	}
+}
+
+.closeButton {
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: 4.3rem;
+	height: 4.3rem;
+	border: 0;
+	background: transparent;
+	color: var(--global-white);
+	cursor: pointer;
+	transition: opacity var(--time-m) var(--easing-bezzy);
+
+	&:hover { opacity: 0.4; }
+
+	// Extend the hover and click target without moving or enlarging the arrow.
+	&::before {
+		content: '';
+		position: absolute;
+		inset: calc(-1 * var(--gap-m));
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--brand-c1);
+		outline-offset: 4px;
+	}
+}
+
+// Empty scrollable canvas, replaced by profile content through the profile slot.
+.placeholder { min-height: 200dvh; }
+
+.mobileIcon {
+	@include heroDesktop { display: none; }
+}
+
+.desktopIcon {
+	display: none;
+
+	@include heroDesktop { display: block; }
+}
+
+.cursor {
+	position: fixed;
+	z-index: 4;
+	top: 0;
+	left: 0;
+	pointer-events: none;
+	color: var(--global-white);
+}
+
+.cursorAppearance {
+	display: block;
+	width: 0;
+	height: 0;
+	opacity: 0;
+	scale: 0;
+	transform-origin: 0 0;
+	transition: opacity 0.2s ease, scale 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+
+	[data-cursor] & {
+		opacity: 1;
+		scale: 1;
+	}
+
+	@media (prefers-reduced-motion: reduce) { transition: none; }
+}
+
+.cursorShape {
+	display: grid;
+	place-items: center;
+	width: 6.4rem;
+	height: 6.4rem;
+	border: 1px solid currentcolor;
+	border-radius: 50%;
+	transform: translate(-50%, -50%) rotate(var(--cursor-angle, 0deg)) scale(var(--cursor-stretch, 1), var(--cursor-squash, 1));
+	transition: width 0.4s ease, height 0.4s ease, border-color 0.2s ease;
+
+	[data-cursor='sticky'] & {
+		width: 4.3rem;
+		height: 4.3rem;
+		transition: width 0.4s ease, height 0.4s ease, border-color 0.2s ease, transform 0.35s ease;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		&,
+		[data-cursor='sticky'] & { transition: none; }
+	}
+}
+
+.closeCursor {
+	position: fixed;
+	z-index: 5;
+	top: 0;
+	left: 0;
+	width: 0;
+	height: 0;
+	pointer-events: none;
+	color: var(--global-white);
+
+	svg {
+		display: block;
+		opacity: 0;
+		transform: translate(-50%, -50%) scale(0);
+		transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	[data-cursor='close'] & svg {
+		opacity: 1;
+		transform: translate(-50%, -50%) scale(1);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		svg { transition: none; }
+	}
+}

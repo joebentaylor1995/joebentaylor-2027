@@ -271,11 +271,11 @@ Dynamic **state** goes on a `data-*` attribute and is styled with an attribute s
 
 ### Spans need a grid
 
-`Col`'s span props (`$m='1/4'`, `$l='1/7'`) only take effect when the `Col` is a **direct child of a `<Grid>`** — the span rules live on `waffl-grid > *`. A `Card` that renders a `Col` must itself be placed straight inside a grid:
+`Col`'s span props (`m='1/4'`, `l='1/7'`) only take effect when the `Col` is a **direct child of a `<Grid>`** — the span rules live on `waffl-grid > *`. A `Card` that renders a `Col` must itself be placed straight inside a grid:
 
 ```tsx
 <Grid>
-	<Card title='…' />   {/* Card renders <Col $m='1/4'> → spans work */}
+	<Card title='…' />   {/* Card renders <Col m='1/4'> → spans work */}
 </Grid>
 ```
 
@@ -300,16 +300,16 @@ Prefer a `data-*` attribute over a conditional class when the change is a state 
 ```tsx
 import Grid, { Col } from '@waffl';
 
-<Grid $isFixed>
+<Grid isFixed>
 	{/* full on mobile, cols 2–6 of 6 on tablet, cols 3–9 of 12 on desktop */}
-	<Col as='article' className={s.content} $m='2/6' $l='3/9'>…</Col>
+	<Col as='article' className={s.content} m='2/6' l='3/9'>…</Col>
 
 	{/* full width at every breakpoint — no props, no component */}
 	<figure className={s.media}>…</figure>
 </Grid>
 ```
 
-Each span falls back to the breakpoint below it, so `$l` alone stays full-width below `l`. Details in [Waffl Grid](./WafflGrid.md) and [Grid span props](./GridSystemProps.md).
+Each span falls back to the breakpoint below it, so `l` alone stays full-width below `l`. Details in [Waffl Grid](./WafflGrid.md) and [Grid span props](./GridSystemProps.md).
 
 ## Import cheat sheet
 
@@ -336,5 +336,5 @@ Each span falls back to the breakpoint below it, so `$l` alone stays full-width 
 | `alpha(--brand-c1, 20)` for translucency | Hand-rolled rgba strings |
 | `transition: x var(--time-m) var(--easing-bezzy)` | Magic duration numbers |
 | `&[data-state='open']` for state | Toggling one-off global classes |
-| Let grid children default to full width | `<Col $s='1/-1'>` on everything |
+| Let grid children default to full width | `<Col s='1/-1'>` on everything |
 | Bare tag selectors in `global.scss` | Bare tag selectors at the top level of a module |

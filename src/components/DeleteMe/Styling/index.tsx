@@ -16,8 +16,8 @@ import s from './styles.module.scss';
 // ------------
 const Styling = () => (
 	<Section id='styling' title='Design tokens. Zero runtime.' intro={<p>Every demo runs on the kit's own tokens.</p>}>
-		<Grid $isFixed>
-			<Tile $l='1/7'>
+		<Grid isFixed>
+			<Tile l='1/7'>
 				<h3 className={s.title}>Colour and opacity</h3>
 				<p className={s.text}>
 					<code>alpha()</code> makes any colour translucent, in SCSS or JS.
@@ -25,13 +25,13 @@ const Styling = () => (
 				<AlphaPlayground />
 			</Tile>
 
-			<Tile $l='7/13'>
+			<Tile l='7/13'>
 				<h3 className={s.title}>Type styles</h3>
 				<p className={s.text}>Written once, used three ways. Resize to see it scale.</p>
 				<TypeTester />
 			</Tile>
 
-			<Tile $l='1/7'>
+			<Tile l='1/7'>
 				<h3 className={s.title}>Breakpoints</h3>
 				<p className={s.text}>
 					Mobile-first: <code>bp()</code> in SCSS, <code>mq</code> in JS. Live:
@@ -53,7 +53,7 @@ mq.up.l; // '(min-width: 1024px)'`}
 				/>
 			</Tile>
 
-			<Tile $l='7/13'>
+			<Tile l='7/13'>
 				<h3 className={s.title}>Section spacing</h3>
 				<p className={s.text}>One vertical rhythm, from a data attribute or a mixin.</p>
 				<Code

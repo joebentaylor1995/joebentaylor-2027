@@ -12,24 +12,21 @@
 	}
 }
 
-
-
 .marquee {
 	--gap: var(--gap-xl);
 
-	position: absolute;
-	z-index: -1;
+	position: relative;
+	flex: none;
+	z-index: 2;
 	right: 0;
 	bottom: 0;
 	left: 0;
 
 	display: flex;
 	gap: var(--gap);
-	padding-block: var(--gap-l);
+	padding-block: calc(var(--gap-sm) + 1rem) 0;
+	height: calc(4.1rem + var(--gap-sm) + 1rem);
 	user-select: none;
-
-	border-top: 1px solid alpha(var(--brand-c4), 5);
-
 	// Keep semantic logo names available while the GPU owns their visible pixels.
 	:global([data-liquid-ready='true']) & {
 		opacity: 0;
@@ -37,21 +34,44 @@
 		.track { animation-play-state: paused; }
 	}
 
-	// &:hover .track {
-	// 	animation-play-state: paused;
-	// }
-
 	h2 {
 		--offset: var(--gap-s);
 
 		position: absolute;
-		top: 0;
-		left: var(--gap-xl);
-		translate: calc(-1 * var(--offset)) -50%;
+		inset: 0 0 auto;
+		translate: none;
+		display: flex;
+		align-items: center;
+		gap: var(--gap-sm);
+		background: transparent;
+		padding: 0;
+		color: alpha(var(--global-white), 40);
 
-		color: alpha(var(--brand-c4), 40);
-		background: var(--brand-c5);
-		padding: var(--offset);
+		&::before, &::after {
+			content: '';
+			flex: 1;
+			height: 1px;
+			background: alpha(var(--global-white), 10);
+		}
+	}
+
+	@include heroDesktop {
+		position: absolute;
+		z-index: -1;
+		padding-block: var(--gap-l);
+		height: auto;
+		border-top: 1px solid alpha(var(--brand-c4), 5);
+
+		h2 {
+			inset: 0 auto auto var(--gap-xl);
+			translate: calc(-1 * var(--offset)) -50%;
+			display: block;
+			color: alpha(var(--brand-c4), 40);
+			background: var(--brand-c5);
+			padding: var(--offset);
+
+			&::before, &::after { content: none; }
+		}
 	}
 }
 
@@ -71,9 +91,21 @@
 		animation: none;
 	}
 
-	@include bp(l) {
+	@include heroDesktop {
 		animation-play-state: paused;
 	}
+}
+
+.mobileLabel {
+	display: inline;
+
+	@include heroDesktop { display: none; }
+}
+
+.desktopLabel {
+	display: none;
+
+	@include heroDesktop { display: inline; }
 }
 
 .logo {
@@ -84,11 +116,18 @@
 	img {
 		--logo-ratio: 3.5;
 
-		filter: invert(1);
+		filter: none;
 		opacity: 0.4;
-		width: auto;
-		height: 2.5rem;
-		height: clamp(1.8rem, calc(4.6rem / sqrt(var(--logo-ratio))), 3.6rem);
+		width: 6rem;
+		height: auto;
+		max-height: 4.1rem;
 		object-fit: contain;
+
+		@include heroDesktop {
+			filter: invert(1);
+			width: auto;
+			height: clamp(1.8rem, calc(4.6rem / sqrt(var(--logo-ratio))), 3.6rem);
+			max-height: none;
+		}
 	}
 }

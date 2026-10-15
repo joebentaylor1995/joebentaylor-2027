@@ -1,7 +1,8 @@
 // Styles: SpecialHeading
 // ---------------
 .special {
-    --color: var(--brand-c4);
+    --color: var(--global-white);
+
     display: flex;
     align-items: center;
     gap: var(--gap-s);

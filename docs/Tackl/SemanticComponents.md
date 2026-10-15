@@ -25,22 +25,22 @@ The element is whatever the markup says, accepts every HTML attribute, and works
 ```tsx
 import Grid, { Col } from '@waffl';
 
-<Grid $isFixed>
-	<Col as='article' className={s.content} $m='2/6' $l='3/9'>…</Col>
-	<Col as='aside' $l='9/13'>…</Col>
+<Grid isFixed>
+	<Col as='article' className={s.content} m='2/6' l='3/9'>…</Col>
+	<Col as='aside' l='9/13'>…</Col>
 </Grid>
 ```
 
 | Prop | Type | What it does |
 | --- | --- | --- |
 | `as` | any element type | The tag (or component) to render. Default `div`. |
-| `$s` `$sm` `$m` `$l` `$xl` `$xxl` `$huge` `$uber` | `string` | `grid-column` value from that breakpoint up — `'2/6'`, `'1/-1'`, `'span 3'` |
+| `s` `sm` `m` `l` `xl` `xxl` `huge` `uber` | `string` | `grid-column` value from that breakpoint up — `'2/6'`, `'1/-1'`, `'span 3'` |
 | everything else | props of the chosen tag | `className`, `ref`, `id`, `aria-*`, `data-*`, event handlers… — typed for that tag |
 
 What it renders is just the tag with a style attribute:
 
 ```tsx
-<Col as='article' $m='2/6' $l='3/9'>…</Col>
+<Col as='article' m='2/6' l='3/9'>…</Col>
 // → <article style="--col-m: 2/6; --col-l: 3/9">…</article>
 ```
 
@@ -66,7 +66,7 @@ Values combine as space-separated words — `data-mar='top bottom'`, `data-pad='
 ```tsx
 <section data-pad>…</section>
 <footer data-pad='top' data-mar='bottom'>…</footer>
-<Col as='article' $l='3/11' data-pad>…</Col>
+<Col as='article' l='3/11' data-pad>…</Col>
 ```
 
 A bare `data-pad` renders as `data-pad="true"` in React (and `""` in plain HTML); both mean top + bottom.
@@ -94,7 +94,7 @@ The polymorphic `Div` primitive and its spacing props have been removed. Map old
 | --- | --- |
 | `import { Div } from '@tackl'` | Plain JSX tags; `import { Col } from '@waffl'` only for spanned grid children |
 | `<Div as='section'>` | `<section>` |
-| `<Div as='article' $m='2/6' $l='3/9'>` (in a grid) | `<Col as='article' $m='2/6' $l='3/9'>` |
+| `<Div as='article' m='2/6' l='3/9'>` (in a grid) | `<Col as='article' m='2/6' l='3/9'>` |
 | `<Div $pad>` | `<div data-pad>` |
 | `<Div $padTop>` / `$padBottom` | `data-pad='top'` / `data-pad='bottom'` |
 | `<Div $mar>` / `$marTop` / `$marBottom` | `data-mar` / `data-mar='top'` / `data-mar='bottom'` |

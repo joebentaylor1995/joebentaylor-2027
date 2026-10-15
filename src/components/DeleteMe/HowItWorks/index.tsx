@@ -55,8 +55,8 @@ export const baseColors = {
 		label: 'Card/index.tsx',
 		code: `
 <section data-pad>
-  <Grid $isFixed>
-    <Col $m='2/6' $l='3/11' className={s.jacket}>
+  <Grid isFixed>
+    <Col m='2/6' l='3/11' className={s.jacket}>
       <h2 className='t-headlineL'>Hello</h2>
     </Col>
   </Grid>
@@ -68,9 +68,9 @@ export const baseColors = {
 // ------------
 const HowItWorks = () => (
 	<Section id='how' title='Tokens in. Static CSS out.' intro={<p>SCSS modules, compiled at build time.</p>}>
-		<Grid $isFixed>
+		<Grid isFixed>
 			{STEPS.map(({ title, text, label, code }, index) => (
-				<Tile key={title} $l={index % 2 ? '7/13' : '1/7'}>
+				<Tile key={title} l={index % 2 ? '7/13' : '1/7'}>
 					<p className={s.index}>Step {index + 1}</p>
 					<h3 className={s.title}>{title}</h3>
 					<p className={s.text}>{text}</p>

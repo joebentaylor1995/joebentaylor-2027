@@ -25,7 +25,10 @@ const LogoMarquee = ({ logos }: I.LogoMarqueeProps) => {
 
 	return (
 		<section className={s.marquee} data-logo-marquee>
-			<h2 data-type='captionL'>Trusted by</h2>
+			<h2 data-type='captionL'>
+				<span className={s.desktopLabel}>Trusted by</span>
+				<span className={s.mobileLabel}>Clients include</span>
+			</h2>
 
 			<ul className={s.track} data-logo-track>
 				{items(false)}

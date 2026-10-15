@@ -62,9 +62,9 @@ const GetStarted = () => (
 			</p>
 		}
 	>
-		<Grid $isFixed>
+		<Grid isFixed>
 			{STEPS.map(({ title, text, label, code }, index) => (
-				<Tile key={title} $l={`${index * 4 + 1}/span 4`}>
+				<Tile key={title} l={`${index * 4 + 1}/span 4`}>
 					<span className={s.index}>{index + 1}</span>
 					<h3 className={s.title}>{title}</h3>
 					<p className={s.text}>{text}</p>
@@ -73,7 +73,7 @@ const GetStarted = () => (
 			))}
 		</Grid>
 
-		<Grid $isFixed className={s.cta}>
+		<Grid isFixed className={s.cta}>
 			<Col className={s.ctaInner}>
 				<CopyButton text='bunx tackl' />
 				<a className={s.link} href={DOCS_URL}>

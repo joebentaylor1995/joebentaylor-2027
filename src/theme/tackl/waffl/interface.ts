@@ -4,21 +4,23 @@ import type { Breakpoints } from '@theme/grid/interface';
 import type { ComponentProps, ElementType, HTMLAttributes } from 'react';
 
 // SECTION • Spans
-// NOTE — One optional grid-column value per breakpoint ($s, $m, $l…),
+// NOTE — One optional grid-column value per breakpoint (s, m, l…),
 // derived from the grid tokens so a new breakpoint adds a prop automatically
 export type SpanProps = {
-	[K in keyof Breakpoints as `$${K}`]?: string;
+	[K in keyof Breakpoints]?: string;
 };
 
 // SECTION • Grid
 // NOTE — Layout switches become data attributes on <waffl-grid> (styled in
 // src/css/global.scss). Span props let a grid sit inside another grid.
 export interface GridProps extends SpanProps, HTMLAttributes<HTMLElement> {
-	$noMargin?: boolean;
-	$isFixed?: boolean;
-	$isFullscreen?: boolean;
-	$isCenter?: boolean;
-	$noGutter?: boolean;
+	/** Positive integer column count from bp(l) upwards. */
+	columnsDesktop?: number;
+	noMargin?: boolean;
+	isFixed?: boolean;
+	isFullscreen?: boolean;
+	isCenter?: boolean;
+	noGutter?: boolean;
 }
 
 // SECTION • Col

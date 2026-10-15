@@ -14,6 +14,30 @@
   isolation: isolate;
 
   user-select: none;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: clip;
+  padding-bottom: var(--gap-l);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0;
+    height: 38rem;
+    background: linear-gradient(transparent, var(--global-black));
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  @include heroDesktop {
+    display: block;
+    overflow: visible;
+    padding-bottom: 0;
+
+    &::after { content: none; }
+  }
 }
 
 .introCover {

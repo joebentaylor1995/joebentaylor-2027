@@ -94,9 +94,9 @@ const GROUPS = [
 // ------------
 const Features = () => (
 	<Section id='features' title='Batteries included.' intro={<p>The unglamorous parts, done properly.</p>}>
-		<Grid $isFixed>
+		<Grid isFixed>
 			{GROUPS.map(({ title, features }) => (
-				<Tile key={title} $m='1/7' $l='span 4' className={s.group}>
+				<Tile key={title} m='1/7' l='span 4' className={s.group}>
 					<h3 className={s.groupTitle}>{title}</h3>
 					<ul className={s.list}>
 						{features.map(feature => (
@@ -111,7 +111,7 @@ const Features = () => (
 			))}
 		</Grid>
 
-		<Grid $isFixed className={s.demo}>
+		<Grid isFixed className={s.demo}>
 			<Tile tone='glow' className={s.demoTile}>
 				<div className={s.demoCopy}>
 					<h3 className={s.demoTitle}>Try the consent manager.</h3>

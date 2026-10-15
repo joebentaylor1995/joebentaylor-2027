@@ -14,28 +14,28 @@ import s from './styles.module.scss';
 
 // Constants
 // ------------
-type Switch = '$isFixed' | '$noGutter' | '$noMargin' | '$isCenter' | '$isFullscreen';
+type Switch = 'isFixed' | 'noGutter' | 'noMargin' | 'isCenter' | 'isFullscreen';
 
 const SWITCHES: { prop: Switch; comment: string }[] = [
-	{ prop: '$isFixed', comment: 'max-width 1440px, centred' },
-	{ prop: '$noGutter', comment: 'no gap between columns or rows' },
-	{ prop: '$noMargin', comment: 'no margin at the sides' },
-	{ prop: '$isCenter', comment: 'centre items vertically' },
-	{ prop: '$isFullscreen', comment: 'fill the parent’s height' },
+	{ prop: 'isFixed', comment: 'max-width 1440px, centred' },
+	{ prop: 'noGutter', comment: 'no gap between columns or rows' },
+	{ prop: 'noMargin', comment: 'no margin at the sides' },
+	{ prop: 'isCenter', comment: 'centre items vertically' },
+	{ prop: 'isFullscreen', comment: 'fill the parent’s height' },
 ];
 
 const INITIAL: Record<Switch, boolean> = {
-	$isFixed: false,
-	$noGutter: false,
-	$noMargin: false,
-	$isCenter: false,
-	$isFullscreen: false,
+	isFixed: false,
+	noGutter: false,
+	noMargin: false,
+	isCenter: false,
+	isFullscreen: false,
 };
 
 // Component
 // ------------
 // NOTE • Every layout switch on <Grid>, live. The preview is a fixed-height
-// frame, so $isFullscreen and $isCenter have room to show, and $isFixed's
+// frame, so isFullscreen and isCenter have room to show, and isFixed's
 // 1440px is scaled down to fit it.
 const Switches = () => {
 	// State
@@ -46,7 +46,7 @@ const Switches = () => {
 	const gridProps: GridProps = Object.fromEntries(active.map(({ prop }) => [prop, true]));
 	// NOTE • The overlay only mirrors the columns — centring would collapse
 	// them to zero height
-	const { $isCenter: _, ...overlayProps } = gridProps;
+	const { isCenter: _, ...overlayProps } = gridProps;
 	const code = [
 		`<Grid${active.map(({ prop }) => ` ${prop}`).join('')}>`,
 		'  …',
@@ -76,9 +76,9 @@ const Switches = () => {
 					))}
 				</Grid>
 				<Grid {...gridProps} className={s.grid}>
-					<Cell label='A' $m='span 2' $l='span 4' />
-					<Cell label='B' $m='span 2' $l='span 4' tone='soft' />
-					<Cell label='C' $m='span 2' $l='span 4' />
+					<Cell label='A' m='span 2' l='span 4' />
+					<Cell label='B' m='span 2' l='span 4' tone='soft' />
+					<Cell label='C' m='span 2' l='span 4' />
 				</Grid>
 			</div>
 

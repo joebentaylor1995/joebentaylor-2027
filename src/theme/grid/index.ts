@@ -19,6 +19,7 @@ export const grid = {
 		m: '700px',
 		l: '1024px',
 		xl: '1200px',
+		hero: '1283px',
 		xxl: '1400px',
 		huge: '1600px',
 		uber: '1800px',

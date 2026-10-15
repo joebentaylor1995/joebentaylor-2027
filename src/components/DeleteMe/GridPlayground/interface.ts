@@ -15,6 +15,6 @@ export type Item = {
 	id: number;
 	label: string;
 	// NOTE • Only the breakpoints set explicitly — the rest fall back, exactly
-	// like the $s/$m/$l props on <Col>
+	// like the s/m/l props on <Col>
 	spans: Partial<Record<Device, Placement>>;
 };

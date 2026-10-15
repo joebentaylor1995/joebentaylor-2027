@@ -10,22 +10,37 @@ import { splitSpans } from './spans';
 // NOTE • Renders a plain <waffl-grid> tag — no JS custom element, no
 // client code. All styling lives in src/css/global.scss (the grid layer);
 // the boolean props become data attributes:
-//   <Grid $isFixed $noGutter> → <waffl-grid data-fixed data-no-gutter>
+//   <Grid isFixed noGutter> → <waffl-grid data-fixed data-no-gutter>
 // Direct children span the full grid by default; narrow them with <Col>,
 // exported alongside: import Grid, { Col } from '@waffl'
-const Grid = ({ $noMargin, $isFixed, $isFullscreen, $isCenter, $noGutter, style, ...props }: I.GridProps) => {
+const Grid = ({
+	columnsDesktop,
+	noMargin,
+	isFixed,
+	isFullscreen,
+	isCenter,
+	noGutter,
+	className,
+	style,
+	...props
+}: I.GridProps) => {
 	// Derived
 	const { spans, rest } = splitSpans(props);
+	const desktopColumns =
+		columnsDesktop !== undefined && Number.isInteger(columnsDesktop) && columnsDesktop > 0
+			? columnsDesktop
+			: undefined;
 
 	// Render
 	return (
 		<waffl-grid
-			data-no-margin={$noMargin || undefined}
-			data-fixed={$isFixed || undefined}
-			data-fullscreen={$isFullscreen || undefined}
-			data-center={$isCenter || undefined}
-			data-no-gutter={$noGutter || undefined}
-			style={{ ...spans, ...style }}
+			data-no-margin={noMargin || undefined}
+			data-fixed={isFixed || undefined}
+			data-fullscreen={isFullscreen || undefined}
+			data-center={isCenter || undefined}
+			data-no-gutter={noGutter || undefined}
+			className={className}
+			style={{ ...spans, '--grid-columns-desktop': desktopColumns, ...style }}
 			{...rest}
 		/>
 	);

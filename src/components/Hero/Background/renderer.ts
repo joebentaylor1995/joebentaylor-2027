@@ -249,8 +249,10 @@ export function mountDepthEffect({
 		for (const key of ['intensity', 'lift', 'zoom'] as const) gl.uniform1f(u[key], s[key]);
 		gl.uniform1f(u.rotation, (s.rotation * Math.PI) / 180);
 	}
+	const profileScene = host.closest<HTMLElement>('[data-profile-scene]');
 	function draw(_time: number, deltaMs: number) {
-		if (!loaded || disposed || lost || !visible || document.hidden) return;
+		if (!loaded || disposed || lost || !visible || document.hidden || profileScene?.dataset.scenePaused === 'true')
+			return;
 		try {
 			const now = performance.now(),
 				dt = Math.min(deltaMs / 1000, 0.05) || 0.016,
@@ -342,12 +344,15 @@ export function mountDepthEffect({
 			const introConfig = introSettings.get(host) ?? introDefaults;
 			const settleProgress = Math.min(1, reveal / (introConfig.portraitFinish / 100));
 			const scaleEase = gsap.parseEase(introConfig.portraitEase)(settleProgress);
-			// Freeze width-driven cover sizing at the configured CSS viewport width.
-			// Height-driven cover sizing stays intact on tall screens.
+			// Keep tall windows from enlarging the portrait into the text column.
 			const portraitAspect = 1.4455;
 			const coverWidth = Math.max(cssWidth, cssHeight * portraitAspect);
-			const cappedWidth = Math.max(Math.min(cssWidth, s.maxWidth), cssHeight * portraitAspect);
-			const widthScale = cappedWidth / coverWidth;
+			const widthScale = cssWidth / coverWidth;
+			const settledWidth = cssWidth * s.zoom;
+			const rotation = Math.abs((s.rotation * Math.PI) / 180);
+			const bottomSpan = (settledWidth / portraitAspect) * Math.cos(rotation) - settledWidth * Math.sin(rotation);
+			const bottomOffset = Math.max(0, (cssHeight - bottomSpan) / 2);
+			gl.uniform2f(u.positionShift, s.positionX / 100, s.positionY / 100 + bottomOffset / cssHeight);
 			gl.uniform1f(
 				u.zoom,
 				(introConfig.portraitScale + (s.zoom - introConfig.portraitScale) * scaleEase) * widthScale

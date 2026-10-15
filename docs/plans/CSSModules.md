@@ -354,7 +354,7 @@ A Server Component that renders `<waffl-grid>`. Boolean props become data
 attributes:
 
 ```tsx
-<Grid $isFixed $noGutter>…</Grid>
+<Grid isFixed noGutter>…</Grid>
 // → <waffl-grid data-fixed data-no-gutter>…</waffl-grid>
 ```
 

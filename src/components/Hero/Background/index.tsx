@@ -2,9 +2,9 @@
 
 // Imports
 // ------------
-import { mq } from '@tackl';
 import Image from 'next/image';
-import { type ComponentType, useEffect, useRef, useState } from 'react';
+import { type ComponentType, type CSSProperties, useEffect, useRef, useState } from 'react';
+import { HERO_DESKTOP_QUERY } from '../layout';
 import { type DepthSettings, defaultSettings, portraitUrl } from './effect-settings';
 // Styles + Interfaces
 // ------------
@@ -48,12 +48,13 @@ const Background = ({ className }: I.BackgroundProps) => {
 		if (!canvas || !photo || !host) return;
 
 		const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-		const desktop = window.matchMedia(`${mq.up.l} and (hover: hover) and (pointer: fine)`);
+		const desktopLayout = window.matchMedia(HERO_DESKTOP_QUERY);
+		const desktop = window.matchMedia(`${HERO_DESKTOP_QUERY} and (hover: hover) and (pointer: fine)`);
 		const start = () => {
 			controllerRef.current?.destroy();
 			controllerRef.current = null;
 			setReady(false);
-			if (!motion.matches)
+			if (desktopLayout.matches && !motion.matches)
 				controllerRef.current = mountDepthEffect({
 					canvas,
 					photo,
@@ -67,10 +68,12 @@ const Background = ({ className }: I.BackgroundProps) => {
 
 		start();
 		motion.addEventListener('change', start);
+		desktopLayout.addEventListener('change', start);
 		desktop.addEventListener('change', start);
 
 		return () => {
 			motion.removeEventListener('change', start);
+			desktopLayout.removeEventListener('change', start);
 			desktop.removeEventListener('change', start);
 			controllerRef.current?.destroy();
 			controllerRef.current = null;
@@ -117,6 +120,14 @@ const Background = ({ className }: I.BackgroundProps) => {
 				aria-hidden='true'
 				data-ready={ready}
 				data-testid='hero-depth'
+				style={
+					{
+						'--mobile-portrait-x': `${settings.mobilePositionX}%`,
+						'--mobile-portrait-y': `${settings.mobilePositionY}%`,
+						'--mobile-portrait-scale': settings.mobileZoom,
+						'--mobile-portrait-rotation': `${settings.mobileRotation}deg`,
+					} as CSSProperties
+				}
 			>
 				<Image
 					ref={photoRef}

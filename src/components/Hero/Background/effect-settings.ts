@@ -21,7 +21,11 @@ export const defaultSettings = {
 	positionX: 3,
 	positionY: 3,
 	zoom: 1.12,
-	maxWidth: 1440,
+	// Figma's 440 × 796 mobile crop; vertical offset is measured from the bottom.
+	mobilePositionX: 11.48,
+	mobilePositionY: 24.87,
+	mobileZoom: 1.22,
+	mobileRotation: 0,
 	chroma: 0.65,
 	glow: 0.65,
 	chromaOn: true,
