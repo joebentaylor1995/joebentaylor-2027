@@ -3,6 +3,7 @@ export const vertex = `attribute vec2 position;varying vec2 v;void main(){v=posi
 export const fragment = `precision highp float;
 varying vec2 v;uniform sampler2D photo;uniform sampler2D depthMask;uniform vec2 resolution;uniform vec2 motion;uniform float intensity;uniform float lift;uniform float debug;uniform vec2 positionShift;uniform float rotation;uniform float zoom;
 uniform vec2 cursorPos;uniform float cursorOn;uniform float cursorSpeed;
+uniform float portraitAspect;
 uniform float chromaFX;uniform float glowFX;
 uniform float scrollFX[4];uniform float scrollVelocity;
 uniform sampler2D colourPhoto;uniform float colourMix,entrance;
@@ -14,14 +15,14 @@ float light=dot(colour,vec3(.299,.587,.114));
 vec3 tint=colour-vec3(light);
 original.rgb=clamp(original.rgb+tint*colourMix,0.,1.);return original*ok;}
 vec4 premultSample(vec2 uv){vec4 t=portrait(uv);return vec4(t.rgb*t.a,t.a);}
-float tipLight(vec2 uv,vec2 cursorUV,vec2 tip){return exp(-dot((uv-tip)*vec2(1.4455,1.),(uv-tip)*vec2(1.4455,1.))*2100.)*(1.-smoothstep(.025,.10,length((cursorUV-tip)*vec2(1.4455,1.))));}
+float tipLight(vec2 uv,vec2 cursorUV,vec2 tip){return exp(-dot((uv-tip)*vec2(portraitAspect,1.),(uv-tip)*vec2(portraitAspect,1.))*2100.)*(1.-smoothstep(.025,.10,length((cursorUV-tip)*vec2(portraitAspect,1.))));}
 
 float box(vec2 p,vec2 lo,vec2 hi){vec2 d=max(lo-p,p-hi);return max(d.x,d.y);}
 // The nose correction is baked into depthMask on the CPU (see bakeDepth in renderer.ts).
 float adjustedDepth(vec2 uv){return texture2D(depthMask,uv).r;}
 float depthAt(vec2 uv){float z=adjustedDepth(uv);return (z*.42+smoothstep(.55,.94,z)*lift*.27)*texture2D(photo,uv).a;}
 void main(){
-vec2 q=vec2(v.x,1.-v.y);float aspect=resolution.x/resolution.y;vec2 size=vec2(1.,aspect/1.4455);if(size.y<1.)size=vec2(1.4455/aspect,1.);size*=zoom;
+vec2 q=vec2(v.x,1.-v.y);float aspect=resolution.x/resolution.y;vec2 size=vec2(1.,aspect/portraitAspect);if(size.y<1.)size=vec2(portraitAspect/aspect,1.);size*=zoom;
 // Rotate in aspect-correct screen coordinates around the positioned centre.
 vec2 centred=(q-.5-positionShift)*vec2(aspect,1.);
 float c=cos(rotation),s=sin(rotation);
@@ -56,7 +57,7 @@ vec4 texel=portrait(uv);
 float focalDepth=.91;
 float blur=scrollFX[3]*scrollSpeed*smoothstep(.08,.36,abs(rawDepth-focalDepth))*.012;
 if(blur>.00001){
- vec2 radius=vec2(blur/1.4455,blur);vec4 sum=premultSample(uv)*.2;
+ vec2 radius=vec2(blur/portraitAspect,blur);vec4 sum=premultSample(uv)*.2;
  sum+=premultSample(uv+radius*vec2(1.,0.))*.1;sum+=premultSample(uv-radius*vec2(1.,0.))*.1;
  sum+=premultSample(uv+radius*vec2(0.,1.))*.1;sum+=premultSample(uv-radius*vec2(0.,1.))*.1;
  sum+=premultSample(uv+radius*vec2(.707,.707))*.1;sum+=premultSample(uv-radius*vec2(.707,.707))*.1;

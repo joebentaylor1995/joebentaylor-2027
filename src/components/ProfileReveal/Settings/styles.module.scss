@@ -1,0 +1,99 @@
+.jacket {
+	position: fixed;
+	z-index: 10;
+	top: 2rem;
+	left: 2rem;
+	width: min(34rem, calc(100vw - 101.1rem));
+	max-height: calc(100dvh - 4rem);
+	padding: 2rem;
+	overflow: auto;
+	overscroll-behavior: contain;
+	border: 1px solid alpha(--global-white, 20);
+	border-radius: 1.6rem;
+	background: var(--brand-c4);
+	color: var(--global-white);
+	font-size: 1.3rem;
+	font-family: var(--font-body);
+	line-height: 1.5;
+	cursor: auto;
+
+	summary {
+		font-size: 1.8rem;
+		cursor: pointer;
+	}
+
+	p {
+		margin: 1rem 0;
+		opacity: 0.6;
+	}
+
+	fieldset {
+		margin: 2rem 0;
+		padding: 0;
+		border: 0;
+	}
+
+	legend {
+		margin-bottom: 1rem;
+		font-size: 1.5rem;
+	}
+	input { accent-color: var(--global-white); }
+
+	input[type='number'] {
+		width: 8rem;
+		padding: 0.4rem;
+		border: 1px solid alpha(--global-white, 25);
+		border-radius: 0.4rem;
+		background: transparent;
+		color: inherit;
+	}
+
+	input[type='range'] {
+		grid-column: 1 / -1;
+		width: 100%;
+	}
+
+	button {
+		padding: 0.8rem 1rem;
+		border: 1px solid alpha(--global-white, 25);
+		border-radius: 0.6rem;
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+	}
+
+	:focus-visible {
+		outline: 2px solid var(--global-white);
+		outline-offset: 3px;
+	}
+
+	@media (width < 1280px) {
+		top: auto;
+		bottom: 1rem;
+		left: 1rem;
+		width: min(34rem, calc(100vw - 2rem));
+		max-height: 38dvh;
+	}
+}
+
+.control {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	align-items: center;
+	gap: 0.4rem;
+	margin-bottom: 1rem;
+	span { opacity: 0.5; }
+}
+
+.toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.8rem;
+	margin-top: 1rem;
+}
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem;
+}

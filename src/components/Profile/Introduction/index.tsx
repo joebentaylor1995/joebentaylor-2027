@@ -6,6 +6,7 @@ import Grid, { Col } from '@waffl';
 // Styles
 // ------------
 import s from './styles.module.scss';
+import Title from './Title';
 
 // Component
 // ------------
@@ -15,12 +16,8 @@ const Introduction = () => {
 		<section className={s.jacket}>
 			<Grid columnsDesktop={8}>
 				<Col as='hgroup' l='1/9' className={s.header}>
-					<SpecialHeading tag='h2' text='Bringing stories to life' />
-					<p data-type='displayL'>
-						<span>Designer</span>
-						<span>Developer</span>
-						<span>Storyteller</span>
-					</p>
+					<SpecialHeading tag='h2' text='Bringing stories to life' revealOnOpen />
+					<Title />
 
 					<em data-type='bodyM'>Scroll</em>
 				</Col>
@@ -28,7 +25,7 @@ const Introduction = () => {
 
 			<Grid columnsDesktop={8}>
 				<Col as='div' l='1/4' className={s.heading}>
-					<SpecialHeading tag='h2' text='Introduction' />
+					<SpecialHeading tag='h2' text='Introduction' revealOnView />
 				</Col>
 
 				<Col as='div' l='4/9' className={s.text}>

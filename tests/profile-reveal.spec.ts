@@ -53,7 +53,13 @@ for (const width of [1440, 440]) {
 		await expect.poll(() => panel.evaluate(element => element.scrollTop)).toBeGreaterThan(100);
 		expect(await page.locator('#page').evaluate(element => element.scrollTop)).toBe(pageScroll);
 		await expect(close).toBeInViewport();
+		const toolkitBounds = await panel.locator('[data-toolkit="Design toolkit"]').boundingBox();
+		await panel.hover();
+		await page.mouse.wheel(0, (toolkitBounds?.y ?? 200) - 200);
+		await expect(panel.locator('[data-toolkit="Design toolkit"]')).toHaveAttribute('data-state', 'ready');
 		await close.press('Tab');
+		await expect(panel.locator('[data-tool="figma"]')).toBeFocused();
+		await panel.locator('[data-tool="figma"]').press('Shift+Tab');
 		await expect(close).toBeFocused();
 		await close.press('Escape');
 		await expect(panel).toBeHidden();

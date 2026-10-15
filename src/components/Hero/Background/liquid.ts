@@ -242,29 +242,47 @@ export async function createLiquidLayer(
 		const textElement = host.querySelector<HTMLElement>('[data-hero-content]');
 		let textFrame: string | undefined;
 		let allocatedResolution = settings.resolution;
+		let allocatedWidth = 0;
+		let allocatedHeight = 0;
 		function resize() {
-			allocatedResolution = settings.resolution;
-			for (const t of targets) {
-				gl.deleteFramebuffer(t.fbo);
-				gl.deleteTexture(t.texture);
-				textures.delete(t.texture);
-			}
-			targets.clear();
 			cssWidth = canvas.clientWidth;
 			cssHeight = canvas.clientHeight;
 			const scale = Math.min(
 				settings.resolution / Math.min(cssWidth, cssHeight),
 				768 / Math.max(cssWidth, cssHeight)
 			);
-			simWidth = Math.max(1, Math.round(cssWidth * scale));
-			simHeight = Math.max(1, Math.round(cssHeight * scale));
-			portrait = target(canvas.width, canvas.height, gl.UNSIGNED_BYTE);
-			scene = target(canvas.width, canvas.height, gl.UNSIGNED_BYTE);
-			velocity = pair();
-			height = pair();
-			pressure = pair();
-			divergence = target(simWidth, simHeight, gl.FLOAT);
-			curl = target(simWidth, simHeight, gl.FLOAT);
+			const nextSimWidth = Math.max(1, Math.round(cssWidth * scale));
+			const nextSimHeight = Math.max(1, Math.round(cssHeight * scale));
+			// Text, font and entrance refreshes share this path with viewport resizes.
+			// Keep the live water state unless the render targets actually need a new size.
+			if (
+				allocatedWidth !== canvas.width ||
+				allocatedHeight !== canvas.height ||
+				simWidth !== nextSimWidth ||
+				simHeight !== nextSimHeight
+			) {
+				for (const t of targets) {
+					gl.deleteFramebuffer(t.fbo);
+					gl.deleteTexture(t.texture);
+					textures.delete(t.texture);
+				}
+				targets.clear();
+				allocatedWidth = canvas.width;
+				allocatedHeight = canvas.height;
+				simWidth = nextSimWidth;
+				simHeight = nextSimHeight;
+				portrait = target(canvas.width, canvas.height, gl.UNSIGNED_BYTE);
+				scene = target(canvas.width, canvas.height, gl.UNSIGNED_BYTE);
+				velocity = pair();
+				height = pair();
+				pressure = pair();
+				divergence = target(simWidth, simHeight, gl.FLOAT);
+				curl = target(simWidth, simHeight, gl.FLOAT);
+				previous = null;
+				queued = [];
+				activeTime = 0;
+			}
+			allocatedResolution = settings.resolution;
 			// Rasterise only on layout/content changes. Every animation frame scrolls this texture on the GPU.
 			const bounds = track.getBoundingClientRect(),
 				hostBounds = canvas.getBoundingClientRect();
@@ -329,9 +347,7 @@ export async function createLiquidLayer(
 			revealDark = Array.from(ctx.getImageData(0, 0, 1, 1).data)
 				.slice(0, 3)
 				.map(n => n / 255);
-			previous = null;
-			queued = [];
-			activeTime = 0;
+			textFrame = textElement?.dataset.textFrame;
 		}
 		resize();
 		return {

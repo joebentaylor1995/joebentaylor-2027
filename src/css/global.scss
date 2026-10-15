@@ -71,6 +71,10 @@
 	html {
 		font-size: 62.5%; // 10px base font size for easier rem calculations
 		interpolate-size: allow-keywords;
+
+		@media (width > 1600px) {
+			font-size: 0.625vw; // 10px at 1600px; scale all rem-based dimensions together.
+		}
 	}
 
 	// Locked viewport — deliberate (see AGENTS.md, Animation section): scrolling

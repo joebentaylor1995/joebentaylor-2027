@@ -6,7 +6,8 @@ import { GlobalContext } from '@parts/Contexts';
 import { PerformanceContext } from '@parts/Contexts/Performance';
 import { gsap } from 'gsap';
 import Lenis from 'lenis';
-import { use, useEffect, useRef, useState } from 'react';
+import { type ComponentType, use, useEffect, useRef, useState } from 'react';
+import { ProfilePresenceContext } from './context';
 
 // Styles + Interfaces
 // ------------
@@ -38,9 +39,21 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 
 	// State
 	const [presented, setPresented] = useState(false);
+	const [Settings, setSettings] = useState<ComponentType | null>(null);
 	const active = profileOpen || presented;
 
 	// Effects
+	useEffect(() => {
+		if (!new URLSearchParams(window.location.search).has('modalSettings')) return;
+		let disposed = false;
+		void import('./Settings').then(module => {
+			if (!disposed) setSettings(() => module.default);
+		});
+		return () => {
+			disposed = true;
+		};
+	}, []);
+
 	useEffect(() => {
 		const cursor = cursorRef.current;
 		const jacket = jacketRef.current;
@@ -79,6 +92,10 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			resetShape();
 		};
 		const move = (event: PointerEvent) => {
+			if (event.target instanceof Element && event.target.closest('[data-modal-settings]')) {
+				hide();
+				return;
+			}
 			if (
 				!mouse.matches ||
 				event.pointerType !== 'mouse' ||
@@ -100,7 +117,8 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 				x = bounds.left + bounds.width / 2;
 				y = bounds.top + bounds.height / 2;
 			}
-			jacket.dataset.cursor = overClose ? 'sticky' : inside ? 'follow' : 'close';
+			const overLink = event.target instanceof Element && event.target.closest('[data-cursor-link]');
+			jacket.dataset.cursor = overClose ? 'sticky' : overLink ? 'link' : inside ? 'follow' : 'close';
 			targetX = x;
 			targetY = y;
 			movement?.kill();
@@ -214,10 +232,13 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			}
 			if (event.key !== 'Tab') return;
 			const focusable = Array.from(
-				panelRef.current?.querySelectorAll<HTMLElement>(
+				jacketRef.current?.querySelectorAll<HTMLElement>(
 					'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
 				) ?? []
-			).filter(element => element.getClientRects().length > 0);
+			).filter(
+				element =>
+					element.getClientRects().length > 0 && element.closest('#profile-panel, [data-modal-settings]')
+			);
 			const first = focusable[0];
 			const last = focusable.at(-1);
 			if (event.shiftKey && document.activeElement === first) {
@@ -240,12 +261,13 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 	// Render
 	return (
 		<div ref={jacketRef} className={s.jacket} data-state={profileOpen ? 'open' : active ? 'closing' : 'closed'}>
+			{Settings && <Settings />}
 			<div
 				ref={panelRef}
 				id='profile-panel'
 				className={s.panel}
 				role='dialog'
-				aria-modal={active ? true : undefined}
+				aria-modal={active && !Settings ? true : undefined}
 				aria-label='Profile'
 				aria-hidden={!active}
 				inert={!active}
@@ -276,7 +298,9 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 							</svg>
 						</button>
 					</div>
-					{profile ?? <div className={s.placeholder} aria-hidden='true' />}
+					<ProfilePresenceContext.Provider value={active}>
+						{profile ?? <div className={s.placeholder} aria-hidden='true' />}
+					</ProfilePresenceContext.Provider>
 				</div>
 			</div>
 			<div
@@ -300,6 +324,18 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			<div ref={cursorRef} className={s.cursor} aria-hidden='true'>
 				<span className={s.cursorAppearance}>
 					<span className={s.cursorShape} />
+					<svg
+						className={s.linkCursor}
+						width='16'
+						height='16'
+						viewBox='0 0 16 16'
+						fill='currentColor'
+						aria-hidden='true'
+					>
+						<path d='M11,0C9.7,0,8.4,0.5,7.5,1.5L6.3,2.6C5.9,3,5.9,3.6,6.3,4s1,0.4,1.4,0l1.2-1.2c1.1-1.1,3.1-1.1,4.2,0 C13.7,3.4,14,4.2,14,5s-0.3,1.6-0.9,2.1L12,8.3c-0.4,0.4-0.4,1,0,1.4c0.2,0.2,0.5,0.3,0.7,0.3s0.5-0.1,0.7-0.3l1.2-1.2 C15.5,7.6,16,6.3,16,5s-0.5-2.6-1.5-3.5C13.6,0.5,12.3,0,11,0z' />
+						<path d='M8.3,12l-1.2,1.2c-1.1,1.1-3.1,1.1-4.2,0C2.3,12.6,2,11.8,2,11s0.3-1.6,0.9-2.1L4,7.7c0.4-0.4,0.4-1,0-1.4 s-1-0.4-1.4,0L1.5,7.5C0.5,8.4,0,9.7,0,11s0.5,2.6,1.5,3.5C2.4,15.5,3.7,16,5,16s2.6-0.5,3.5-1.5l1.2-1.2c0.4-0.4,0.4-1,0-1.4 S8.7,11.6,8.3,12z' />
+						<path d='M9.4,5.2L5.2,9.4c-0.4,0.4-0.4,1,0,1.4c0.2,0.2,0.5,0.3,0.7,0.3s0.5-0.1,0.7-0.3l4.2-4.2 c0.4-0.4,0.4-1,0-1.4C10.4,4.8,9.8,4.8,9.4,5.2z' />
+					</svg>
 				</span>
 			</div>
 			<div ref={closeCursorRef} className={s.closeCursor} aria-hidden='true' data-close-cursor>

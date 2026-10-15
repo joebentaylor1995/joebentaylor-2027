@@ -1,0 +1,33 @@
+.jacket {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+
+	canvas {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+
+	button {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 9.8rem;
+		height: 9.8rem;
+		padding: 0;
+		border: 0;
+		border-radius: 1.6rem;
+		background: transparent;
+		transform: translate(var(--tool-x, -200px), var(--tool-y, -200px)) rotate(var(--tool-angle, 0rad));
+		cursor: grab;
+		touch-action: none;
+
+		&:active { cursor: grabbing; }
+
+		&:focus-visible {
+			outline: 2px solid var(--global-white);
+			outline-offset: 4px;
+		}
+	}
+}

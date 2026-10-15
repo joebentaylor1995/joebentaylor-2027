@@ -170,6 +170,7 @@
 }
 
 .cursorShape {
+	opacity: 1;
 	display: grid;
 	place-items: center;
 	width: 6.4rem;
@@ -189,6 +190,21 @@
 		&,
 		[data-cursor='sticky'] & { transition: none; }
 	}
+}
+
+.linkCursor {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 20px;
+	height: 20px;
+	transform: translate(-50%, -50%);
+	opacity: 0;
+	transition: opacity 0.2s ease;
+
+	[data-cursor='link'] & { opacity: 1; }
+
+	@media (prefers-reduced-motion: reduce) { transition: none; }
 }
 
 .closeCursor {

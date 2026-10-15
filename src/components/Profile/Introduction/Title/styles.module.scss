@@ -1,0 +1,31 @@
+.jacket {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	color: var(--global-white);
+}
+
+.line {
+	--tfw-fill: -16;
+	--tfw-from: color-mix(in srgb, var(--global-white) 20%, transparent);
+	--tfw-to: var(--global-white);
+	--tfw-accent: var(--brand-c1);
+
+	display: block;
+	width: fit-content;
+	background-image: linear-gradient(
+		97deg,
+		var(--tfw-to) 0%,
+		var(--tfw-to) calc((var(--tfw-fill) - 8) * 1%),
+		var(--tfw-accent) calc(var(--tfw-fill) * 1%),
+		var(--tfw-from) calc((var(--tfw-fill) + 8) * 1%),
+		var(--tfw-from) 100%
+	);
+	background-clip: text;
+	color: transparent;
+
+	@media (prefers-reduced-motion: reduce) {
+		background-image: none;
+		color: var(--global-white);
+	}
+}

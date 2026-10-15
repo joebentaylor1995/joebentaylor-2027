@@ -244,6 +244,7 @@ export function mountDepthEffect({
 	}
 	function commonUniforms(u: Uniforms, s: DepthSettings) {
 		gl.uniform2f(u.resolution, canvas.width, canvas.height);
+		gl.uniform1f(u.portraitAspect, photo.naturalWidth / photo.naturalHeight);
 		gl.uniform2f(u.motion, pointer[0] * s.horizontal, pointer[1] * s.vertical);
 		gl.uniform2f(u.positionShift, s.positionX / 100, s.positionY / 100);
 		for (const key of ['intensity', 'lift', 'zoom'] as const) gl.uniform1f(u[key], s[key]);
@@ -345,7 +346,7 @@ export function mountDepthEffect({
 			const settleProgress = Math.min(1, reveal / (introConfig.portraitFinish / 100));
 			const scaleEase = gsap.parseEase(introConfig.portraitEase)(settleProgress);
 			// Keep tall windows from enlarging the portrait into the text column.
-			const portraitAspect = 1.4455;
+			const portraitAspect = photo.naturalWidth / photo.naturalHeight;
 			const coverWidth = Math.max(cssWidth, cssHeight * portraitAspect);
 			const widthScale = cssWidth / coverWidth;
 			const settledWidth = cssWidth * s.zoom;
@@ -524,6 +525,7 @@ export function mountDepthEffect({
 				'entrance',
 				'depthMask',
 				'resolution',
+				'portraitAspect',
 				'motion',
 				'intensity',
 				'lift',
