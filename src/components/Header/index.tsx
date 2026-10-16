@@ -9,6 +9,7 @@ import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { use, useRef, useState } from 'react';
 
 // Styles + Interfaces
@@ -21,6 +22,8 @@ import s from './styles.module.scss';
 const Header = (_props: I.HeaderProps) => {
 	// Context
 	const { profileOpen, setProfileOpen } = use(GlobalContext);
+	const pathname = usePathname();
+	const isLegalPage = /^\/(cookies|terms-privacy|llms)\/?$/.test(pathname);
 	// State
 	const [contactOpen, setContactOpen] = useState(false);
 	// Refs
@@ -75,7 +78,12 @@ const Header = (_props: I.HeaderProps) => {
 	// Render
 	return (
 		<>
-			<header ref={ref} className={s.jacket} data-profile={profileOpen ? 'open' : 'closed'}>
+			<header
+				ref={ref}
+				className={s.jacket}
+				data-profile={profileOpen ? 'open' : 'closed'}
+				data-tone={isLegalPage ? 'light' : 'dark'}
+			>
 				<nav className={s.left} aria-label='Homepage navigation'>
 					<Link href='/' aria-label='Go to home page'>
 						<Logo className={s.logo} />
