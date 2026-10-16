@@ -35,7 +35,7 @@ gl_FragColor=vec4(texture2D(source,uv).xy-vec2(r-l,t-b)*.5,0.,1.);}`;
 // In front mode the portrait joins the scene before refraction.
 export const composite = `uniform sampler2D logos,decoration,content;uniform vec3 background;
 uniform vec2 screen,strip;uniform float bottom,phase,inFront;
-uniform float logoBlur;
+uniform float logoBlur,mobile;
 void main(){vec2 p=uv*screen;float y=(p.y-bottom)/strip.y;
 vec2 logoUV=vec2(p.x/strip.x+phase,clamp(y,0.,1.));
 vec4 logo=texture2D(logos,vec2(fract(logoUV.x),logoUV.y));
@@ -45,7 +45,11 @@ for(int i=0;i<9;i++){vec4 tap=texture2D(logos,vec2(fract(logoUV.x+(float(i)-4.)*
 logo.rgb/=max(logo.a,.0001);}
 logo*=step(0.,y)*step(y,1.);vec3 col=mix(background,logo.rgb,logo.a);
 vec4 detail=texture2D(decoration,uv);col=mix(col,detail.rgb,detail.a);
-if(inFront>.5){vec4 person=texture2D(source,uv);col=person.rgb+col*(1.-person.a);vec4 text=texture2D(content,uv);col=mix(col,text.rgb,text.a);}
+if(mobile>.5)col=background;
+if(inFront>.5){vec4 person=texture2D(source,uv);col=person.rgb+col*(1.-person.a);
+// Mobile overlays belong above the portrait and its readability scrim.
+if(mobile>.5){col*=1.-.96*smoothstep(0.,1.,(.65-uv.y)/.65);col=mix(col,logo.rgb,logo.a);col=mix(col,detail.rgb,detail.a);}
+vec4 text=texture2D(content,uv);col=mix(col,text.rgb,text.a);}
 gl_FragColor=vec4(col,1.);}`;
 // Behind mode composites the premultiplied portrait after water shading,
 // retaining its translucent scroll trails and soft edges.

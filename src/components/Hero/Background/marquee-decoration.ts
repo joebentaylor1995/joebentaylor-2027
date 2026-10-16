@@ -45,12 +45,33 @@ export function drawMarqueeDecoration(
 	ctx.textBaseline = 'alphabetic';
 	// Only measure the visible responsive label, not its hidden mobile sibling.
 	const original = heading.innerText.trim();
-	let text = phrase ?? original;
+	const isMobile = css.display === 'flex';
+	let text = isMobile ? original : (phrase ?? original);
 	if (css.textTransform === 'uppercase') text = text.toUpperCase();
 	else if (css.textTransform === 'lowercase') text = text.toLowerCase();
 	const left = parseFloat(css.paddingLeft) + (parseFloat(css.borderLeftWidth) || 0);
 	const top = parseFloat(css.paddingTop) + (parseFloat(css.borderTopWidth) || 0);
 	const metrics = ctx.measureText(text);
+	if (isMobile) {
+		// Match the centred mobile label and its two flex rules.
+		const x = h.left - bounds.left + (h.width - metrics.width) / 2;
+		const y = h.top - bounds.top;
+		const gap = parseFloat(css.columnGap) || 0;
+		const line = getComputedStyle(heading, '::before');
+		ctx.fillStyle = line.backgroundColor;
+		const lineWidth = Math.max(0, (h.width - metrics.width) / 2 - gap);
+		ctx.fillRect(h.left - bounds.left, y + h.height / 2, lineWidth, 1);
+		ctx.fillRect(x + metrics.width + gap, y + h.height / 2, lineWidth, 1);
+		ctx.fillStyle = css.color;
+		ctx.fillText(
+			text,
+			x,
+			y +
+				(h.height - metrics.fontBoundingBoxAscent - metrics.fontBoundingBoxDescent) / 2 +
+				metrics.fontBoundingBoxAscent
+		);
+		return raster;
+	}
 	// Preserve the HTML's padding and responsive position as the label gets longer.
 	const originalText =
 		css.textTransform === 'uppercase'

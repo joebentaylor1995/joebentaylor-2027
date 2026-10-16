@@ -1,6 +1,7 @@
 // Imports
 // ------------
 
+import { HERO_DESKTOP_QUERY } from '../layout';
 import { drawHeroContent } from './hero-content-texture';
 import type { LiquidSettings } from './liquid-settings';
 import * as shaders from './liquid-shaders';
@@ -40,6 +41,7 @@ export async function createLiquidLayer(
 	isCancelled = () => false
 ): Promise<LiquidLayer> {
 	const bindProgram = gl.useProgram.bind(gl);
+	const desktopLayout = window.matchMedia(HERO_DESKTOP_QUERY);
 	const parallel = gl.getExtension('KHR_parallel_shader_compile');
 	if (!gl.getExtension('OES_texture_float') || !gl.getExtension('OES_texture_float_linear')) {
 		throw new Error('Liquid glass requires filtered float textures');
@@ -471,7 +473,8 @@ export async function createLiquidLayer(
 				}
 				draw(passes.composite, scene, {
 					source: portrait,
-					inFront: Number(settings.inFront),
+					inFront: Number(!desktopLayout.matches || settings.inFront),
+					mobile: Number(!desktopLayout.matches),
 					logos,
 					decoration,
 					content,
@@ -492,7 +495,7 @@ export async function createLiquidLayer(
 					revealDark,
 					rippleStrength: (introSettings.get(host) ?? introDefaults).strength,
 					rippleWidth: (introSettings.get(host) ?? introDefaults).width,
-					inFront: Number(settings.inFront),
+					inFront: Number(!desktopLayout.matches || settings.inFront),
 					strength: settings.intensity,
 					refraction: settings.refraction,
 					dispersion: settings.dispersion,
