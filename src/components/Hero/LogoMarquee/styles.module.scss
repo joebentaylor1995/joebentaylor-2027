@@ -27,12 +27,6 @@
 	padding-block: calc(var(--gap-sm) + 1rem) 0;
 	height: calc(4.1rem + var(--gap-sm) + 1rem);
 	user-select: none;
-	// Keep semantic logo names available while the GPU owns their visible pixels.
-	:global([data-liquid-ready='true']) & {
-		opacity: 0;
-
-		.track { animation-play-state: paused; }
-	}
 
 	h2 {
 		--offset: var(--gap-s);
@@ -56,6 +50,12 @@
 	}
 
 	@include heroDesktop {
+		// Only desktop hands the visible marquee over to WebGL.
+		:global([data-liquid-ready='true']) & {
+			opacity: 0;
+			.track { animation-play-state: paused; }
+		}
+
 		position: absolute;
 		z-index: -1;
 		padding-block: var(--gap-l);

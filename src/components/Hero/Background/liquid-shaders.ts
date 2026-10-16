@@ -33,6 +33,11 @@ void main(){float l=texture2D(pressure,uv-vec2(px.x,0.)).x,r=texture2D(pressure,
 float b=texture2D(pressure,uv-vec2(0.,px.y)).x,t=texture2D(pressure,uv+vec2(0.,px.y)).x;
 gl_FragColor=vec4(texture2D(source,uv).xy-vec2(r-l,t-b)*.5,0.,1.);}`;
 // In front mode the portrait joins the scene before refraction.
+export const mobileComposite = `uniform vec3 background;
+void main(){vec4 person=texture2D(source,uv);
+vec3 col=person.rgb+background*(1.-person.a);
+col*=1.-.96*smoothstep(0.,1.,(.65-uv.y)/.65);
+gl_FragColor=vec4(col,1.);}`;
 export const composite = `uniform sampler2D logos,decoration,content;uniform vec3 background;
 uniform vec2 screen,strip;uniform float bottom,phase,inFront;
 uniform float logoBlur,mobile;

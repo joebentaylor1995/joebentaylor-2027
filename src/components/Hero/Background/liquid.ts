@@ -52,7 +52,8 @@ export async function createLiquidLayer(
 	if (!trackElement) throw new Error('Logo track missing');
 	const track = trackElement;
 	const images = Array.from(track.querySelectorAll('img'));
-	if (images.some(image => !image.complete || !image.naturalWidth)) throw new Error('Logo textures not ready');
+	if (!mobile && images.some(image => !image.complete || !image.naturalWidth))
+		throw new Error('Logo textures not ready');
 	const textures = new Set<WebGLTexture>();
 	const targets = new Set<Target>();
 	const programs: WebGLProgram[] = [];
@@ -217,7 +218,7 @@ export async function createLiquidLayer(
 			divergence: shaders.divergence,
 			pressure: shaders.pressure,
 			gradient: shaders.gradient,
-			composite: shaders.composite,
+			composite: mobile ? shaders.mobileComposite : shaders.composite,
 			display: shaders.display,
 		};
 		const results = await Promise.allSettled(activeNames.map(name => makeProgram(sources[name])));
@@ -233,6 +234,7 @@ export async function createLiquidLayer(
 		const decoration = { texture: texture() };
 		let labelGesture = 0;
 		const uploadDecoration = () => {
+			if (mobile) return;
 			gl.bindTexture(gl.TEXTURE_2D, decoration.texture);
 			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 			try {
@@ -308,40 +310,42 @@ export async function createLiquidLayer(
 			}
 			allocatedResolution = settings.resolution;
 			// Rasterise only on layout/content changes. Every animation frame scrolls this texture on the GPU.
-			const bounds = track.getBoundingClientRect(),
-				hostBounds = canvas.getBoundingClientRect();
-			const style = getComputedStyle(track);
-			stripWidth = bounds.width + (parseFloat(style.columnGap) || 0);
-			stripHeight = Math.max(1, bounds.height);
-			bottom = hostBounds.bottom - bounds.bottom;
-			duration = parseFloat(style.animationDuration) || 48;
-			if (!phaseInitialized) {
-				const animation = track.getAnimations()[0];
-				phase = typeof animation?.currentTime === 'number' ? animation.currentTime / 1000 / duration : 0;
-				phaseInitialized = true;
+			if (!mobile) {
+				const bounds = track.getBoundingClientRect(),
+					hostBounds = canvas.getBoundingClientRect();
+				const style = getComputedStyle(track);
+				stripWidth = bounds.width + (parseFloat(style.columnGap) || 0);
+				stripHeight = Math.max(1, bounds.height);
+				bottom = hostBounds.bottom - bounds.bottom;
+				duration = parseFloat(style.animationDuration) || 48;
+				if (!phaseInitialized) {
+					const animation = track.getAnimations()[0];
+					phase = typeof animation?.currentTime === 'number' ? animation.currentTime / 1000 / duration : 0;
+					phaseInitialized = true;
+				}
+				const raster = document.createElement('canvas');
+				const ratio = Math.min(2, maxTexture / Math.max(stripWidth, stripHeight));
+				raster.width = Math.max(1, Math.ceil(stripWidth * ratio));
+				raster.height = Math.max(1, Math.ceil(stripHeight * ratio));
+				const ctx = raster.getContext('2d');
+				if (!ctx) throw new Error('Logo texture canvas unavailable');
+				ctx.scale(raster.width / stripWidth, raster.height / stripHeight);
+				for (const image of images) {
+					const r = image.getBoundingClientRect(),
+						s = getComputedStyle(image);
+					ctx.globalAlpha = Number(s.opacity);
+					ctx.filter = s.filter;
+					ctx.drawImage(image, r.left - bounds.left, r.top - bounds.top, r.width, r.height);
+				}
+				gl.bindTexture(gl.TEXTURE_2D, logos.texture);
+				gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+				try {
+					gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, raster);
+				} finally {
+					gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+				}
+				uploadDecoration();
 			}
-			const raster = document.createElement('canvas');
-			const ratio = Math.min(2, maxTexture / Math.max(stripWidth, stripHeight));
-			raster.width = Math.max(1, Math.ceil(stripWidth * ratio));
-			raster.height = Math.max(1, Math.ceil(stripHeight * ratio));
-			const ctx = raster.getContext('2d');
-			if (!ctx) throw new Error('Logo texture canvas unavailable');
-			ctx.scale(raster.width / stripWidth, raster.height / stripHeight);
-			for (const image of images) {
-				const r = image.getBoundingClientRect(),
-					s = getComputedStyle(image);
-				ctx.globalAlpha = Number(s.opacity);
-				ctx.filter = s.filter;
-				ctx.drawImage(image, r.left - bounds.left, r.top - bounds.top, r.width, r.height);
-			}
-			gl.bindTexture(gl.TEXTURE_2D, logos.texture);
-			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-			try {
-				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, raster);
-			} finally {
-				gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-			}
-			uploadDecoration();
 			gl.bindTexture(gl.TEXTURE_2D, content.texture);
 			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 			try {

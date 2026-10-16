@@ -163,7 +163,9 @@ export function mountDepthEffect({
 		if (!liquidEnabled) return;
 		const current = ++generation;
 		try {
-			const images = Array.from(host.querySelectorAll<HTMLImageElement>('[data-logo-track] img'));
+			const images = desktopLayout.matches
+				? Array.from(host.querySelectorAll<HTMLImageElement>('[data-logo-track] img'))
+				: [];
 			// The desktop strip needs offscreen logos too; mobile retains native lazy loading.
 			for (const image of images) image.loading = 'eager';
 			await Promise.all(
