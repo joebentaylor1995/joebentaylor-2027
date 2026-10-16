@@ -35,17 +35,23 @@ const ConsentDemo = () => {
 	return (
 		<div className={s.jacket}>
 			<ul className={s.state} aria-live='polite'>
-				<li data-granted>Necessary</li>
-				<li data-granted={consent?.analytics || undefined}>Analytics</li>
-				<li data-granted={consent?.marketing || undefined}>Marketing</li>
+				<li data-type='captionL' data-granted>
+					Necessary
+				</li>
+				<li data-type='captionL' data-granted={consent?.analytics || undefined}>
+					Analytics
+				</li>
+				<li data-type='captionL' data-granted={consent?.marketing || undefined}>
+					Marketing
+				</li>
 			</ul>
 
-			<button type='button' className={s.button} onClick={openCookieSettings}>
+			<button data-type='captionL' type='button' className={s.button} onClick={openCookieSettings}>
 				Change cookie settings
 			</button>
 
 			{IS_DEV && (
-				<p className={s.note}>
+				<p data-type='captionS' className={s.note}>
 					The cookie banner only renders in production builds — run bun run build &amp;&amp; bun run start to
 					try it.
 				</p>
@@ -54,10 +60,12 @@ const ConsentDemo = () => {
 			<ConsentGate
 				category='marketing'
 				fallback={
-					<p className={s.gate}>Gated: allow marketing cookies and this box unlocks instantly — no reload.</p>
+					<p data-type='captionL' className={s.gate}>
+						Gated: allow marketing cookies and this box unlocks instantly — no reload.
+					</p>
 				}
 			>
-				<p className={s.gate} data-open>
+				<p data-type='captionL' className={s.gate} data-open>
 					Unlocked. This is where a YouTube embed or ad pixel would load.
 				</p>
 			</ConsentGate>

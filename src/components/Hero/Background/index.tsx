@@ -11,14 +11,13 @@ import { type DepthSettings, defaultSettings, portraitUrl } from './effect-setti
 import type * as I from './interface';
 import type { LiquidControlsProps } from './LiquidControls/interface';
 import { type LiquidSettings, liquidSettings as liquidDefaults } from './liquid-settings';
-import { type DepthController, mountDepthEffect } from './renderer';
+import type { DepthController } from './renderer';
 import type { SettingsProps } from './Settings/interface';
-import { type IntroSettings, introDefaults, introReplays, introSettings } from './scene-intro';
+import { type IntroSettings, introDefaults, introReplays, introSettings, mobileIntroDefaults } from './scene-intro';
 import s from './styles.module.scss';
 
-// NOTE • The portrait covers the hero, so on tall screens its width follows the
-// height (portrait aspect 1.4455) — lets the srcset pick a texture that stays sharp
-const PORTRAIT_SIZES = 'max(100vw, 144.55vh)';
+// Cover sizing uses the landscape source (4046 × 2799), including mobile zoom.
+const PORTRAIT_SIZES = `${HERO_DESKTOP_QUERY} 112vw, max(122vw, 177vh)`;
 
 // Component
 // ------------
@@ -36,7 +35,12 @@ const Background = ({ className }: I.BackgroundProps) => {
 	const [Controls, setControls] = useState<ComponentType<SettingsProps> | null>(null);
 	const [liquidValues, setLiquidValues] = useState<LiquidSettings>({ ...liquidDefaults });
 	const [liquidOpen, setLiquidOpen] = useState(false);
-	const [introValues, setIntroValues] = useState<IntroSettings>({ ...introDefaults });
+	const [introTarget, setIntroTarget] = useState<'mobile' | 'desktop'>('desktop');
+	const [introProfiles, setIntroProfiles] = useState({
+		mobile: { ...mobileIntroDefaults },
+		desktop: { ...introDefaults },
+	});
+	const introValues = introProfiles[introTarget];
 	const [LiquidControls, setLiquidControls] = useState<ComponentType<LiquidControlsProps> | null>(null);
 
 	// Effects
@@ -50,20 +54,25 @@ const Background = ({ className }: I.BackgroundProps) => {
 		const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 		const desktopLayout = window.matchMedia(HERO_DESKTOP_QUERY);
 		const desktop = window.matchMedia(`${HERO_DESKTOP_QUERY} and (hover: hover) and (pointer: fine)`);
-		const start = () => {
+		let generation = 0;
+		const start = async () => {
+			const current = ++generation;
 			controllerRef.current?.destroy();
 			controllerRef.current = null;
 			setReady(false);
-			if (desktopLayout.matches && !motion.matches)
+			if (!motion.matches) {
+				const { mountDepthEffect } = await import('./renderer');
+				if (generation !== current) return;
 				controllerRef.current = mountDepthEffect({
 					canvas,
 					photo,
 					host,
-					liquidEnabled: desktop.matches,
+					liquidEnabled: true,
 					liquidSettings: liquidRef.current,
 					getSettings: () => settingsRef.current,
 					onReady: setReady,
 				});
+			}
 		};
 
 		start();
@@ -72,12 +81,28 @@ const Background = ({ className }: I.BackgroundProps) => {
 		desktop.addEventListener('change', start);
 
 		return () => {
+			generation++;
 			motion.removeEventListener('change', start);
 			desktopLayout.removeEventListener('change', start);
 			desktop.removeEventListener('change', start);
 			controllerRef.current?.destroy();
 			controllerRef.current = null;
 		};
+	}, []);
+
+	useEffect(() => {
+		const query = window.matchMedia(HERO_DESKTOP_QUERY);
+		const apply = () => {
+			const target = query.matches ? 'desktop' : 'mobile';
+			const host = canvasRef.current?.closest('section');
+			if (host) introSettings.set(host, introProfiles[target]);
+		};
+		apply();
+		query.addEventListener('change', apply);
+		return () => query.removeEventListener('change', apply);
+	}, [introProfiles]);
+	useEffect(() => {
+		setIntroTarget(window.matchMedia(HERO_DESKTOP_QUERY).matches ? 'desktop' : 'mobile');
 	}, []);
 
 	useEffect(() => {
@@ -107,9 +132,7 @@ const Background = ({ className }: I.BackgroundProps) => {
 		if (!LiquidControls) void import('./LiquidControls').then(module => setLiquidControls(() => module.default));
 	};
 	const updateIntro = (next: IntroSettings) => {
-		const host = canvasRef.current?.closest('section');
-		if (host) introSettings.set(host, next);
-		setIntroValues(next);
+		setIntroProfiles(profiles => ({ ...profiles, [introTarget]: next }));
 	};
 
 	// Render
@@ -135,6 +158,7 @@ const Background = ({ className }: I.BackgroundProps) => {
 					src={portraitUrl}
 					alt=''
 					fill
+					quality={90}
 					sizes={PORTRAIT_SIZES}
 					loading='eager'
 					fetchPriority='high'
@@ -144,6 +168,8 @@ const Background = ({ className }: I.BackgroundProps) => {
 			{Controls ? (
 				<Controls
 					intro={introValues}
+					introTarget={introTarget}
+					onIntroTargetChange={setIntroTarget}
 					onIntroChange={updateIntro}
 					onReplay={() => {
 						const host = canvasRef.current?.closest('section');
@@ -155,7 +181,7 @@ const Background = ({ className }: I.BackgroundProps) => {
 					onChange={update}
 					onPreview={() => controllerRef.current?.preview()}
 					exportSettings={JSON.stringify(
-						{ version: 1, portrait: settings, liquid: liquidValues, intro: introValues },
+						{ version: 2, portrait: settings, liquid: liquidValues, intro: introProfiles },
 						null,
 						2
 					)}

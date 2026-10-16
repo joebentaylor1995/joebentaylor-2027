@@ -17,8 +17,6 @@
 }
 
 .style {
-	@include captionS;
-
 	padding: var(--gap-xs) var(--gap-sm);
 	border-radius: var(--br-round);
 	font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -44,16 +42,12 @@
 }
 
 .field {
-	@include captionL;
-
 	display: flex;
 	flex-direction: column;
 	gap: var(--gap-xs);
 	color: alpha(--global-white, 62);
 
 	input {
-		@include bodyS;
-
 		padding: var(--gap-s) var(--gap-m);
 		border-radius: $inner-radius;
 		color: var(--global-white);

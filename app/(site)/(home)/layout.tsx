@@ -1,11 +1,17 @@
 // Imports
 // ------------
-// import type { Metadata } from 'next';
 import PageTransition from '@parts/PageTransition';
+import type { Metadata } from 'next';
 
 // SEO
 // ------------
-// NOTE • Site-wide defaults live in app/layout.tsx — only add what this route
+// NOTE • The home page uses the site-wide title and description; it only adds
+// its canonical URL (set per route, so other pages never inherit '/')
+export const metadata: Metadata = {
+	alternates: { canonical: '/' },
+};
+
+// NOTE • Site-wide defaults live in app/(site)/layout.tsx — only add what this route
 // changes. With a CMS wired up, swap the static object for generateMetadata:
 //
 // export async function generateMetadata(): Promise<Metadata> {

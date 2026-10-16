@@ -96,9 +96,15 @@ const Calendar = () => {
 				)}
 			</div>
 			{!isReady && (
-				<div className={s.loading}>
+				<div data-type='bodyM' className={s.loading}>
 					<p role='status'>Loading calendar…</p>
-					<a className={s.fallback} href={BOOKING_URL} target='_blank' rel='noopener noreferrer'>
+					<a
+						data-type='bodyS'
+						className={s.fallback}
+						href={BOOKING_URL}
+						target='_blank'
+						rel='noopener noreferrer'
+					>
 						Calendar not loading? Book on Cal.com ↗
 					</a>
 				</div>

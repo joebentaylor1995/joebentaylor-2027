@@ -1,5 +1,6 @@
 // Imports
 // ------------
+import { getSettings, subscribe } from '@parts/ProfileReveal/Settings/store';
 import { gsap } from 'gsap';
 import { Body, Sleeping } from 'matter-js';
 import * as THREE from 'three';
@@ -67,7 +68,13 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 	signal?.throwIfAborted();
 	const buttons = Array.from(element.querySelectorAll('button'));
 	// Keep physics in design units; the camera and hit targets scale with rem sizing.
-	let scale = parseFloat(getComputedStyle(document.documentElement).fontSize) / 10;
+	const getScale = () =>
+		((parseFloat(getComputedStyle(document.documentElement).fontSize) / 10) *
+			(element.dataset.toolkit === 'Design toolkit'
+				? getSettings().designToolkitSize
+				: getSettings().developmentToolkitSize)) /
+		100;
+	let scale = getScale();
 	let width = Math.max(SIZE + 16, element.clientWidth / scale);
 	let height = Math.max(SIZE + 16, element.clientHeight / scale);
 	const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -129,8 +136,9 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 			mesh.position.set(body.position.x, body.position.y, 0);
 			mesh.rotation.z = body.angle;
 			const button = buttons[index];
-			button.style.setProperty('--tool-x', `${(body.position.x - SIZE / 2) / 10}rem`);
-			button.style.setProperty('--tool-y', `${(body.position.y - SIZE / 2) / 10}rem`);
+			button.style.setProperty('--tool-size', `${SIZE * scale}px`);
+			button.style.setProperty('--tool-x', `${(body.position.x - SIZE / 2) * scale}px`);
+			button.style.setProperty('--tool-y', `${(body.position.y - SIZE / 2) * scale}px`);
 			button.style.setProperty('--tool-angle', `${body.angle}rad`);
 			if (fallback) {
 				fallback.save();
@@ -223,7 +231,7 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		);
 	});
 	function resize() {
-		scale = parseFloat(getComputedStyle(document.documentElement).fontSize) / 10;
+		scale = getScale();
 		const nextWidth = Math.max(SIZE + 16, element.clientWidth / scale);
 		const nextHeight = Math.max(SIZE + 16, element.clientHeight / scale);
 		if (width !== nextWidth || height !== nextHeight) {
@@ -244,6 +252,7 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		draw();
 		start();
 	}
+	const unsubscribe = subscribe(resize);
 	const resizeObserver = new ResizeObserver(resize);
 	resizeObserver.observe(element);
 	document.addEventListener(
@@ -286,6 +295,7 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 			release();
 			events.abort();
 			resizeObserver.disconnect();
+			unsubscribe();
 			physics.destroy();
 			for (const mesh of meshes) {
 				mesh.geometry.dispose();

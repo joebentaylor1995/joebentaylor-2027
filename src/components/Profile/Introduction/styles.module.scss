@@ -44,10 +44,15 @@
 }
 
 .heading {
-	position: sticky;
-	bottom: var(--gap-xl); left: 0;
-	align-self: end;
-	padding-top: var(--gap-xl);
+	display: none;
+
+	@include bp(l) {
+		display: block;
+		position: sticky;
+		bottom: var(--gap-xl); left: 0;
+		align-self: end;
+		padding-top: var(--gap-xl);
+	}
 }
 
 .text {

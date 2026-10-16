@@ -14,7 +14,11 @@ import s from './styles.module.scss';
 // work, so it runs on the server — or in the client for live code
 const Code = ({ label, code, language = inferLanguage(label), className }: I.CodeProps) => (
 	<figure className={cn(s.jacket, className)}>
-		{label && <figcaption className={s.label}>{label}</figcaption>}
+		{label && (
+			<figcaption data-type='captionS' className={s.label}>
+				{label}
+			</figcaption>
+		)}
 		<pre className={s.pre}>
 			<code data-language={language}>
 				{highlight(code.trim(), language).map(({ type, text }, index) =>

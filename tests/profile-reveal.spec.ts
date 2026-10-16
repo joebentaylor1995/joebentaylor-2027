@@ -8,6 +8,8 @@ for (const width of [1440, 440]) {
 		await expect(page.locator('header')).toHaveAttribute('data-header-entrance', 'complete', { timeout: 15000 });
 		await trigger.click();
 		const panel = page.getByRole('dialog', { name: 'Profile', exact: true });
+		await expect(panel).toHaveCSS('transform', 'none');
+		await expect(panel).toHaveCSS('clip-path', 'inset(0px)');
 		const close = page.getByRole('button', { name: 'Close profile' });
 		await expect(close).toBeFocused();
 		await expect(panel).toHaveClass(/\blenis\b/);
@@ -19,7 +21,7 @@ for (const width of [1440, 440]) {
 					return Math.round(matrix.e);
 				})
 			)
-			.toBe(-width / 2);
+			.toBe(Math.round(-width * 0.12));
 		await expect(scene).toHaveAttribute('inert');
 		const bounds = await panel.boundingBox();
 		expect(bounds?.width).toBeCloseTo(Math.min(971, width), 0);

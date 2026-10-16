@@ -17,8 +17,10 @@
     cursor: pointer;
     font: inherit;
 
-    &:hover {
-      background: alpha(var(--brand-c4), 8);
+    @include desktopHover {
+	    &:hover {
+	      background: alpha(var(--brand-c4), 8);
+	    }
     }
   }
 

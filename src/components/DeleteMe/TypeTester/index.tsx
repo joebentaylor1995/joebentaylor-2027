@@ -20,6 +20,7 @@ const TYPE_STYLES = [
 	'titleL',
 	'titleS',
 	'bodyL',
+	'bodyM',
 	'bodyS',
 	'captionL',
 	'captionS',
@@ -28,7 +29,7 @@ const TYPE_STYLES = [
 // Component
 // ------------
 // NOTE • Type your own sample and switch styles — rendered with the real
-// global t-* classes, so sizes step up with the viewport like the site does
+// data-type attributes, so sizes step up with the viewport like the site does
 const TypeTester = () => {
 	// State
 	const [style, setStyle] = useState('headlineL');
@@ -41,6 +42,7 @@ const TypeTester = () => {
 				<legend className={s.legend}>Type style</legend>
 				{TYPE_STYLES.map(name => (
 					<button
+						data-type='captionS'
 						key={name}
 						type='button'
 						aria-pressed={style === name}
@@ -52,20 +54,22 @@ const TypeTester = () => {
 				))}
 			</fieldset>
 
-			<label className={s.field}>
+			<label data-type='captionL' className={s.field}>
 				<span>Sample text</span>
-				<input type='text' value={text} onChange={event => setText(event.target.value)} maxLength={80} />
+				<input
+					data-type='bodyS'
+					type='text'
+					value={text}
+					onChange={event => setText(event.target.value)}
+					maxLength={80}
+				/>
 			</label>
 
-			<p className={`t-${style} ${s.preview}`}>{text || 'Type something'}</p>
+			<p data-type={style} className={s.preview}>
+				{text || 'Type something'}
+			</p>
 
-			<Code
-				label='Three ways to use it'
-				code={`.title { @include ${style}; }      // a mixin, in a module
-
-<h2 className='t-${style}'>…</h2>   // a global class
-<p data-type='${style}'>…</p>        // a data attribute`}
-			/>
+			<Code label='Apply typography in the markup' code={`<p data-type='${style}'>…</p>`} />
 		</div>
 	);
 };

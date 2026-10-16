@@ -1,7 +1,6 @@
 // Cookie Consent
 // ------------
-// NOTE • The CookieBar is production-only, which is what `bun run test`
-// builds. Covers the choice, its persistence before first paint, and
+// Covers the choice, its persistence before first paint, and
 // withdrawing consent from the settings.
 import { expect, test } from '@playwright/test';
 
@@ -9,7 +8,7 @@ const consentAttribute = () => document.documentElement.getAttribute('data-cooki
 
 test('stores a per-category choice and hides the banner for returning visitors', async ({ page }) => {
 	await page.goto('/');
-	const banner = page.getByRole('region', { name: 'We use cookies!' });
+	const banner = page.getByRole('region', { name: 'Cookies' });
 	await expect(banner).toBeVisible();
 
 	await banner.getByRole('button', { name: 'Let me choose' }).click();
@@ -40,11 +39,11 @@ test('withdrawing consent from the settings clears cookies and reloads', async (
 		window.dispatchEvent(new Event('tackl:cookie-settings'));
 	});
 
-	const banner = page.getByRole('region', { name: 'We use cookies!' });
+	const banner = page.getByRole('region', { name: 'Cookies' });
 	await expect(banner).toBeVisible();
-	await banner.getByRole('checkbox', { name: /Marketing/ }).uncheck();
+	await banner.getByRole('checkbox', { name: /Analytics/ }).uncheck();
 	await Promise.all([page.waitForEvent('load'), banner.getByRole('button', { name: 'Save Choices' }).click()]);
 
-	expect(await page.evaluate(consentAttribute)).toBe('analytics');
+	expect(await page.evaluate(consentAttribute)).toBe('necessary');
 	expect(await page.evaluate(() => document.cookie)).not.toContain('_ga');
 });

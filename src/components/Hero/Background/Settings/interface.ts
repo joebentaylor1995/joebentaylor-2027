@@ -4,6 +4,8 @@ import type { LiquidSettings } from '../liquid-settings';
 import type { IntroSettings } from '../scene-intro';
 export interface SettingsProps {
 	intro: IntroSettings;
+	introTarget: 'mobile' | 'desktop';
+	onIntroTargetChange: (target: 'mobile' | 'desktop') => void;
 	onIntroChange: (settings: IntroSettings) => void;
 	onReplay: () => void;
 	liquid: LiquidSettings;

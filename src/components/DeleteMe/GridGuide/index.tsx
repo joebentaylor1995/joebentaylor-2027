@@ -22,7 +22,7 @@ const GridGuide = () => (
 		intro={
 			<>
 				<p>One plain tag, static CSS, no client code.</p>
-				<p className={s.viewport}>
+				<p data-type='captionL' className={s.viewport}>
 					<span className={s.breakpoint} data-bp='s'>
 						Now: <code>s</code>, 2 columns
 					</span>
@@ -38,7 +38,7 @@ const GridGuide = () => (
 	>
 		<Grid isFixed className={s.playground}>
 			<Tile tone='glow'>
-				<div className={s.playgroundCopy}>
+				<div data-type='bodyS' className={s.playgroundCopy}>
 					<h3 className={s.playgroundTitle}>Try it.</h3>
 					<p>Move the blocks. Copy the code.</p>
 				</div>
@@ -56,7 +56,9 @@ const GridGuide = () => (
 			demo={
 				<Demo>
 					<Grid isFixed>
-						<figure className={s.plain}>A plain &lt;figure&gt; — no props, no component</figure>
+						<figure data-type='bodyS' className={s.plain}>
+							A plain &lt;figure&gt; — no props, no component
+						</figure>
 					</Grid>
 				</Demo>
 			}

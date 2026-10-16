@@ -2,6 +2,17 @@
 // ---------------
 
 .jacket {
+	--header-foreground: var(--brand-c4);
+	// Text colour inside the nav's hover block
+	--header-inverse: var(--global-white);
+
+	:global(body:has([data-legal-page])) & {
+		--header-foreground: var(--global-white);
+		--header-inverse: var(--brand-c4);
+	}
+
+	.logo { fill: var(--header-foreground); }
+
 	position: fixed;
 	z-index: 12;
 	inset: 0 0 auto;
@@ -41,7 +52,7 @@
 			align-items: center;
 			gap: var(--gap-xs);
 			font-style: normal;
-			color: var(--brand-c4);
+			color: var(--header-foreground);
 
 			&::before {
 				--size: 0.4rem;
@@ -56,7 +67,7 @@
 			}
 		}
 
-		span { color: alpha(var(--brand-c4), 40) }
+		span { color: alpha(var(--header-foreground), 40) }
 	}
 }
 
@@ -71,10 +82,80 @@
 	a {
 		cursor: pointer;
 		user-select: none;
+		position: relative;
+		isolation: isolate;
 
 		display: flex;
 		padding: var(--pad);
 
-		color: var(--brand-c4);
+		color: var(--header-foreground);
+		transition: color var(--time-m) var(--easing-bezzy);
+
+		// NOTE • Block reveal — a block wipes in from the left behind the text on
+		// hover, then carries on out to the right on unhover
+		&::before {
+			content: '';
+			position: absolute;
+			// Hug the text line, not the padded hit area — a hair wider than the word
+			inset-block: var(--pad);
+			inset-inline: calc(var(--pad) - 0.25em);
+			z-index: -1;
+
+			background: var(--header-foreground);
+			transform: scaleX(0);
+			transform-origin: right center;
+			transition: transform var(--time-m) var(--easing-bezzy);
+		}
+
+		@media (hover: hover) {
+			&:hover {
+				color: var(--header-inverse);
+
+				&::before {
+					transform: scaleX(1);
+					transform-origin: left center;
+				}
+			}
+		}
+
+		&:focus-visible {
+			color: var(--header-inverse);
+
+			&::before {
+				transform: scaleX(1);
+				transform-origin: left center;
+			}
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			&,
+			&::before { transition-duration: 0s; }
+		}
 	}
+}
+
+// NOTE • Temporary: the label sits under the link, out of the layout, and
+// shows on hover or keyboard focus
+.projects {
+	&:hover .soon,
+	&:focus-visible .soon {
+		opacity: 1;
+		transform: translate(-50%, 0);
+	}
+}
+
+.soon {
+	pointer-events: none;
+	position: absolute;
+	top: 100%;
+	left: 50%;
+	transform: translate(-50%, -0.4rem);
+
+	white-space: nowrap;
+	color: alpha(var(--header-foreground), 60);
+
+	opacity: 0;
+	transition:
+		opacity var(--time-m) var(--easing-bezzy),
+		transform var(--time-m) var(--easing-bezzy);
 }

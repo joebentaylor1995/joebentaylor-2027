@@ -34,51 +34,73 @@ const Why = () => (
 	>
 		<Grid isFixed>
 			<Tile m='1/7' l='1/9' image={performanceImage} imageSizes={SIZES.twoThirds} className={s.hero}>
-				<p className={s.kicker}>Performance</p>
+				<p data-type='captionL' className={s.kicker}>
+					Performance
+				</p>
 				<p className={s.stat}>
 					<Odometer value='100' />
 				</p>
 				<h3 className={s.title}>Lighthouse. Out of the box.</h3>
-				<p className={s.text}>Static by default. CI fails the build if it slips.</p>
+				<p data-type='bodyS' className={s.text}>
+					Static by default. CI fails the build if it slips.
+				</p>
 			</Tile>
 
 			<Tile m='1/4' l='9/13' image={runtimeImage} imageSizes={SIZES.third} className={s.photo}>
-				<p className={s.kicker}>Styling runtime</p>
+				<p data-type='captionL' className={s.kicker}>
+					Styling runtime
+				</p>
 				<p className={s.stat}>
 					<Odometer value='0 KB' />
 				</p>
-				<p className={s.text}>SCSS modules, compiled away.</p>
+				<p data-type='bodyS' className={s.text}>
+					SCSS modules, compiled away.
+				</p>
 			</Tile>
 
 			<Tile m='4/7' l='1/5'>
-				<p className={s.kicker}>Grid</p>
+				<p data-type='captionL' className={s.kicker}>
+					Grid
+				</p>
 				<p className={s.stat}>
 					<Odometer value='∞' />
 				</p>
-				<p className={s.text}>Any column count, per breakpoint.</p>
+				<p data-type='bodyS' className={s.text}>
+					Any column count, per breakpoint.
+				</p>
 			</Tile>
 
 			<Tile m='1/4' l='5/9'>
-				<p className={s.kicker}>CMS</p>
+				<p data-type='captionL' className={s.kicker}>
+					CMS
+				</p>
 				<p className={s.stat}>
 					<Odometer value='3' />
 				</p>
-				<p className={s.text}>DatoCMS, Sanity or none.</p>
+				<p data-type='bodyS' className={s.text}>
+					DatoCMS, Sanity or none.
+				</p>
 			</Tile>
 
 			<Tile m='4/7' l='9/13' image={motionImage} imageSizes={SIZES.third} className={s.photo}>
 				<h3 className={s.title}>Built for motion.</h3>
-				<p className={s.text}>GSAP and Lenis on one ticker.</p>
+				<p data-type='bodyS' className={s.text}>
+					GSAP and Lenis on one ticker.
+				</p>
 			</Tile>
 
 			<Tile m='1/7' l='1/7' image={designImage} imageSizes={SIZES.half} className={s.wide}>
 				<h3 className={s.title}>Day one is for design.</h3>
-				<p className={s.text}>The plumbing is done. Start on page one.</p>
+				<p data-type='bodyS' className={s.text}>
+					The plumbing is done. Start on page one.
+				</p>
 			</Tile>
 
 			<Tile m='1/7' l='7/13' image={agentsImage} imageSizes={SIZES.half} className={s.wide}>
 				<h3 className={s.title}>Ready for agents.</h3>
-				<p className={s.text}>AGENTS.md and skills teach your AI the conventions.</p>
+				<p data-type='bodyS' className={s.text}>
+					AGENTS.md and skills teach your AI the conventions.
+				</p>
 			</Tile>
 		</Grid>
 	</Section>

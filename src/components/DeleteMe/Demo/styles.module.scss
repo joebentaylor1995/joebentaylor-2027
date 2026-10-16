@@ -58,7 +58,5 @@
 }
 
 .caption {
-	@include captionS;
-
 	color: alpha(--global-white, 62);
 }

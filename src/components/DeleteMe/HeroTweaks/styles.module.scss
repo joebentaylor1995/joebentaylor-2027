@@ -20,8 +20,6 @@
 }
 
 .badge {
-	@include captionS;
-
 	display: grid;
 	place-items: center;
 	min-width: 2rem;
@@ -71,8 +69,6 @@
 }
 
 .hint {
-	@include captionS;
-
 	padding-inline: var(--gap-xs);
 	color: alpha(--global-white, 62);
 }
@@ -88,8 +84,6 @@
 }
 
 .summary {
-	@include captionL;
-
 	padding: var(--gap-s) var(--gap-sm);
 	font-weight: var(--weight-medium);
 	color: var(--global-white);
@@ -122,8 +116,6 @@
 }
 
 .label {
-	@include captionS;
-
 	display: flex;
 	justify-content: space-between;
 	gap: var(--gap-s);
@@ -137,8 +129,6 @@
 }
 
 .colourLabel {
-	@include captionS;
-
 	display: flex;
 	align-items: center;
 	gap: var(--gap-s);
@@ -155,7 +145,6 @@
 }
 
 .tokenButton {
-	@include captionS;
 	@include mono;
 
 	color: alpha(--global-white, 62);

@@ -4,6 +4,7 @@
 // ------------
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
 import { getSettings, subscribe } from '@parts/ProfileReveal/Settings/store';
+import { canHover } from '@utils/desktopHover';
 import { gsap } from 'gsap';
 import NextImage from 'next/image';
 import { use, useEffect, useRef } from 'react';
@@ -101,7 +102,7 @@ const Keycap = () => {
 			if (audible) play(1);
 		};
 		const enter = (event: PointerEvent) => {
-			hovered = event.pointerType !== 'touch';
+			hovered = canHover() && event.pointerType === 'mouse';
 			if (!held && !reducedMotion.matches && hovered) animate(HOVER_FRAME);
 		};
 		const leave = () => {
@@ -111,7 +112,8 @@ const Keycap = () => {
 			if (!held) animate(0);
 		};
 		const move = (event: PointerEvent) => {
-			if (!getSettings().keycapTilt || reducedMotion.matches || event.pointerType === 'touch') return;
+			if (!canHover() || !getSettings().keycapTilt || reducedMotion.matches || event.pointerType === 'touch')
+				return;
 			const bounds = button.getBoundingClientRect();
 			button.style.setProperty('--keycap-tilt-x', `${(0.5 - (event.clientY - bounds.y) / bounds.height) * 8}deg`);
 			button.style.setProperty('--keycap-tilt-y', `${((event.clientX - bounds.x) / bounds.width - 0.5) * 8}deg`);

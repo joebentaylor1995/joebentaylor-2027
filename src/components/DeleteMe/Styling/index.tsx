@@ -19,7 +19,7 @@ const Styling = () => (
 		<Grid isFixed>
 			<Tile l='1/7'>
 				<h3 className={s.title}>Colour and opacity</h3>
-				<p className={s.text}>
+				<p data-type='bodyS' className={s.text}>
 					<code>alpha()</code> makes any colour translucent, in SCSS or JS.
 				</p>
 				<AlphaPlayground />
@@ -27,13 +27,15 @@ const Styling = () => (
 
 			<Tile l='7/13'>
 				<h3 className={s.title}>Type styles</h3>
-				<p className={s.text}>Written once, used three ways. Resize to see it scale.</p>
+				<p data-type='bodyS' className={s.text}>
+					Written once, used three ways. Resize to see it scale.
+				</p>
 				<TypeTester />
 			</Tile>
 
 			<Tile l='1/7'>
 				<h3 className={s.title}>Breakpoints</h3>
-				<p className={s.text}>
+				<p data-type='bodyS' className={s.text}>
 					Mobile-first: <code>bp()</code> in SCSS, <code>mq</code> in JS. Live:
 				</p>
 				<BreakpointReadout />
@@ -55,7 +57,9 @@ mq.up.l; // '(min-width: 1024px)'`}
 
 			<Tile l='7/13'>
 				<h3 className={s.title}>Section spacing</h3>
-				<p className={s.text}>One vertical rhythm, from a data attribute or a mixin.</p>
+				<p data-type='bodyS' className={s.text}>
+					One vertical rhythm, from a data attribute or a mixin.
+				</p>
 				<Code
 					label='HTML or SCSS'
 					code={`

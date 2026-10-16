@@ -2,6 +2,7 @@
 // ------------
 
 import { getSettings, subscribe } from '@parts/ProfileReveal/Settings/store';
+import { canHover } from '@utils/desktopHover';
 import { gsap } from 'gsap';
 import { loadGeometry } from './loadGeometry';
 import { framing, projectLocation, rotation } from './projection';
@@ -245,7 +246,14 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 				draw();
 				return;
 			}
-			if (!settings.globeFollow || motion.matches || event.pointerType !== 'mouse' || event.buttons) return;
+			if (
+				!canHover() ||
+				!settings.globeFollow ||
+				motion.matches ||
+				event.pointerType !== 'mouse' ||
+				event.buttons
+			)
+				return;
 			const box = canvas.getBoundingClientRect();
 			hover.targetX = -(((event.clientX - box.left) / box.width) * 2 - 1) * MAX_TILT_X;
 			hover.targetY = (((event.clientY - box.top) / box.height) * 2 - 1) * MAX_TILT_Y;

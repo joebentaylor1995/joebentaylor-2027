@@ -30,8 +30,6 @@
 }
 
 .tab {
-	@include captionL;
-
 	padding: var(--gap-xs) var(--gap-m);
 	border-radius: var(--br-round);
 	font-weight: var(--weight-medium);
@@ -140,14 +138,10 @@
 }
 
 .itemLabel {
-	@include titleS;
-
 	font-weight: var(--weight-semi);
 }
 
 .itemValue {
-	@include captionS;
-
 	font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 	opacity: 0.75;
 }
@@ -161,8 +155,6 @@
 }
 
 .selection {
-	@include captionL;
-
 	flex-basis: 100%;
 
 	code {

@@ -67,7 +67,9 @@ const GetStarted = () => (
 				<Tile key={title} l={`${index * 4 + 1}/span 4`}>
 					<span className={s.index}>{index + 1}</span>
 					<h3 className={s.title}>{title}</h3>
-					<p className={s.text}>{text}</p>
+					<p data-type='bodyS' className={s.text}>
+						{text}
+					</p>
 					<Code label={label} code={code} className={s.code} />
 				</Tile>
 			))}
@@ -76,7 +78,7 @@ const GetStarted = () => (
 		<Grid isFixed className={s.cta}>
 			<Col className={s.ctaInner}>
 				<CopyButton text='bunx tackl' />
-				<a className={s.link} href={DOCS_URL}>
+				<a data-type='captionL' className={s.link} href={DOCS_URL}>
 					Read the docs
 				</a>
 			</Col>

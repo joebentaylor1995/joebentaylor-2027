@@ -31,8 +31,8 @@ const ErrorPage = ({ error, retry }: ErrorProps) => {
 			title='Something went wrong'
 			message='Sorry — this page failed to load. Trying again usually fixes it.'
 		>
-			<title>Something went wrong — Tackl</title>
-			<button type='button' className={actionClass} onClick={retry}>
+			<title>Something went wrong — Joe Ben Taylor</title>
+			<button data-type='captionL' type='button' className={actionClass} onClick={retry}>
 				Try again
 			</button>
 		</StatusPage>

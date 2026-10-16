@@ -2,10 +2,72 @@
 
 import { GlobalContext } from '@parts/Contexts';
 import { use, useEffect, useState, useSyncExternalStore } from 'react';
-import { defaults, getSettings, type NumberSetting, ranges, STORAGE_KEY, subscribe, updateSettings } from './store';
+import {
+	defaults,
+	getSavedSettings,
+	getSettingsFor,
+	getSettingsTarget,
+	type ModalSettings,
+	mobileDefaults,
+	type NumberSetting,
+	ranges,
+	restoreSettings,
+	type SettingsTarget,
+	STORAGE_KEY,
+	subscribe,
+	updateSettings as updateProfileSettings,
+} from './store';
 import s from './styles.module.scss';
 
+const sections: Record<string, string> = {
+	Recognition: '[data-recognition]',
+	About: '[data-about]',
+	Globe: '[data-globe]',
+	'Keycap placement': '[data-keycap]',
+	Connect: '[data-connect]',
+	'Design toolkit': '[data-toolkit="Design toolkit"]',
+	'Development toolkit': '[data-toolkit="Development toolkit"]',
+};
+
 const fields: { title: string; controls: [NumberSetting, string, string][] }[] = [
+	{
+		title: 'Connect',
+		controls: [
+			['matrixPortraitSize', 'Desktop face size', '×'],
+			['matrixSpeed', 'Rain speed', '×'],
+			['matrixBrightness', 'Brightness', '×'],
+			['matrixGlow', 'Glow', '×'],
+			['matrixFace', 'Face detail', '×'],
+			['matrixDepth', 'Face depth', '×'],
+			['matrixBend', 'Rain bending', '×'],
+		],
+	},
+	{ title: 'Design toolkit', controls: [['designToolkitSize', 'Tile size', '%']] },
+	{ title: 'Development toolkit', controls: [['developmentToolkitSize', 'Tile size', '%']] },
+	{
+		title: 'Recognition',
+		controls: [
+			['awardSize', 'Award size', '%'],
+			['awardZoom', 'Spiral camera zoom', '×'],
+			['awardSpeed', 'Spiral speed', '×'],
+			['awardDragEasing', 'Drag smoothing', 's · higher is softer'],
+			['awardScrollBoost', 'Scroll acceleration', '×'],
+			['awardBendStrength', 'Bending strength', '×'],
+			['awardHoverIntensity', 'Hover intensity', '×'],
+			['awardFocusDuration', 'Move to centre duration', 's · lower is faster'],
+		],
+	},
+	{
+		title: 'About',
+		controls: [
+			['aboutScrollDistance', 'Scroll distance', 'svh'],
+			['aboutStartZoom', 'Starting image zoom', '%'],
+			['aboutFinalOpacity', 'Final image opacity', '%'],
+			['aboutIntroParallax', 'Intro Y parallax', '%'],
+			['aboutExitParallax', 'Exit Y parallax', '%'],
+			['aboutPreviousZoom', 'Previous image extra zoom', '%'],
+		],
+	},
 	{
 		title: 'Keycap placement',
 		controls: [
@@ -34,19 +96,33 @@ const fields: { title: string; controls: [NumberSetting, string, string][] }[] =
 
 export default function ModalSettingsPanel() {
 	const { setProfileOpen } = use(GlobalContext);
-	const values = useSyncExternalStore(subscribe, getSettings, () => defaults);
+	const [target, setTarget] = useState<SettingsTarget>('desktop');
+	const values = useSyncExternalStore(
+		subscribe,
+		() => getSettingsFor(target),
+		() => defaults
+	);
+	const updateSettings = (values: Partial<ModalSettings>) => updateProfileSettings(values, target);
 	const [message, setMessage] = useState('Changes save in this browser for settings mode.');
 	useEffect(() => {
+		setTarget(getSettingsTarget());
 		try {
 			const saved = localStorage.getItem(STORAGE_KEY);
-			if (saved) updateSettings(JSON.parse(saved));
+			if (saved) restoreSettings(JSON.parse(saved));
+			// Apply the approved mobile preset once, preserving saved desktop settings.
+			const mobilePresetKey = 'jbt-mobile-preset-2026-10-16';
+			if (!localStorage.getItem(mobilePresetKey)) {
+				updateProfileSettings(mobileDefaults, 'mobile');
+				localStorage.setItem(STORAGE_KEY, JSON.stringify(getSavedSettings()));
+				localStorage.setItem(mobilePresetKey, '1');
+			}
 		} catch {
 			/* Storage may be unavailable or contain an older draft. */
 		}
 		setProfileOpen(true);
 		return subscribe(() => {
 			try {
-				localStorage.setItem(STORAGE_KEY, JSON.stringify(getSettings()));
+				localStorage.setItem(STORAGE_KEY, JSON.stringify(getSavedSettings()));
 			} catch {
 				setMessage('Preview updated. Browser storage is unavailable.');
 			}
@@ -54,7 +130,7 @@ export default function ModalSettingsPanel() {
 	}, [setProfileOpen]);
 	const copy = async () => {
 		try {
-			await navigator.clipboard.writeText(JSON.stringify(values, null, 2));
+			await navigator.clipboard.writeText(JSON.stringify(getSavedSettings(), null, 2));
 			setMessage('Settings copied. Paste them here to make them the defaults.');
 		} catch {
 			setMessage('Clipboard unavailable. Your settings remain saved in this browser.');
@@ -65,6 +141,60 @@ export default function ModalSettingsPanel() {
 			<details open>
 				<summary>Modal settings</summary>
 				<p>Live preview · settings mode only</p>
+				<label>
+					Editing settings for{' '}
+					<select
+						aria-label='Settings device'
+						value={target}
+						onChange={event => setTarget(event.target.value as SettingsTarget)}
+					>
+						<option value='mobile'>Mobile</option>
+						<option value='desktop'>Desktop</option>
+					</select>
+				</label>
+				<p>
+					{target === 'mobile'
+						? 'Mobile settings apply below 1024px. Desktop stays unchanged.'
+						: 'Desktop settings apply from 1024px. Mobile stays unchanged.'}
+				</p>
+				{target === 'mobile' && (
+					<fieldset>
+						<legend>Connect · mobile face</legend>
+						<button
+							type='button'
+							onClick={() =>
+								document.querySelector('[data-connect]')?.scrollIntoView({ block: 'center' })
+							}
+						>
+							Show Connect
+						</button>
+						<label className={s.toggle}>
+							<input
+								type='checkbox'
+								checked={values.mobileFaceSmall}
+								onChange={event => updateSettings({ mobileFaceSmall: event.target.checked })}
+							/>
+							Smaller mobile face
+						</label>
+						<div className={s.control}>
+							<label htmlFor='modal-mobileFaceSize'>
+								Mobile face size{' '}
+								<span>{Math.round((values.mobileFaceSize / 1.45) * 100)}% of original</span>
+							</label>
+							<input
+								id='modal-mobileFaceSize'
+								type='range'
+								min={ranges.mobileFaceSize[0]}
+								max={ranges.mobileFaceSize[1]}
+								step={ranges.mobileFaceSize[2]}
+								value={values.mobileFaceSize}
+								disabled={!values.mobileFaceSmall}
+								onChange={event => updateSettings({ mobileFaceSize: event.target.valueAsNumber })}
+							/>
+						</div>
+						<p>Mobile only. Turn off to compare with the original size.</p>
+					</fieldset>
+				)}
 				{fields.map(group => (
 					<fieldset key={group.title}>
 						<legend>{group.title}</legend>
@@ -73,49 +203,60 @@ export default function ModalSettingsPanel() {
 							onClick={() => {
 								setProfileOpen(true);
 								document
-									.querySelector(group.title === 'Globe' ? '[data-globe]' : '[data-keycap]')
-									?.scrollIntoView({ block: 'center' });
+									.querySelector(sections[group.title])
+									?.scrollIntoView({ block: group.title === 'About' ? 'start' : 'center' });
 							}}
 						>
-							Show {group.title === 'Globe' ? 'globe' : 'keycap'}
+							Show{' '}
+							{group.title === 'Globe'
+								? 'globe'
+								: group.title === 'Keycap placement'
+									? 'keycap'
+									: group.title === 'Connect'
+										? 'rain'
+										: group.title}
 						</button>
-						{group.controls.map(([key, label, unit]) => (
-							<div className={s.control} key={key}>
-								<label htmlFor={`modal-${key}`}>
-									{label} <span>{unit}</span>
-								</label>
-								<input
-									id={`modal-${key}`}
-									type='number'
-									min={ranges[key][0]}
-									max={ranges[key][1]}
-									step={ranges[key][2]}
-									value={Number(values[key].toFixed(4))}
-									onChange={event => {
-										if (event.target.value !== '')
-											updateSettings({ [key]: event.target.valueAsNumber });
-									}}
-								/>
-								<input
-									aria-label={`${group.title}: ${label} slider`}
-									type='range'
-									min={ranges[key][0]}
-									max={ranges[key][1]}
-									step={ranges[key][2]}
-									value={values[key]}
-									onChange={event => updateSettings({ [key]: event.target.valueAsNumber })}
-								/>
-							</div>
-						))}
-						{(group.title === 'Globe'
-							? [
-									['globeFollow', 'Mouse movement'],
-									['globePulse', 'Dot pulse'],
-								]
-							: [
-									['keycapTilt', 'Mouse tilt'],
-									['keycapSound', 'Click sound'],
-								]
+						{group.controls
+							.filter(([key]) => !(target === 'mobile' && key === 'matrixPortraitSize'))
+							.map(([key, label, unit]) => (
+								<div className={s.control} key={key}>
+									<label htmlFor={`modal-${key}`}>
+										{label} <span>{unit}</span>
+									</label>
+									<input
+										id={`modal-${key}`}
+										type='number'
+										min={ranges[key][0]}
+										max={ranges[key][1]}
+										step={ranges[key][2]}
+										value={Number(values[key].toFixed(4))}
+										onChange={event => {
+											if (event.target.value !== '')
+												updateSettings({ [key]: event.target.valueAsNumber });
+										}}
+									/>
+									<input
+										aria-label={`${group.title}: ${label} slider`}
+										type='range'
+										min={ranges[key][0]}
+										max={ranges[key][1]}
+										step={ranges[key][2]}
+										value={values[key]}
+										onChange={event => updateSettings({ [key]: event.target.valueAsNumber })}
+									/>
+								</div>
+							))}
+						{(!['Globe', 'Keycap placement'].includes(group.title)
+							? []
+							: group.title === 'Globe'
+								? [
+										['globeFollow', 'Mouse movement'],
+										['globePulse', 'Dot pulse'],
+									]
+								: [
+										['keycapTilt', 'Mouse tilt'],
+										['keycapSound', 'Click sound'],
+									]
 						).map(([key, label]) => (
 							<label className={s.toggle} key={key}>
 								<input
@@ -132,7 +273,10 @@ export default function ModalSettingsPanel() {
 					<button type='button' onClick={() => window.dispatchEvent(new Event('modal-settings-replay'))}>
 						Replay globe
 					</button>
-					<button type='button' onClick={() => updateSettings(defaults)}>
+					<button
+						type='button'
+						onClick={() => updateSettings(target === 'mobile' ? mobileDefaults : defaults)}
+					>
 						Reset defaults
 					</button>
 					<button type='button' onClick={copy}>

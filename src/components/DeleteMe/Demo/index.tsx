@@ -38,7 +38,9 @@ const Demo = ({ children, hasOverlay = true, caption, className, style }: I.Demo
 
 		{caption && (
 			<Grid isFixed>
-				<figcaption className={s.caption}>{caption}</figcaption>
+				<figcaption data-type='captionS' className={s.caption}>
+					{caption}
+				</figcaption>
 			</Grid>
 		)}
 	</figure>

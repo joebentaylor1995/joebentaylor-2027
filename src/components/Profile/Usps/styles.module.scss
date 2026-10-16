@@ -26,8 +26,10 @@
 			transition: scale 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 		}
 
-		&[data-cursor-link]:hover :is(img, video) {
-			scale: 1.04;
+		@include desktopHover {
+			&[data-cursor-link]:hover :is(img, video) {
+				scale: 1.04;
+			}
 		}
 	}
 

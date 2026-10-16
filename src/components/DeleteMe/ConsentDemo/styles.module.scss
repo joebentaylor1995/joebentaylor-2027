@@ -13,8 +13,6 @@
 	gap: var(--gap-s);
 
 	li {
-		@include captionL;
-
 		padding: var(--gap-xxs) var(--gap-sm);
 		border-radius: var(--br-round);
 		color: alpha(--global-white, 62);
@@ -43,13 +41,10 @@
 }
 
 .note {
-	@include captionS;
-
 	color: var(--feedback-warning);
 }
 
 .gate {
-	@include captionL;
 	@include secondary;
 
 	padding: var(--gap-l);

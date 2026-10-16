@@ -45,8 +45,6 @@ $tile-radius: var(--br-l);
 }
 
 @mixin eyebrow {
-	@include captionL;
-
 	font-weight: var(--weight-semi);
 	color: accent(55);
 }
@@ -101,7 +99,6 @@ $tile-radius: var(--br-l);
 }
 
 @mixin body {
-	@include bodyS;
 	@include secondary;
 
 	line-height: 1.5;
@@ -115,8 +112,6 @@ $tile-radius: var(--br-l);
 
 // Pill buttons
 @mixin pill {
-	@include captionL;
-
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -154,8 +149,6 @@ $tile-radius: var(--br-l);
 
 // Text link with a chevron, keynote style
 @mixin chevronLink {
-	@include captionL;
-
 	font-weight: var(--weight-medium);
 	color: accent(55);
 

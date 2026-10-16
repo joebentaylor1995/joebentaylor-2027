@@ -20,6 +20,10 @@ export const baseColors = {
 		c3: '#212121',
 		c4: '#121212',
 		c5: '#F0EDED',
+		c6: '#03082E',
+		c7: '#C8EAFF',
+		// NOTE • The electric blue of the loader's glitch intro (sampled from the source edit)
+		c8: '#1012FD',
 	},
 
 	global: {

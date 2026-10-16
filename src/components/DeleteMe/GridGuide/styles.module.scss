@@ -3,8 +3,6 @@
 // SECTION • Viewport readout
 // NOTE • Only the line for the current breakpoint shows
 .viewport {
-	@include captionL;
-
 	align-self: center;
 	padding: var(--gap-xs) var(--gap-m);
 	white-space: nowrap;
@@ -43,8 +41,6 @@
 
 // SECTION • Demos
 .plain {
-	@include bodyS;
-
 	display: grid;
 	place-items: center;
 	min-height: 8rem;

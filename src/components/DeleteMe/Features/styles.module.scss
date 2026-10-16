@@ -29,8 +29,6 @@
 }
 
 .title {
-	@include bodyL;
-
 	font-weight: var(--weight-semi);
 	color: var(--global-white);
 }
@@ -41,7 +39,6 @@
 
 .where {
 	@include mono;
-	@include captionS;
 
 	color: accent(60);
 }

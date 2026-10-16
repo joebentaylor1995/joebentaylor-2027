@@ -11,8 +11,8 @@ import Link from 'next/link';
 // adds noindex to 404 responses itself.
 const NotFound = () => (
 	<StatusPage code='404' title='Page not found' message="The page you're looking for doesn't exist or has moved.">
-		<title>Page not found — Tackl</title>
-		<Link href='/' className={actionClass}>
+		<title>Page not found — Joe Ben Taylor</title>
+		<Link data-type='captionL' href='/' className={actionClass}>
 			Back to home
 		</Link>
 	</StatusPage>

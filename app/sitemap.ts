@@ -29,6 +29,12 @@ const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
 			changeFrequency: 'monthly',
 			priority: 1,
 		},
+		...['cookies', 'terms-privacy', 'llms'].map(slug => ({
+			url: `${siteUrl}/${slug}`,
+			lastModified: new Date(),
+			changeFrequency: 'yearly' as const,
+			priority: 0.3,
+		})),
 	];
 };
 

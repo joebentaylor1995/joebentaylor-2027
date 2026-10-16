@@ -88,6 +88,7 @@ const nextConfig = {
 	// Image loader settings
 	images: {
 		formats: ['image/avif', 'image/webp'],
+		qualities: [75, 90],
 		// Optimized images are cached for a day — bump higher if your imagery
 		// rarely changes (CMS images get new URLs on change anyway)
 		minimumCacheTTL: 86400,

@@ -34,8 +34,8 @@ export const introDefaults: IntroSettings = {
 	width: 1,
 	speed: 0.95,
 	ease: 'none',
-	portraitScale: 2.06,
-	portraitFinish: 90,
+	portraitScale: 2.58,
+	portraitFinish: 100,
 	portraitEase: 'power2.inOut',
 	headingStart: 1.2,
 	headingCoverDuration: 0.4,
@@ -50,4 +50,5 @@ export const introDefaults: IntroSettings = {
 	copyrightDigitStagger: 0.07,
 };
 export const introSettings = new WeakMap<HTMLElement, IntroSettings>();
+export const mobileIntroDefaults: IntroSettings = { ...introDefaults, portraitScale: 2.06, portraitFinish: 90 };
 export const introReplays = new WeakMap<HTMLElement, () => void>();

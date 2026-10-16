@@ -85,7 +85,9 @@
 	cursor: pointer;
 
 	@media (hover: hover) and (pointer: fine) {
-		&:hover .closeIcon { opacity: 0.4 }
+		@include desktopHover {
+			&:hover .closeIcon { opacity: 0.4 }
+		}
 	}
 
 	@include bp(l) {
@@ -125,16 +127,12 @@
 	background: var(--brand-c4);
 
 	a {
-		@include bodyS;
-
 		text-decoration: underline;
 		text-underline-offset: 0.25em;
 	}
 }
 
 .allowButton {
-	@include bodyS;
-
 	min-height: 44px;
 	padding: var(--gap-s) var(--gap-m);
 	border-radius: var(--br-s);
@@ -144,8 +142,6 @@
 }
 
 .loading {
-	@include bodyM;
-
 	text-align: center;
 }
 

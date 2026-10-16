@@ -48,7 +48,7 @@ const AlphaPlayground = () => {
 				))}
 			</fieldset>
 
-			<label className={s.slider}>
+			<label data-type='captionL' className={s.slider}>
 				<span>
 					Opacity <output>{opacity}</output>
 				</span>

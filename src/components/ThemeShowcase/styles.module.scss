@@ -15,23 +15,17 @@
 }
 
 .blockTitle {
-	@include headlineS;
-
 	padding-bottom: var(--gap-s);
 	border-bottom: 1px solid alpha(--global-white, 10);
 }
 
 .groupLabel {
-	@include captionL;
-
 	text-transform: uppercase;
 	letter-spacing: 0.12em;
 	color: var(--brand-c1);
 }
 
 .roleNote {
-	@include bodyS;
-
 	max-width: 72rem;
 	color: alpha(--global-white, 60);
 }
@@ -61,20 +55,10 @@
 	border-radius: var(--br-s);
 }
 
-.tokenName {
-	@include captionL;
-}
-
 .tokenValue {
-	@include captionS;
-
 	font-family: var(--font-mono);
 	color: alpha(--global-white, 50);
 	overflow-wrap: anywhere;
-}
-
-.fontRow {
-	@include titleL;
 }
 
 .specimenRow {
@@ -121,8 +105,10 @@
 	border: 1px solid alpha(--global-white, 10);
 	border-radius: var(--br-m);
 
-	&:hover > span {
-		transform: translateX(10rem);
+	@include desktopHover {
+		&:hover > span {
+			transform: translateX(10rem);
+		}
 	}
 
 	> span {

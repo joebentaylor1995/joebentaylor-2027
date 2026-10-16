@@ -11,8 +11,6 @@
 }
 
 .label {
-	@include captionS;
-
 	padding: var(--gap-s) var(--gap-m);
 	border-bottom: 1px solid alpha(--global-white, 8);
 	font-weight: var(--weight-medium);

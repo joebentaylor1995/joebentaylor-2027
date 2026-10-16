@@ -1,6 +1,8 @@
 // Imports
 // ------------
+import { canHover } from '@utils/desktopHover';
 import { gsap } from 'gsap';
+import { HERO_DESKTOP_QUERY } from '../layout';
 import { type DepthSettings, depthUrl, scrollKeys } from './effect-settings';
 import type { LiquidLayer } from './liquid';
 import type { LiquidSettings } from './liquid-settings';
@@ -25,7 +27,7 @@ export interface DepthController {
 
 // NOTE • Fewer pixels for the 48-step ray march; the portrait is soft enough
 // that retina screens can't tell 1.5 from 2
-const MAX_PIXEL_RATIO = 1.5;
+const MAX_PIXEL_RATIO = 2;
 // NOTE • Sub-threshold motion is snapped to rest so the loop can stop drawing
 const SETTLE_EPSILON = 0.0001,
 	CURSOR_SPEED_EPSILON = 0.001;
@@ -246,11 +248,29 @@ export function mountDepthEffect({
 		gl.uniform2f(u.resolution, canvas.width, canvas.height);
 		gl.uniform1f(u.portraitAspect, photo.naturalWidth / photo.naturalHeight);
 		gl.uniform2f(u.motion, pointer[0] * s.horizontal, pointer[1] * s.vertical);
-		gl.uniform2f(u.positionShift, s.positionX / 100, s.positionY / 100);
-		for (const key of ['intensity', 'lift', 'zoom'] as const) gl.uniform1f(u[key], s[key]);
-		gl.uniform1f(u.rotation, (s.rotation * Math.PI) / 180);
+		const mobile = !desktopLayout.matches;
+		// CSS fallback scales around centre bottom; shaders rotate around centre.
+		gl.uniform2f(
+			u.positionShift,
+			mobile ? s.mobilePositionX / 100 : s.positionX / 100,
+			mobile ? s.mobilePositionY / 100 + (1 - s.mobileZoom) / 2 : s.positionY / 100
+		);
+		for (const key of ['intensity', 'lift'] as const) gl.uniform1f(u[key], s[key]);
+		gl.uniform1f(u.zoom, mobile ? s.mobileZoom : s.zoom);
+		gl.uniform1f(u.rotation, ((mobile ? s.mobileRotation : s.rotation) * Math.PI) / 180);
 	}
+	const desktopLayout = window.matchMedia(HERO_DESKTOP_QUERY);
 	const profileScene = host.closest<HTMLElement>('[data-profile-scene]');
+	function syncTicker() {
+		gsap.ticker.remove(draw);
+		if (loaded && !disposed && !lost && visible && !document.hidden && profileScene?.dataset.scenePaused !== 'true')
+			gsap.ticker.add(draw);
+	}
+	const pauseObserver = new MutationObserver(() => {
+		if (profileScene?.dataset.scenePaused === 'true') resetMotion();
+		syncTicker();
+	});
+	if (profileScene) pauseObserver.observe(profileScene, { attributes: true, attributeFilter: ['data-scene-paused'] });
 	function draw(_time: number, deltaMs: number) {
 		if (!loaded || disposed || lost || !visible || document.hidden || profileScene?.dataset.scenePaused === 'true')
 			return;
@@ -346,18 +366,25 @@ export function mountDepthEffect({
 			const settleProgress = Math.min(1, reveal / (introConfig.portraitFinish / 100));
 			const scaleEase = gsap.parseEase(introConfig.portraitEase)(settleProgress);
 			// Keep tall windows from enlarging the portrait into the text column.
-			const portraitAspect = photo.naturalWidth / photo.naturalHeight;
-			const coverWidth = Math.max(cssWidth, cssHeight * portraitAspect);
-			const widthScale = cssWidth / coverWidth;
-			const settledWidth = cssWidth * s.zoom;
-			const rotation = Math.abs((s.rotation * Math.PI) / 180);
-			const bottomSpan = (settledWidth / portraitAspect) * Math.cos(rotation) - settledWidth * Math.sin(rotation);
-			const bottomOffset = Math.max(0, (cssHeight - bottomSpan) / 2);
-			gl.uniform2f(u.positionShift, s.positionX / 100, s.positionY / 100 + bottomOffset / cssHeight);
-			gl.uniform1f(
-				u.zoom,
-				(introConfig.portraitScale + (s.zoom - introConfig.portraitScale) * scaleEase) * widthScale
-			);
+			if (desktopLayout.matches) {
+				const portraitAspect = photo.naturalWidth / photo.naturalHeight;
+				const coverWidth = Math.max(cssWidth, cssHeight * portraitAspect);
+				const widthScale = cssWidth / coverWidth;
+				const settledWidth = cssWidth * s.zoom;
+				const rotation = Math.abs((s.rotation * Math.PI) / 180);
+				const bottomSpan =
+					(settledWidth / portraitAspect) * Math.cos(rotation) - settledWidth * Math.sin(rotation);
+				const bottomOffset = Math.max(0, (cssHeight - bottomSpan) / 2);
+				gl.uniform2f(u.positionShift, s.positionX / 100, s.positionY / 100 + bottomOffset / cssHeight);
+				gl.uniform1f(
+					u.zoom,
+					(introConfig.portraitScale + (s.zoom - introConfig.portraitScale) * scaleEase) * widthScale
+				);
+			} else {
+				const zoom = introConfig.portraitScale + (s.mobileZoom - introConfig.portraitScale) * scaleEase;
+				gl.uniform1f(u.zoom, zoom);
+				gl.uniform2f(u.positionShift, s.mobilePositionX / 100, s.mobilePositionY / 100 + (1 - zoom) / 2);
+			}
 			gl.uniform1f(u.entrance, entrance);
 			gl.uniform2f(u.cursorPos, cursor[0], cursor[1]);
 			gl.uniform1f(u.cursorOn, cursorActive);
@@ -391,6 +418,7 @@ export function mountDepthEffect({
 		);
 	}
 	function track(event: PointerEvent) {
+		if (!canHover() || event.pointerType !== 'mouse') return;
 		// Depth and water cursor become available together once the ripple lands.
 		if ((sceneIntros.get(host)?.waterReveal ?? 1) < 1) {
 			liquid?.resetPointer();
@@ -402,7 +430,7 @@ export function mountDepthEffect({
 		if (!wasActive) previousCursor = [...cursor];
 		cursorActive = 1;
 		target = cursor.map(v => Math.max(-1, Math.min(1, v * 2 - 1)));
-		if (event.pointerType !== 'touch' && !ignored(event)) liquid?.move(cursor[0], cursor[1]);
+		if (!ignored(event)) liquid?.move(cursor[0], cursor[1]);
 		else liquid?.resetPointer();
 		dirty = true;
 	}
@@ -431,44 +459,53 @@ export function mountDepthEffect({
 		event => {
 			if (ignored(event) || !event.isPrimary || event.button !== 0) return;
 			track(event);
-			if (event.pointerType === 'touch') touchY = event.clientY;
 		},
 		{ signal: events.signal }
 	);
 	host.addEventListener(
-		'pointermove',
+		'touchmove',
 		event => {
-			if (event.pointerType === 'touch' && touchY !== null) {
-				kick((touchY - event.clientY) * 3);
-				touchY = event.clientY;
+			if (event.touches.length === 1 && touchY !== null) {
+				kick((touchY - event.touches[0].clientY) * 3);
+				touchY = event.touches[0].clientY;
 			}
 		},
 		{ passive: true, signal: events.signal }
 	);
 	host.addEventListener(
-		'pointerup',
+		'touchend',
 		() => {
 			touchY = null;
 		},
 		{ signal: events.signal }
 	);
 	host.addEventListener(
-		'pointercancel',
+		'touchcancel',
 		() => {
 			touchY = null;
 		},
 		{ signal: events.signal }
 	);
+	// Touch events continue after the browser takes over native scrolling.
+	host.addEventListener(
+		'touchstart',
+		event => {
+			touchY = !ignored(event) && event.touches.length === 1 ? event.touches[0].clientY : null;
+		},
+		{ passive: true, signal: events.signal }
+	);
 	document.addEventListener(
 		'visibilitychange',
 		() => {
 			if (document.hidden) resetMotion();
+			syncTicker();
 		},
 		{ signal: events.signal }
 	);
 	const observer = new IntersectionObserver(([entry]) => {
 		visible = entry.isIntersecting;
 		if (!visible) resetMotion();
+		syncTicker();
 	});
 	observer.observe(host);
 	// Cached here so the frame loop never forces layout
@@ -498,6 +535,7 @@ export function mountDepthEffect({
 		event => {
 			event.preventDefault();
 			lost = true;
+			syncTicker();
 			generation++;
 			stopLiquid();
 			onReady(false);
@@ -562,6 +600,7 @@ export function mountDepthEffect({
 			gl.uniform1i(main.uniforms.colourPhoto, 2);
 			gl.uniform1i(main.uniforms.depthMask, 1);
 			loaded = true;
+			syncTicker();
 			dirty = true;
 			draw(0, 16);
 			if (loaded) onReady(true);
@@ -602,7 +641,6 @@ export function mountDepthEffect({
 		.catch(() => {
 			if (!disposed) onReady(false);
 		});
-	gsap.ticker.add(draw);
 	// CMS/React changes to the shared logo markup refresh the desktop texture too.
 	const logoTrack = host.querySelector('[data-logo-marquee]');
 	const logoObserver = new MutationObserver(() => {
@@ -650,6 +688,7 @@ export function mountDepthEffect({
 			generation++;
 			stopLiquid();
 			logoObserver.disconnect();
+			pauseObserver.disconnect();
 			decorationResizer.disconnect();
 			themeObserver.disconnect();
 			gsap.ticker.remove(draw);

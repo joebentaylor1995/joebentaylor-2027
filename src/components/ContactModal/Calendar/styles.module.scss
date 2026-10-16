@@ -30,8 +30,6 @@
 }
 
 .loading {
-	@include bodyM;
-
 	position: absolute;
 	inset: 0;
 	display: flex;
@@ -42,8 +40,6 @@
 }
 
 .fallback {
-	@include bodyS;
-
 	display: block;
 	width: fit-content;
 	margin: var(--gap-m) auto 0;

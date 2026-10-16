@@ -1,5 +1,12 @@
 @use 'breakpoints' as *;
 
+// Keep in sync with DESKTOP_HOVER_QUERY in utils/desktopHover.ts.
+@mixin desktopHover {
+    @include bp(l) {
+        @media (hover: hover) and (pointer: fine) { @content; }
+    }
+}
+
 // Keep in sync with HERO_DESKTOP_QUERY in Hero/layout.ts.
 @mixin heroDesktop {
     @include bp(hero) {

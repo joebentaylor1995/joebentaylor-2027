@@ -3,14 +3,16 @@
 
 import Analytics from '@parts/Analytics';
 import { consentScript } from '@parts/CookieBar/consent';
+import Favicons from '@parts/Favicons';
 import Header from '@parts/Header';
 import Profile from '@parts/Profile';
 import ProfileReveal from '@parts/ProfileReveal';
 import SiteLoader from '@parts/SiteLoader';
 import SmoothScroll from '@parts/SmoothScroll';
+import StructuredData from '@parts/StructuredData';
 import { ppNeueMontreal, sequel } from '@theme/fonts';
 import type { Metadata, Viewport } from 'next';
-import { isSiteUrlConfigured, siteUrl } from '@/config';
+import { isSiteUrlConfigured, profile, siteUrl } from '@/config';
 import Providers from './Providers';
 
 // Styles
@@ -20,31 +22,47 @@ import '@css/global.scss';
 
 // SEO
 // ------------
-// NOTE • Site-wide defaults — override per route with `metadata` or `generateMetadata`
+// NOTE • Site-wide defaults, built from `profile` in src/config.ts — override
+// per route with `metadata` or `generateMetadata`. The share image comes from
+// opengraph-image.tsx beside this layout, which every route inherits.
 export const metadata: Metadata = {
 	metadataBase: new URL(siteUrl),
 	title: {
-		default: 'Joe Ben Taylor',
-		template: '%s — Joe Ben Taylor',
+		default: `${profile.name} — ${profile.tagline}`,
+		template: `%s — ${profile.name}`,
 	},
-	description: 'Digital Narrative Architect',
+	description: profile.description,
+	applicationName: profile.name,
+	authors: [{ name: profile.name, url: siteUrl }],
+	creator: profile.name,
+	publisher: profile.business.name,
+	keywords: [profile.name, 'designer', 'developer', 'Doncaster', ...profile.knowsAbout],
+	category: 'design',
+	formatDetection: { telephone: false, address: false, email: false },
 	// NOTE • Indexing is gated on a real site URL — a deploy that forgot
-	// NEXT_PUBLIC_SITE_URL can't be indexed under the tackl.netlify.app fallback
+	// NEXT_PUBLIC_SITE_URL can't be indexed under the fallback
 	robots: {
 		index: isSiteUrlConfigured,
 		follow: isSiteUrlConfigured,
+		googleBot: {
+			index: isSiteUrlConfigured,
+			follow: isSiteUrlConfigured,
+			'max-image-preview': 'large',
+			'max-snippet': -1,
+			'max-video-preview': -1,
+		},
 	},
-	// NOTE • The default share image is public/og.jpg (1200 × 630). A page
-	// can swap it with its own `metadata`, or generate one with an
-	// opengraph-image.tsx beside its page.tsx (see src/utils/ogImage.tsx)
 	openGraph: {
 		type: 'website',
-		siteName: 'Joe Ben Taylor',
-		images: [{ url: '/og.jpg', width: 1200, height: 630, alt: 'Joe Ben Taylor — Digital Narrative Architect' }],
+		siteName: profile.name,
+		locale: profile.locale,
+		title: `${profile.name} — ${profile.tagline}`,
+		description: profile.description,
 	},
 	twitter: {
 		card: 'summary_large_image',
-		images: ['/og.jpg'],
+		title: `${profile.name} — ${profile.tagline}`,
+		description: profile.description,
 	},
 };
 
@@ -63,6 +81,8 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
 				{/* NOTE • Marks returning visitors' cookie choice before first paint, so the server-rendered CookieBar never flashes (src/components/CookieBar/consent.ts) */}
 				{/* biome-ignore lint/security/noDangerouslySetInnerHtml: static inline script built from constants — no user input */}
 				<script dangerouslySetInnerHTML={{ __html: consentScript }} />
+				<Favicons />
+				<StructuredData />
 			</head>
 			<body>
 				<Providers>

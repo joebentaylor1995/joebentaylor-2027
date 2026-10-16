@@ -1,0 +1,48 @@
+.jacket {
+	position: fixed;
+	z-index: 100;
+	right: var(--gap-s);
+	bottom: var(--gap-s);
+	width: min(32rem, calc(100vw - 2 * var(--gap-s)));
+	max-height: 45dvh;
+	padding: var(--gap-s);
+	overflow: auto;
+	overscroll-behavior: contain;
+	border: 1px solid alpha(--global-white, 25);
+	border-radius: var(--gap-xs);
+	background: var(--brand-c4);
+	color: var(--global-white);
+	cursor: auto;
+
+	summary { cursor: pointer; }
+	p { margin-block: var(--gap-s); }
+
+	input {
+		width: 100%;
+		accent-color: var(--brand-c1);
+	}
+
+	button {
+		padding: var(--gap-xs) var(--gap-s);
+		border: 1px solid alpha(--global-white, 25);
+		border-radius: var(--gap-xs);
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+	}
+
+	:focus-visible {
+		outline: 2px solid var(--brand-c2);
+		outline-offset: 3px;
+	}
+}
+
+.control {
+	display: grid;
+	gap: var(--gap-xs);
+
+	span {
+		display: flex;
+		justify-content: space-between;
+	}
+}

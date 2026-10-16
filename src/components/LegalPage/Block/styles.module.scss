@@ -1,0 +1,121 @@
+// Styles: Block
+// ---------------
+.paragraph {
+	color: alpha(--global-white, 70);
+}
+
+.note {
+	color: alpha(--global-white, 40);
+}
+
+.list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-s);
+	list-style: none;
+
+	li {
+		position: relative;
+		padding-left: calc(0.5rem + var(--gap-sm));
+		color: alpha(--global-white, 70);
+
+		// Bullet — a 5px brand dot centred on the first line
+		&::before {
+			content: '';
+			position: absolute;
+			top: calc(0.5lh - 0.25rem);
+			left: 0;
+			width: 0.5rem;
+			height: 0.5rem;
+			border-radius: var(--br-round);
+			background: var(--brand-c1);
+		}
+	}
+}
+
+.table {
+	width: 100%;
+	border-collapse: collapse;
+	text-align: left;
+
+	thead {
+		display: none;
+
+		@include bp(l) {
+			display: table-header-group;
+		}
+	}
+
+	th, td {
+		padding: 0;
+		font-weight: inherit;
+		vertical-align: top;
+	}
+
+	thead th {
+		padding-block: var(--gap-sm);
+		color: alpha(--global-white, 40);
+	}
+
+	// Mobile: each row stacks — name, purpose, then provider and duration side by side
+	tr {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		grid-template-areas:
+			'name name'
+			'purpose purpose'
+			'provider duration';
+		gap: var(--gap-xs) var(--gap-m);
+		padding-block: var(--gap-sm);
+		border-bottom: 1px solid alpha(--global-white, 10);
+
+		@include bp(l) {
+			grid-template-columns: 22.4rem 9.2rem 1fr 8.4rem;
+			grid-template-areas: 'name provider purpose duration';
+			gap: 0 var(--gap-sm);
+		}
+	}
+
+	thead tr {
+		padding-block: 0;
+	}
+
+	[data-cell='name'] {
+		grid-area: name;
+		color: var(--global-white);
+	}
+
+	[data-cell='purpose'] {
+		grid-area: purpose;
+		color: alpha(--global-white, 70);
+	}
+
+	[data-cell='provider'] {
+		grid-area: provider;
+		color: alpha(--global-white, 40);
+
+		@include bp(l) {
+			color: alpha(--global-white, 70);
+		}
+	}
+
+	[data-cell='duration'] {
+		grid-area: duration;
+		color: alpha(--global-white, 40);
+
+		@include bp(l) {
+			color: alpha(--global-white, 70);
+		}
+	}
+}
+
+.code {
+	padding: var(--gap-m);
+	border-radius: var(--br-s);
+	background: alpha(--global-white, 5);
+	color: alpha(--global-white, 90);
+	font-family: var(--font-heading);
+	line-height: 1.6;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}

@@ -13,8 +13,6 @@
 }
 
 .key {
-	@include captionL;
-
 	padding: var(--gap-xxs) var(--gap-sm);
 	border-radius: var(--br-round);
 	font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -31,7 +29,6 @@
 }
 
 .status {
-	@include captionL;
 	@include secondary;
 
 	code {

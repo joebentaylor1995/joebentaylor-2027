@@ -26,7 +26,6 @@
 }
 
 .tagline {
-	@include bodyL;
 	@include secondary;
 
 	margin-bottom: var(--gap-m);
@@ -34,7 +33,6 @@
 }
 
 .footer {
-	@include captionL;
 	@include secondary;
 
 	display: flex;

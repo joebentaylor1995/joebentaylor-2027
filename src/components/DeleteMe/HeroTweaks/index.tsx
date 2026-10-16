@@ -68,20 +68,31 @@ const HeroTweaks = () => {
 
 	return (
 		<div className={s.jacket} data-hero-ignore data-state={isOpen ? 'open' : 'closed'}>
-			<button type='button' className={s.toggle} aria-expanded={isOpen} onClick={() => setIsOpen(open => !open)}>
+			<button
+				data-type='captionL'
+				type='button'
+				className={s.toggle}
+				aria-expanded={isOpen}
+				onClick={() => setIsOpen(open => !open)}
+			>
 				{isOpen ? 'Close' : 'Tweak effect'}
-				{changed > 0 && <span className={s.badge}>{changed}</span>}
+				{changed > 0 && (
+					<span data-type='captionS' className={s.badge}>
+						{changed}
+					</span>
+				)}
 			</button>
 
 			{isOpen && (
 				<div className={s.panel} data-lenis-prevent>
 					<div className={s.header}>
-						<p className={s.hint}>
+						<p data-type='captionS' className={s.hint}>
 							Changes apply live. Copy the values into HeroField/settings.ts to keep them.
 						</p>
 						<div className={s.actions}>
 							<CopyButton text={toSource(settings)} label='Copy settings' />
 							<button
+								data-type='captionL'
 								type='button'
 								className={s.reset}
 								onClick={heroSettings.reset}
@@ -93,13 +104,15 @@ const HeroTweaks = () => {
 					</div>
 
 					<details className={s.group} open>
-						<summary className={s.summary}>Colours</summary>
+						<summary data-type='captionL' className={s.summary}>
+							Colours
+						</summary>
 						{COLOURS.map(({ key, label, token }) => {
 							const override = settings.colours[key];
 
 							return (
 								<div key={key} className={s.row} data-changed={override !== null || undefined}>
-									<label className={s.colourLabel}>
+									<label data-type='captionS' className={s.colourLabel}>
 										<span>{label}</span>
 										<input
 											type='color'
@@ -108,6 +121,7 @@ const HeroTweaks = () => {
 										/>
 									</label>
 									<button
+										data-type='captionS'
 										type='button'
 										className={s.tokenButton}
 										onClick={() => heroSettings.setColour(key, null)}
@@ -122,14 +136,16 @@ const HeroTweaks = () => {
 
 					{GROUPS.map(({ title, controls }) => (
 						<details key={title} className={s.group}>
-							<summary className={s.summary}>{title}</summary>
+							<summary data-type='captionL' className={s.summary}>
+								{title}
+							</summary>
 							{controls.map(({ key, label, min, max, step }) => {
 								const value = settings.values[key];
 								const isChanged = value !== DEFAULTS[key];
 
 								return (
 									<label key={key} className={s.row} data-changed={isChanged || undefined}>
-										<span className={s.label}>
+										<span data-type='captionS' className={s.label}>
 											{label}
 											<output className={s.value}>{value.toFixed(decimalsOf(step))}</output>
 										</span>
@@ -148,7 +164,9 @@ const HeroTweaks = () => {
 						</details>
 					))}
 
-					<p className={s.hint}>Double-click a slider to reset it. Click the hero to send a pulse.</p>
+					<p data-type='captionS' className={s.hint}>
+						Double-click a slider to reset it. Click the hero to send a pulse.
+					</p>
 				</div>
 			)}
 		</div>

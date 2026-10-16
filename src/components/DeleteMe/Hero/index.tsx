@@ -217,7 +217,9 @@ const Hero = () => {
 			<Grid isFixed className={s.content}>
 				<Col m='2/6' l='3/11'>
 					<div ref={innerRef} className={s.inner}>
-						<p className={s.eyebrow}>Introducing</p>
+						<p data-type='bodyS' className={s.eyebrow}>
+							Introducing
+						</p>
 						<h1 ref={titleRef} className={s.title} aria-label={TITLE}>
 							{[...TITLE].map((letter, index) => (
 								// biome-ignore lint/suspicious/noArrayIndexKey: letters are positional
@@ -226,11 +228,13 @@ const Hero = () => {
 								</span>
 							))}
 						</h1>
-						<p className={s.tagline}>The Next.js starter kit. Built for motion. Fast by default.</p>
+						<p data-type='bodyL' className={s.tagline}>
+							The Next.js starter kit. Built for motion. Fast by default.
+						</p>
 
 						<div className={s.actions}>
 							<CopyButton text='bunx tackl' />
-							<a className={s.link} href={REPO_URL}>
+							<a data-type='captionL' className={s.link} href={REPO_URL}>
 								View on GitHub
 							</a>
 						</div>

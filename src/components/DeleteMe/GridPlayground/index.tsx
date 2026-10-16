@@ -87,6 +87,7 @@ const GridPlayground = () => {
 					<legend className={s.legend}>Preview device</legend>
 					{DEVICES.map(key => (
 						<button
+							data-type='captionL'
 							key={key}
 							type='button'
 							className={s.tab}
@@ -134,8 +135,10 @@ const GridPlayground = () => {
 									data-inherited={isInherited || undefined}
 									onClick={() => setSelectedId(item.id)}
 								>
-									<span className={s.itemLabel}>{item.label}</span>
-									<span className={s.itemValue}>
+									<span data-type='titleS' className={s.itemLabel}>
+										{item.label}
+									</span>
+									<span data-type='captionS' className={s.itemValue}>
 										{start}/{start + span}
 									</span>
 								</button>
@@ -147,7 +150,7 @@ const GridPlayground = () => {
 
 			{/* SECTION • Controls */}
 			<div className={s.controls}>
-				<p className={s.selection}>
+				<p data-type='captionL' className={s.selection}>
 					Block <strong>{selected.label}</strong> on {DEVICE_NAMES[device]?.toLowerCase() ?? device}:{' '}
 					{placement.isInherited ? (
 						<span className={s.muted}>
@@ -181,6 +184,7 @@ const GridPlayground = () => {
 
 				<div className={s.actions}>
 					<button
+						data-type='captionL'
 						type='button'
 						className={s.action}
 						onClick={() => setPlacement(null)}
@@ -188,10 +192,22 @@ const GridPlayground = () => {
 					>
 						{device === DEVICES[0] ? 'Full width' : 'Inherit from smaller'}
 					</button>
-					<button type='button' className={s.action} onClick={addItem} disabled={items.length >= MAX_ITEMS}>
+					<button
+						data-type='captionL'
+						type='button'
+						className={s.action}
+						onClick={addItem}
+						disabled={items.length >= MAX_ITEMS}
+					>
 						Add block
 					</button>
-					<button type='button' className={s.action} onClick={removeItem} disabled={items.length <= 1}>
+					<button
+						data-type='captionL'
+						type='button'
+						className={s.action}
+						onClick={removeItem}
+						disabled={items.length <= 1}
+					>
 						Remove {selected.label}
 					</button>
 				</div>

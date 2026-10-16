@@ -20,7 +20,9 @@ const Example = ({ id, title, children, demo, code, label = 'tsx' }: I.ExamplePr
 				<h3 id={id} className={s.title}>
 					{title}
 				</h3>
-				<div className={s.text}>{children}</div>
+				<div data-type='bodyS' className={s.text}>
+					{children}
+				</div>
 			</div>
 			{demo}
 			{code && <Code label={label} code={code} />}

@@ -41,6 +41,11 @@
 }
 
 .introCover {
+  // Mobile uses the global loader's aperture; a second mask creates a trailing wipe.
+  display: none;
+
+  @include heroDesktop { display: block; }
+
   position: fixed;
   inset: 0;
   z-index: 1000;

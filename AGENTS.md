@@ -144,11 +144,12 @@ existing file, match the labels and order already there.
   base styles are mobile; `@include bp(m) { … }`, `bp(l)`, … layer changes upward with
   `min-width`. `@include bpd(m) { … }` is the rare `max-width` case. In JS use
   `breakpoints` / `mq` from `@tackl` (`mq.up.l` → `'(min-width: 1024px)'`).
-- **Type** is hand-written in `src/css/tackl/_type.scss` (from Figma). Use a style as a
-  mixin (`@include captionL;`), a global class (`className='t-captionL'`) or a data
-  attribute (`data-type='captionL'`). New style → write the mixin and add it to `$type-styles`.
+- **Type** is hand-written in `src/css/tackl/_type.scss` (from Figma). Apply type styles
+  in JSX with `data-type='captionL'`, not typography mixins in component SCSS.
+  Keep component-specific overrides in the SCSS module. New style → write the mixin
+  and add it to `$type-styles`; the global utility layer exposes its data attribute.
   `data-type` takes the **bare** name (never `t-captionL`), module classes only ever go in
-  `className={s.x}` (never `data-type`, never quoted), and an unknown name (`bodyM`) silently
+  `className={s.x}` (never `data-type`, never quoted), and an unknown name silently
   matches nothing.
 - **Section spacing** on the `--space-*` scale: `data-pad` / `data-mar` on any element
   (`data-pad`, `data-pad='top'`, `data-mar='top bottom'`), or `@include pad(top);` / `mar()`.
@@ -176,8 +177,7 @@ existing file, match the labels and order already there.
 }
 
 .title {
-	@include headlineL;
-
+	// Applied in JSX: <h2 data-type='headlineL' className={s.title}>
 	font-size: vw(48);
 }
 ```
@@ -266,9 +266,12 @@ on unmount or when a matchMedia condition stops matching.
 - **404s and errors:** `app/(site)/not-found.tsx` (for `notFound()`), `app/global-not-found.tsx`
   (unmatched URLs), `app/(site)/error.tsx` and `app/global-error.tsx` all render
   `@parts/StatusPage`. Call `notFound()` for missing CMS content rather than rendering empty.
-- **Share images:** `public/og.jpg` (1200 × 630) is the default card, set in the site
-  layout's `metadata`. Give a page its own card with an `opengraph-image.tsx` beside its
+- **Share images:** `app/(site)/opengraph-image.*` (1200 × 630) is the default card, which
+  every route inherits. Give a page its own card with an `opengraph-image.tsx` beside its
   `page.tsx` that returns `createOgImage({ title })` from `@utils/ogImage`.
+- **Who the site is about** (name, bio, email, socials, business) lives once in `profile`
+  in `src/config.ts` — metadata, JSON-LD (`@parts/StructuredData`), the share card and
+  `llms.txt` all read it.
 - Optimise images (WebP/AVIF, explicit width/height, lazy loading).
 
 ---

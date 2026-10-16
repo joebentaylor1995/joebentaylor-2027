@@ -2,6 +2,7 @@
 
 // Imports
 // ------------
+import Favicons from '@parts/Favicons';
 import StatusPage, { actionClass } from '@parts/StatusPage';
 import { ppNeueMontreal, sequel } from '@theme/fonts';
 import { useEffect } from 'react';
@@ -33,13 +34,16 @@ const GlobalError = ({ error, retry }: GlobalErrorProps) => {
 	// Render
 	return (
 		<html lang='en' className={`${ppNeueMontreal.variable} ${sequel.variable}`}>
+			<head>
+				<Favicons />
+			</head>
 			<body>
-				<title>Something went wrong — Tackl</title>
+				<title>Something went wrong — Joe Ben Taylor</title>
 				<StatusPage
 					title='Something went wrong'
 					message='Sorry — the site failed to load. Trying again usually fixes it.'
 				>
-					<button type='button' className={actionClass} onClick={retry}>
+					<button data-type='captionL' type='button' className={actionClass} onClick={retry}>
 						Try again
 					</button>
 				</StatusPage>

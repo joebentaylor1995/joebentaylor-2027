@@ -14,11 +14,13 @@ const Outro = () => (
 		<Grid isFixed>
 			<Col m='2/6' l='3/11' className={s.inner}>
 				<p className={s.title}>Tackl.</p>
-				<p className={s.tagline}>Start on the design, not the setup.</p>
+				<p data-type='bodyL' className={s.tagline}>
+					Start on the design, not the setup.
+				</p>
 				<CopyButton text='bunx tackl' />
 			</Col>
 
-			<Col className={s.footer}>
+			<Col data-type='captionL' className={s.footer}>
 				<p>
 					This page lives in <code>src/components/DeleteMe</code> — delete the folder (and its import in{' '}
 					<code>app/(site)/(home)/page.tsx</code>) and start building.

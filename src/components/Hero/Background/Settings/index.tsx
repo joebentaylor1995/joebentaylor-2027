@@ -4,7 +4,7 @@
 // ------------
 import { useRef, useState } from 'react';
 import { type BooleanSetting, defaultSettings, type NumericSetting } from '../effect-settings';
-import { type IntroSettings, introDefaults, introEasings } from '../scene-intro';
+import { type IntroSettings, introDefaults, introEasings, mobileIntroDefaults } from '../scene-intro';
 import IntroTimings from './IntroTimings';
 // Styles + Interfaces
 // ------------
@@ -58,6 +58,8 @@ const toggles: [BooleanSetting, string][] = [
 // ------------
 export default function Settings({
 	intro,
+	introTarget,
+	onIntroTargetChange,
 	onIntroChange,
 	onReplay,
 	settings,
@@ -134,6 +136,20 @@ export default function Settings({
 					</button>
 					<details className={s.group} open>
 						<summary>Intro ripple</summary>
+						<label>
+							Intro settings device
+							<select
+								value={introTarget}
+								onChange={event => onIntroTargetChange(event.target.value as 'mobile' | 'desktop')}
+							>
+								<option value='mobile'>Mobile</option>
+								<option value='desktop'>Desktop</option>
+							</select>
+						</label>
+						<p>
+							Each device has its own intro settings. Replay uses the current viewport. Copy settings to
+							keep your changes.
+						</p>
 						<p>Shape one outward glass wave. Replay to preview your changes.</p>
 						{(
 							[
@@ -215,7 +231,14 @@ export default function Settings({
 							<button type='button' onClick={onReplay}>
 								Replay introduction
 							</button>
-							<button type='button' onClick={() => onIntroChange({ ...introDefaults })}>
+							<button
+								type='button'
+								onClick={() =>
+									onIntroChange({
+										...(introTarget === 'mobile' ? mobileIntroDefaults : introDefaults),
+									})
+								}
+							>
 								Reset intro
 							</button>
 						</div>

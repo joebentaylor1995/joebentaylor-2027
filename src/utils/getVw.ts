@@ -16,9 +16,9 @@
  * <div style={{ fontSize: getVw(48) }} />
  */
 
-import { theme } from '@theme';
+import { grid } from '../theme/grid';
 
-const { desktop, tablet, mobile } = theme.grid.design;
+const { desktop, tablet, mobile } = grid.design;
 
 export const getVw = (px: number): string => {
 	const vw = (px / desktop) * 100;

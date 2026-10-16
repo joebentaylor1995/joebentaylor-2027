@@ -78,7 +78,7 @@ const Header = (_props: I.HeaderProps) => {
 			<header ref={ref} className={s.jacket} data-profile={profileOpen ? 'open' : 'closed'}>
 				<nav className={s.left} aria-label='Homepage navigation'>
 					<Link href='/' aria-label='Go to home page'>
-						<Logo />
+						<Logo className={s.logo} />
 					</Link>
 
 					<div>
@@ -99,9 +99,20 @@ const Header = (_props: I.HeaderProps) => {
 					>
 						Profile
 					</button>
-					<Link href='/projects' aria-label='Go to Projects page' data-type='bodyS'>
+					{/* NOTE • Points at Dribbble until the projects page exists */}
+					<a
+						href='https://www.dribbble.com/joebentaylor'
+						target='_blank'
+						rel='noopener noreferrer'
+						aria-label='Projects on Dribbble — projects page coming soon (opens in a new tab)'
+						className={s.projects}
+						data-type='bodyS'
+					>
 						Projects
-					</Link>
+						<span className={s.soon} data-type='captionS' aria-hidden='true'>
+							Coming soon
+						</span>
+					</a>
 					<button
 						type='button'
 						aria-label='Open Booking Form'

@@ -1,7 +1,8 @@
 // Imports
 // -----------------
-import { theme } from '@theme';
+
 import { getVw as useVw, getVwMobile as useVwMobile, getVwTablet as useVwTablet } from '@utils/getVw';
+import { grid } from '../grid';
 
 // SECTION • Breakpoints for JS
 // ------------
@@ -10,7 +11,7 @@ import { getVw as useVw, getVwMobile as useVwMobile, getVwTablet as useVwTablet 
 //   breakpoints.m → '700px'
 //   mq.up.m       → '(min-width: 700px)'
 //   mq.down.m     → '(max-width: 699.98px)' (0.02px under, so up/down never overlap)
-export const breakpoints = theme.grid.breakpoints;
+export const breakpoints = grid.breakpoints;
 
 type BreakpointKey = keyof typeof breakpoints;
 

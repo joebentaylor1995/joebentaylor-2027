@@ -1,5 +1,6 @@
 // Imports
 // ------------
+import Favicons from '@parts/Favicons';
 import StatusPage, { actionClass } from '@parts/StatusPage';
 import { ppNeueMontreal, sequel } from '@theme/fonts';
 import type { Metadata } from 'next';
@@ -13,7 +14,7 @@ import '@css/global.scss';
 // SEO
 // ------------
 export const metadata: Metadata = {
-	title: 'Page not found — Tackl',
+	title: 'Page not found — Joe Ben Taylor',
 };
 
 // Component
@@ -24,13 +25,16 @@ export const metadata: Metadata = {
 // next.config.js. A plain <a> on purpose: the site's router isn't mounted here.
 const GlobalNotFound = () => (
 	<html lang='en' className={`${ppNeueMontreal.variable} ${sequel.variable}`}>
+		<head>
+			<Favicons />
+		</head>
 		<body>
 			<StatusPage
 				code='404'
 				title='Page not found'
 				message="The page you're looking for doesn't exist or has moved."
 			>
-				<a href='/' className={actionClass}>
+				<a data-type='captionL' href='/' className={actionClass}>
 					Back to home
 				</a>
 			</StatusPage>

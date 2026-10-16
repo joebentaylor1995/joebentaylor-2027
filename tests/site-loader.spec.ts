@@ -1,5 +1,23 @@
 import { expect, test } from '@playwright/test';
 
+test('mobile uses one centred pulse with a thin edge and clears every corner', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/');
+	const loader = page.locator('[data-site-loader]');
+	const aperture = page.locator('[data-circle-aperture]');
+	await expect(page.locator('[data-scene-cover]')).toHaveCSS('display', 'none');
+	await expect(aperture).toHaveAttribute('cx', '195');
+	await expect(aperture).toHaveAttribute('cy', '422');
+	await page.waitForFunction(() => Number(document.querySelector('[data-circle-aperture]')?.getAttribute('r')) > 130);
+	await page.screenshot({ path: 'test-results/loader-mobile-pulse.png' });
+	await expect(page.locator('[data-loader-ring]')).toHaveCSS('box-shadow', 'none');
+	await expect(loader).toHaveAttribute('data-complete', 'true', { timeout: 8000 });
+	const radius = Number(await aperture.getAttribute('r'));
+	expect(radius).toBeGreaterThan(Math.hypot(195, 422));
+	expect(radius).toBeLessThanOrEqual(Math.hypot(195, 422) * 2);
+	await expect(page.locator('header')).toHaveAttribute('data-header-entrance', 'complete');
+});
+
 test('global pulse washes away a stationary small logo and releases the homepage', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', error => errors.push(error.message));

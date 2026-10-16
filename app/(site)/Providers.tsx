@@ -6,6 +6,7 @@ import '@parts/AnimationPlugins';
 import Contexts from '@parts/Contexts';
 import CookieBar from '@parts/CookieBar';
 import dynamic from 'next/dynamic';
+import { type ComponentType, useEffect, useState } from 'react';
 
 // Dev Tools
 // ------------
@@ -19,13 +20,32 @@ const GridExposer = process.env.NODE_ENV === 'development' ? dynamic(() => impor
 // site chrome live in app/(site)/layout.tsx, so page content stays
 // server-rendered. Styles need no provider: they're static CSS.
 const Providers = ({ children }: { children: React.ReactNode }) => {
+	const [Settings, setSettings] = useState<ComponentType | null>(null);
+	const [LoaderTweaks, setLoaderTweaks] = useState<ComponentType | null>(null);
+	useEffect(() => {
+		const params = new URLSearchParams(window.location.search);
+		let disposed = false;
+		if (params.has('globalSettings'))
+			void import('@parts/GlobalSettings').then(module => {
+				if (!disposed) setSettings(() => module.default);
+			});
+		// NOTE • ?loaderTweaks opens a live control panel for the site loader's intro
+		if (params.has('loaderTweaks'))
+			void import('@parts/SiteLoader/Tweaks').then(module => {
+				if (!disposed) setLoaderTweaks(() => module.default);
+			});
+		return () => {
+			disposed = true;
+		};
+	}, []);
 	return (
 		<>
+			{Settings && <Settings />}
+			{LoaderTweaks && <LoaderTweaks />}
 			{/* GridExposer only rendered in development environment */}
 			{GridExposer && <GridExposer />}
 
-			{/* CookieBar only rendered in production environment */}
-			{process.env.NODE_ENV === 'production' && <CookieBar />}
+			<CookieBar />
 
 			<Contexts>{children}</Contexts>
 		</>

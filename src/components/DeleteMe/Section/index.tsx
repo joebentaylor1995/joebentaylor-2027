@@ -20,7 +20,11 @@ const Section = ({ id, title, intro, children, className }: I.SectionProps) => (
 				<h2 id={id && `${id}-title`} className={s.title}>
 					{title}
 				</h2>
-				{intro && <div className={s.intro}>{intro}</div>}
+				{intro && (
+					<div data-type='bodyL' className={s.intro}>
+						{intro}
+					</div>
+				)}
 			</Col>
 		</Grid>
 

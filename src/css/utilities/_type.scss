@@ -3,7 +3,7 @@
 // NOTE • Every type mixin in src/css/tackl/_type.scss, exposed globally:
 //   <h1 className='t-displayL'>        → class
 //   <p data-type='captionL'>           → data attribute
-// In a module, use the mixin instead: @include captionL;
+// Components apply typography with data-type in JSX; modules hold local overrides.
 @use 'sass:meta';
 @use 'tackl';
 

@@ -3,7 +3,8 @@
   inset: 0;
   z-index: 3000;
   overflow: hidden;
-  animation: fail-open 0s 6s forwards;
+  // NOTE • Asset wait (≤1.5s) + glitch intro and settle (~2.9s) + wavefront (~1.35s)
+  animation: fail-open 0s 9s forwards;
 
   &[data-complete='true'] {
     display: none;
@@ -38,11 +39,18 @@
   overflow: visible;
 }
 
-.mark .logo {
-  width: 68px;
-  height: 26px;
+// Hidden until the intro lands on it (or straight away for reduced motion).
+.final {
+  visibility: hidden;
   fill: var(--global-white);
 }
+
+.intro use {
+  stroke-linejoin: miter;
+}
+.band { fill: var(--global-white); }
+.rim { fill: var(--brand-c8); }
+.bar { fill: var(--global-black); }
 
 .ring {
   position: absolute;
@@ -51,7 +59,10 @@
   width: 200px;
   height: 200px;
   opacity: 0;
-  border: 1px solid var(--global-white);
+  border: var(--ring-width, 1px) solid var(--global-white);
   border-radius: 50%;
-  box-shadow: inset 0 0 12px alpha(var(--global-white), 25), 0 0 12px alpha(var(--global-white), 15);
+
+  @include heroDesktop {
+    box-shadow: inset 0 0 12px alpha(var(--global-white), 25), 0 0 12px alpha(var(--global-white), 15);
+  }
 }

@@ -41,7 +41,7 @@ const CopyButton = ({ text, label, className }: I.CopyButtonProps) => {
 
 	// Render
 	const button = (
-		<button type='button' className={s.button} onClick={handleCopy}>
+		<button data-type='captionL' type='button' className={s.button} onClick={handleCopy}>
 			<span aria-live='polite'>{isCopied ? 'Copied' : (label ?? 'Copy')}</span>
 		</button>
 	);

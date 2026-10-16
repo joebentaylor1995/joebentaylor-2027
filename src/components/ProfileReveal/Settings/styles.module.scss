@@ -1,10 +1,10 @@
 .jacket {
 	position: fixed;
 	z-index: 10;
-	top: 2rem;
-	left: 2rem;
-	width: min(34rem, calc(100vw - 101.1rem));
-	max-height: calc(100dvh - 4rem);
+	bottom: 1rem;
+	left: 1rem;
+	width: min(34rem, calc(100vw - 2rem));
+	max-height: 38dvh;
 	padding: 2rem;
 	overflow: auto;
 	overscroll-behavior: contain;
@@ -67,12 +67,12 @@
 		outline-offset: 3px;
 	}
 
-	@media (width < 1280px) {
-		top: auto;
-		bottom: 1rem;
-		left: 1rem;
-		width: min(34rem, calc(100vw - 2rem));
-		max-height: 38dvh;
+	@include bp(hero) {
+		top: 2rem;
+		bottom: auto;
+		left: 2rem;
+		width: min(34rem, calc(100vw - 101.1rem));
+		max-height: calc(100dvh - 4rem);
 	}
 }
 

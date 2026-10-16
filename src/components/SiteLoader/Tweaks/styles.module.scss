@@ -1,0 +1,79 @@
+// Sits above the loader overlay (z-index 3000) so it stays usable mid-intro
+.jacket {
+	position: fixed;
+	z-index: 3100;
+	right: var(--gap-s);
+	bottom: var(--gap-s);
+	width: min(32rem, calc(100vw - 2 * var(--gap-s)));
+	max-height: 70dvh;
+	padding: var(--gap-s);
+	overflow: auto;
+	overscroll-behavior: contain;
+	border: 1px solid alpha(--global-white, 25);
+	border-radius: var(--gap-xs);
+	background: var(--brand-c3);
+	color: var(--global-white);
+	cursor: auto;
+
+	summary { cursor: pointer; }
+
+	p {
+		margin-block: var(--gap-s) 0;
+		opacity: 0.6;
+	}
+
+	input[type='range'] {
+		width: 100%;
+		accent-color: var(--brand-c1);
+	}
+
+	button {
+		padding: var(--gap-xs) var(--gap-s);
+		border: 1px solid alpha(--global-white, 25);
+		border-radius: var(--gap-xs);
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+	}
+
+	:focus-visible {
+		outline: 2px solid var(--brand-c2);
+		outline-offset: 3px;
+	}
+}
+
+.transport {
+	display: flex;
+	align-items: center;
+	gap: var(--gap-xs);
+	margin-block: var(--gap-s);
+
+	output {
+		margin-inline-start: auto;
+		font-variant-numeric: tabular-nums;
+	}
+}
+
+.control {
+	display: grid;
+	gap: var(--gap-xs);
+	margin-block-end: var(--gap-s);
+
+	> span {
+		display: flex;
+		justify-content: space-between;
+	}
+
+	output { font-variant-numeric: tabular-nums; }
+}
+
+.presets {
+	display: flex;
+	gap: var(--gap-xs);
+}
+
+.swatch {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}

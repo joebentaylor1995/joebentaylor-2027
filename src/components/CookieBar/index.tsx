@@ -17,9 +17,13 @@
  * @component
  */
 
+import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 // Imports
 // ------------
 import { cn } from '@utils/cn';
+import { useAnimation } from '@utils/useAnimation';
+import { gsap } from 'gsap';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { getConsent, noConsent, OPTIONAL_CATEGORIES, onOpenCookieSettings, saveConsent } from './consent';
@@ -38,11 +42,11 @@ const CATEGORIES: Record<I.ConsentCategory, { label: string; description: string
 	},
 	analytics: {
 		label: 'Analytics',
-		description: 'Help us understand how visitors use the site, so we can improve it.',
+		description: 'Helps me understand how visitors use the site.',
 	},
 	marketing: {
-		label: 'Marketing',
-		description: 'Used to personalise ads and measure how well campaigns perform.',
+		label: 'Calendar',
+		description: 'Allow the embedded Cal.com booking calendar.',
 	},
 };
 
@@ -52,8 +56,8 @@ const NECESSARY_COOKIES: string[] = [];
 
 // Helpers
 // ------------
-const allConsent = (): I.Consent =>
-	Object.fromEntries(OPTIONAL_CATEGORIES.map(category => [category, true])) as I.Consent;
+// The banner offers analytics; the calendar requests its own consent when opened.
+const allConsent = (): I.Consent => ({ ...(getConsent() ?? noConsent()), analytics: true });
 
 const isWithdrawn = (previous: I.Consent | null, next: I.Consent): boolean =>
 	OPTIONAL_CATEGORIES.some(category => previous?.[category] && !next[category]);
@@ -76,13 +80,15 @@ const expireCookies = (): void => {
 // Component
 // ------------
 const CookieBar = ({
-	title = 'We use cookies!',
-	message = 'Hi, this website uses essential cookies to ensure its proper operation and tracking cookies to understand how you interact with it. The latter will be set only after consent.',
-	privacyHref = '/privacy-policy/',
+	title = 'Cookies',
+	message = 'I use essential cookies to run this website and optional cookies to understand how you use it.',
+	privacyHref = '/cookies',
 	className,
 }: I.CookieBarProps) => {
 	// Refs
 	const choicesRef = useRef<HTMLFieldSetElement>(null);
+	const bannerRef = useRef<HTMLElement>(null);
+	const enteredRef = useRef(false);
 
 	// State
 	// NOTE • Rendered on the server so the banner paints with the page; for
@@ -150,28 +156,77 @@ const CookieBar = ({
 		if (isChoosing) choicesRef.current?.querySelector<HTMLInputElement>('input:enabled')?.focus();
 	}, [isChoosing]);
 
+	// Animations
+	useAnimation(
+		({ reduced }) => {
+			const banner = bannerRef.current;
+			if (!banner || !isOpen) {
+				enteredRef.current = false;
+				return;
+			}
+			if (enteredRef.current) return;
+			banner.dataset.entrance = 'waiting';
+			banner.inert = true;
+			gsap.set(banner, { autoAlpha: 0, clipPath: 'inset(0 100% 0 0)' });
+			const complete = () => {
+				enteredRef.current = true;
+				banner.inert = false;
+				banner.dataset.entrance = 'complete';
+				if (isReopened) choicesRef.current?.querySelector<HTMLInputElement>('input:enabled')?.focus();
+			};
+			const entrance = gsap.timeline({ paused: true, onComplete: complete });
+			entrance
+				.set(banner, { autoAlpha: 1 })
+				.to(banner, { clipPath: 'inset(0 0% 0 0)', duration: reduced ? 0 : 0.65, ease: 'power3.inOut' })
+				.fromTo(
+					banner.children,
+					{ y: reduced ? 0 : 12, opacity: 0 },
+					{ y: 0, opacity: 1, duration: reduced ? 0 : 0.45, stagger: reduced ? 0 : 0.06, ease: 'power3.out' },
+					reduced ? 0 : 0.16
+				);
+			const reveal = () => {
+				banner.dataset.entrance = 'entering';
+				entrance.play();
+			};
+			if (isLoaderSettled()) reveal();
+			else window.addEventListener(LOADER_SETTLED, reveal, { once: true });
+			return () => {
+				window.removeEventListener(LOADER_SETTLED, reveal);
+				banner.inert = false;
+			};
+		},
+		{ scope: bannerRef, dependencies: [isOpen, isReopened], revertOnUpdate: true },
+		{ reduced: '(prefers-reduced-motion: reduce)' }
+	);
+
 	// Render
 	if (!isOpen) return null;
 
 	return (
 		<section
+			ref={bannerRef}
 			className={cn(s.jacket, className)}
 			aria-labelledby={titleId}
 			data-reopened={isReopened || undefined}
+			data-lenis-prevent
 			onKeyDown={handleKeyDown}
 		>
-			<h2 id={titleId} className={s.title}>
-				{title}
-			</h2>
-
-			<p className={s.message}>
-				{message}{' '}
+			<div className={s.introduction}>
+				<h2 id={titleId} data-type='bodyS' className={s.title}>
+					<Link href={privacyHref} prefetch={false}>
+						<Image src='/images/cookies/link.svg' width={8} height={8} alt='' />
+						{title}
+					</Link>
+				</h2>
+				<p data-type='bodyS' className={s.message}>
+					{message}
+				</p>
 				{!isChoosing && (
-					<button type='button' className={s.link} onClick={() => setIsChoosing(true)}>
+					<button data-type='captionS' type='button' className={s.link} onClick={() => setIsChoosing(true)}>
 						Let me choose
 					</button>
 				)}
-			</p>
+			</div>
 
 			{isChoosing && (
 				<fieldset ref={choicesRef} className={s.choices}>
@@ -179,43 +234,49 @@ const CookieBar = ({
 
 					<label className={s.choice}>
 						<input type='checkbox' checked disabled />
-						<span className={s.label}>{CATEGORIES.necessary.label}</span>
-						<span className={s.description}>{CATEGORIES.necessary.description}</span>
+						<span data-type='captionS' className={s.label}>
+							{CATEGORIES.necessary.label}
+						</span>
+						<span data-type='captionS' className={s.description}>
+							{CATEGORIES.necessary.description}
+						</span>
 					</label>
 
-					{OPTIONAL_CATEGORIES.map(category => (
-						<label key={category} className={s.choice}>
-							<input
-								type='checkbox'
-								checked={choices[category]}
-								onChange={() => toggleChoice(category)}
-							/>
-							<span className={s.label}>{CATEGORIES[category].label}</span>
-							<span className={s.description}>{CATEGORIES[category].description}</span>
-						</label>
-					))}
+					{OPTIONAL_CATEGORIES.filter(category => category === 'analytics' || getConsent()?.[category]).map(
+						category => (
+							<label key={category} className={s.choice}>
+								<input
+									type='checkbox'
+									checked={choices[category]}
+									onChange={() => toggleChoice(category)}
+								/>
+								<span data-type='captionS' className={s.label}>
+									{CATEGORIES[category].label}
+								</span>
+								<span data-type='captionS' className={s.description}>
+									{CATEGORIES[category].description}
+								</span>
+							</label>
+						)
+					)}
 				</fieldset>
 			)}
 
 			<div className={s.actions}>
-				<button type='button' className={s.primary} onClick={() => commit(allConsent())}>
+				<button data-type='bodyS' type='button' onClick={() => commit(allConsent())}>
 					Accept All
 				</button>
 
 				{isChoosing ? (
-					<button type='button' className={s.secondary} onClick={() => commit(choices)}>
+					<button data-type='bodyS' type='button' onClick={() => commit(choices)}>
 						Save Choices
 					</button>
 				) : (
-					<button type='button' className={s.secondary} onClick={() => commit(noConsent())}>
+					<button data-type='bodyS' type='button' onClick={() => commit(noConsent())}>
 						Accept Necessary
 					</button>
 				)}
 			</div>
-
-			<Link href={privacyHref} className={s.link} prefetch={false}>
-				Privacy policy
-			</Link>
 		</section>
 	);
 };

@@ -1,0 +1,156 @@
+// Styles: LegalPage
+// ---------------
+// NOTE • Desktop (l+) mirrors Figma "Legal / … [Desktop]": a black 464/1440
+// sidebar with sticky navigation beside the #121212 document column. Below l
+// the sidebar drops away and the page switcher sits under the title.
+.jacket {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	background: var(--brand-c4);
+	color: var(--global-white);
+
+	@include bp(l) {
+		grid-template-columns: calc(100% * 464 / 1440) minmax(0, 1fr);
+		background: var(--global-black);
+	}
+}
+
+// SECTION • Sidebar
+.sidebar {
+	display: none;
+
+	@include bp(l) {
+		display: block;
+		background: var(--global-black);
+	}
+}
+
+.sticky {
+	position: sticky;
+	top: 0;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	gap: var(--gap-huge);
+	height: 100dvh;
+	padding: var(--gap-xl);
+	overflow-y: auto;
+	scrollbar-width: none;
+}
+
+.group {
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-m);
+}
+
+// SECTION • Document column
+.main {
+	min-width: 0;
+	background: var(--brand-c4);
+}
+
+.header {
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	min-height: 38.4rem;
+	padding: var(--gap-l);
+
+	@include bp(l) {
+		min-height: 75dvh;
+		padding: var(--gap-xl);
+	}
+}
+
+.title span {
+	display: block;
+}
+
+.titleMuted {
+	color: alpha(--global-white, 40);
+}
+
+.mobileLinks {
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-m);
+	padding: 0 var(--gap-l) var(--gap-l);
+
+	// The design's mobile switcher skips the "Legal" label
+	> p { display: none; }
+
+	@include bp(l) {
+		display: none;
+	}
+}
+
+.content {
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-xl);
+	padding: var(--gap-s) var(--gap-l) var(--gap-uber);
+
+	@include bp(l) {
+		padding: var(--gap-xl) var(--gap-xl) var(--gap-uber);
+	}
+}
+
+// SECTION • Sections — label column + body column
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-m);
+	scroll-margin-top: var(--gap-xl);
+
+	& + & {
+		padding-top: var(--gap-xl);
+		border-top: 1px solid alpha(--global-white, 10);
+	}
+
+	@include bp(l) {
+		display: grid;
+		grid-template-columns: 11.2rem minmax(0, 66.2rem);
+		justify-content: space-between;
+		column-gap: var(--gap-xl);
+		max-width: calc(11.2rem + 12.2rem + 66.2rem);
+	}
+}
+
+.label {
+	@include bp(l) {
+		padding-top: var(--gap-s);
+	}
+}
+
+.body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-m);
+}
+
+.copy {
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-sm);
+}
+
+// SECTION • Introduction
+.meta {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--gap-m);
+
+	@include bp(l) {
+		grid-template-columns: repeat(2, minmax(0, 31.5rem));
+		gap: var(--gap-m) var(--gap-l);
+	}
+
+	div {
+		display: flex;
+		flex-direction: column;
+		gap: var(--gap-xs);
+	}
+
+	dt { color: alpha(--global-white, 40); }
+}

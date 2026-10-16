@@ -4,8 +4,10 @@
 // ------------
 import { GlobalContext } from '@parts/Contexts';
 import { PerformanceContext } from '@parts/Contexts/Performance';
+import { DESKTOP_HOVER_QUERY } from '@utils/desktopHover';
 import { gsap } from 'gsap';
 import Lenis from 'lenis';
+import Image from 'next/image';
 import { type ComponentType, use, useEffect, useRef, useState } from 'react';
 import { ProfilePresenceContext } from './context';
 
@@ -57,9 +59,8 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 	useEffect(() => {
 		const cursor = cursorRef.current;
 		const jacket = jacketRef.current;
-		const close = closeRef.current;
-		if (!profileOpen || !cursor || !jacket || !close) return;
-		const mouse = window.matchMedia('(hover: hover) and (pointer: fine)');
+		if (!profileOpen || !cursor || !jacket) return;
+		const mouse = window.matchMedia(DESKTOP_HOVER_QUERY);
 		const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 		const position = { x: 0, y: 0 };
 		let movement: gsap.core.Tween | null = null;
@@ -92,7 +93,7 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			resetShape();
 		};
 		const move = (event: PointerEvent) => {
-			if (event.target instanceof Element && event.target.closest('[data-modal-settings]')) {
+			if (event.target instanceof Element && event.target.closest('[data-modal-settings], dialog[open]')) {
 				hide();
 				return;
 			}
@@ -105,20 +106,40 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 				hide();
 				return;
 			}
-			const overClose = close.contains(event.target);
+			const stickyTarget =
+				event.target instanceof Element ? event.target.closest<HTMLElement>('[data-cursor-sticky]') : null;
 			// Independent positioning keeps the glyph off the circle's eased animation path.
 			gsap.set(closeCursorRef.current, { x: event.clientX, y: event.clientY });
 			const wasSticky = jacket.dataset.cursor === 'sticky';
 			const inside = panelRef.current?.contains(event.target);
 			let x = event.clientX;
 			let y = event.clientY;
-			if (overClose) {
-				const bounds = close.getBoundingClientRect();
+			if (stickyTarget) {
+				const bounds = (
+					stickyTarget.querySelector('[data-cursor-anchor]') ?? stickyTarget
+				).getBoundingClientRect();
 				x = bounds.left + bounds.width / 2;
 				y = bounds.top + bounds.height / 2;
 			}
 			const overLink = event.target instanceof Element && event.target.closest('[data-cursor-link]');
-			jacket.dataset.cursor = overClose ? 'sticky' : overLink ? 'link' : inside ? 'follow' : 'close';
+			const overSoft = event.target instanceof Element && event.target.closest('[data-cursor-soft]');
+			const overCta = event.target instanceof Element && event.target.closest('[data-cursor-cta]');
+			if (overCta && !reduced.matches) {
+				const bounds = overCta.getBoundingClientRect();
+				x += Math.max(-18, Math.min(18, (bounds.left + bounds.width / 2 - x) * 0.12));
+				y += Math.max(-18, Math.min(18, (bounds.top + bounds.height / 2 - y) * 0.12));
+			}
+			jacket.dataset.cursor = stickyTarget
+				? 'sticky'
+				: overCta
+					? 'cta'
+					: overSoft
+						? 'soft'
+						: overLink
+							? 'link'
+							: inside
+								? 'follow'
+								: 'close';
 			targetX = x;
 			targetY = y;
 			movement?.kill();
@@ -130,8 +151,8 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 				movement = gsap.to(position, {
 					x,
 					y,
-					duration: overClose || wasSticky ? CURSOR_SNAP_DURATION : CURSOR_SPEED,
-					ease: overClose || wasSticky ? 'power2.out' : 'power3.out',
+					duration: stickyTarget || wasSticky ? CURSOR_SNAP_DURATION : CURSOR_SPEED,
+					ease: stickyTarget || wasSticky ? 'power2.out' : 'power3.out',
 					onUpdate: deform,
 				});
 			}
@@ -163,6 +184,7 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			const animations = [
 				...(sceneRef.current?.getAnimations() ?? []),
 				...(panelRef.current?.getAnimations() ?? []),
+				...(panelContentRef.current?.getAnimations() ?? []),
 			];
 			void Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
 				if (!cancelled) setPresented(false);
@@ -226,6 +248,7 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 		if (page) page.style.overflow = 'hidden';
 		closeRef.current?.focus({ preventScroll: true });
 		const onKeyDown = (event: KeyboardEvent) => {
+			if (document.querySelector('dialog[open]')) return;
 			if (event.key === 'Escape') {
 				event.preventDefault();
 				setProfileOpen(false);
@@ -279,23 +302,10 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 							type='button'
 							className={s.closeButton}
 							aria-label='Close profile'
+							data-cursor-sticky
 							onClick={() => setProfileOpen(false)}
 						>
-							<svg width='16' height='16' viewBox='0 0 16 16' fill='none' aria-hidden='true'>
-								<path
-									className={s.mobileIcon}
-									d='m3 3 10 10M13 3 3 13'
-									stroke='currentColor'
-									strokeLinecap='round'
-								/>
-								<path
-									className={s.desktopIcon}
-									d='M13 8H3m4-4L3 8l4 4'
-									stroke='currentColor'
-									strokeLinecap='round'
-									strokeLinejoin='round'
-								/>
-							</svg>
+							<Image src='/images/reviews/arrow.svg' width={16} height={11} alt='' />
 						</button>
 					</div>
 					<ProfilePresenceContext.Provider value={active}>
@@ -324,6 +334,16 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			<div ref={cursorRef} className={s.cursor} aria-hidden='true'>
 				<span className={s.cursorAppearance}>
 					<span className={s.cursorShape} />
+					<svg
+						className={s.ctaCursor}
+						width='20'
+						height='20'
+						viewBox='0 0 20 20'
+						fill='none'
+						aria-hidden='true'
+					>
+						<path d='M5 15 15 5M5 5h10v10' stroke='currentColor' strokeWidth='1.5' />
+					</svg>
 					<svg
 						className={s.linkCursor}
 						width='16'

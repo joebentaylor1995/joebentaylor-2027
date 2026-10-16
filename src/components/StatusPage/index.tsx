@@ -17,9 +17,17 @@ export const actionClass = s.action;
 // app/global-not-found, app/(site)/error, app/global-error)
 const StatusPage = ({ code, title, message, children }: I.StatusPageProps) => (
 	<section className={s.jacket}>
-		{code && <p className={s.code}>{code}</p>}
-		<h1 className={s.title}>{title}</h1>
-		{message && <p className={s.message}>{message}</p>}
+		{code && (
+			<p data-type='captionL' className={s.code}>
+				{code}
+			</p>
+		)}
+		<h1 data-type='headlineL'>{title}</h1>
+		{message && (
+			<p data-type='bodyS' className={s.message}>
+				{message}
+			</p>
+		)}
 		{children && <div className={s.actions}>{children}</div>}
 	</section>
 );

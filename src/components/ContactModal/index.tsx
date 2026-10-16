@@ -5,6 +5,7 @@
 import ConsentGate from '@parts/ConsentGate';
 import { GlobalContext } from '@parts/Contexts';
 import { getConsent, noConsent, saveConsent } from '@parts/CookieBar/consent';
+import { canHover } from '@utils/desktopHover';
 import Image from 'next/image';
 import type { PointerEvent } from 'react';
 import { lazy, Suspense, use, useEffect, useRef, useState } from 'react';
@@ -74,7 +75,12 @@ const ContactModal = ({ onClose }: I.ContactModalProps) => {
 		closeButtonRef.current?.style.removeProperty('--magnetic-y');
 	};
 	const moveCloseMagnet = (event: PointerEvent<HTMLButtonElement>) => {
-		if (event.pointerType !== 'mouse' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+		if (
+			!canHover() ||
+			event.pointerType !== 'mouse' ||
+			window.matchMedia('(prefers-reduced-motion: reduce)').matches
+		)
+			return;
 		const button = event.currentTarget;
 		const bounds = button.getBoundingClientRect();
 		const pull = (distance: number) =>
@@ -123,10 +129,10 @@ const ContactModal = ({ onClose }: I.ContactModalProps) => {
 								The calendar is provided by Cal.com. Allow marketing cookies to load it here, or book
 								directly on Cal.com.
 							</p>
-							<button type='button' className={s.allowButton} onClick={allowCalendar}>
+							<button data-type='bodyS' type='button' className={s.allowButton} onClick={allowCalendar}>
 								Allow cookies and load calendar
 							</button>
-							<a href={BOOKING_URL} target='_blank' rel='noopener noreferrer'>
+							<a data-type='bodyS' href={BOOKING_URL} target='_blank' rel='noopener noreferrer'>
 								Book on Cal.com ↗
 							</a>
 						</section>
@@ -134,7 +140,7 @@ const ContactModal = ({ onClose }: I.ContactModalProps) => {
 				>
 					<Suspense
 						fallback={
-							<p className={s.loading} role='status'>
+							<p data-type='bodyM' className={s.loading} role='status'>
 								Loading calendar…
 							</p>
 						}

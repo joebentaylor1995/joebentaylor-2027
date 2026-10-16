@@ -71,9 +71,13 @@ const HowItWorks = () => (
 		<Grid isFixed>
 			{STEPS.map(({ title, text, label, code }, index) => (
 				<Tile key={title} l={index % 2 ? '7/13' : '1/7'}>
-					<p className={s.index}>Step {index + 1}</p>
+					<p data-type='captionL' className={s.index}>
+						Step {index + 1}
+					</p>
 					<h3 className={s.title}>{title}</h3>
-					<p className={s.text}>{text}</p>
+					<p data-type='bodyS' className={s.text}>
+						{text}
+					</p>
 					<Code label={label} code={code} className={s.code} />
 				</Tile>
 			))}

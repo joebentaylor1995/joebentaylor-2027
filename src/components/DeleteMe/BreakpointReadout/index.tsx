@@ -41,12 +41,12 @@ const BreakpointReadout = () => {
 		<div className={s.jacket}>
 			<ol className={s.scale} aria-label='Breakpoints'>
 				{KEYS.map(key => (
-					<li key={key} className={s.key} data-active={key === current || undefined}>
+					<li data-type='captionL' key={key} className={s.key} data-active={key === current || undefined}>
 						{key}
 					</li>
 				))}
 			</ol>
-			<p className={s.status} aria-live='polite'>
+			<p data-type='captionL' className={s.status} aria-live='polite'>
 				{current ? (
 					<>
 						Matching <code>mq.up.{current}</code> — <code>{mq.up[current]}</code>

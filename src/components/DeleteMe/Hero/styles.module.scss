@@ -26,8 +26,8 @@
 
 .eyebrow {
 	@include eyebrow;
-	@include bodyS;
 
+	text-transform: uppercase;
 	font-weight: var(--weight-semi);
 }
 
@@ -62,7 +62,6 @@
 }
 
 .tagline {
-	@include bodyL;
 	@include secondary;
 
 	max-width: 28ch;

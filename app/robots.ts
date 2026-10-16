@@ -9,6 +9,16 @@ import { isSiteUrlConfigured, siteUrl } from '@/config';
 // CONTEXT to deploy-preview / branch-deploy) are blocked from indexing so
 // staging URLs never leak into search results — as is any deploy still on
 // the tackl.netlify.app fallback (NEXT_PUBLIC_SITE_URL unset).
+const AI_TRAINING_CRAWLERS = [
+	'GPTBot',
+	'ClaudeBot',
+	'Google-Extended',
+	'Applebot-Extended',
+	'CCBot',
+	'meta-externalagent',
+	'Bytespider',
+];
+
 const isProduction = !process.env.CONTEXT || process.env.CONTEXT === 'production';
 
 const robots = (): MetadataRoute.Robots => {
@@ -18,8 +28,14 @@ const robots = (): MetadataRoute.Robots => {
 		};
 	}
 
+	// NOTE • Mirrors the "Crawler access" section of /llms — search and AI
+	// answer engines are welcome, model-training crawlers are not. Keep the
+	// two in step (src/components/LegalPage/content/llms.ts).
 	return {
-		rules: { userAgent: '*', allow: '/' },
+		rules: [
+			{ userAgent: '*', allow: '/' },
+			{ userAgent: AI_TRAINING_CRAWLERS, disallow: '/' },
+		],
 		sitemap: `${siteUrl}/sitemap.xml`,
 	};
 };

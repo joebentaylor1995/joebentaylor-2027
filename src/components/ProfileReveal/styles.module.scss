@@ -24,7 +24,7 @@
 	transition: transform 1.2s cubic-bezier(0.76, 0, 0.24, 1);
 
 	[data-state='open'] > & {
-		transform: translateX(-50%);
+		transform: translateX(-12%);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -44,8 +44,8 @@
 	inset: 0 0 0 auto;
 	width: 100%;
 	max-width: 97.1rem;
-	transform: translateX(100%);
-	transition: transform 1.2s cubic-bezier(0.76, 0, 0.24, 1);
+	clip-path: inset(0 0 0 100%);
+	transition: clip-path 1s cubic-bezier(0.76, 0, 0.24, 1);
 	overflow: auto;
 	overscroll-behavior: contain;
 	scrollbar-width: none;
@@ -58,7 +58,7 @@
 	[data-state='open'] > &,
 	[data-state='closing'] > & { visibility: visible; }
 
-	[data-state='open'] > & { transform: translateX(0); }
+	[data-state='open'] > & { clip-path: inset(0); }
 
 	@media (prefers-reduced-motion: reduce) { transition: none; }
 }
@@ -66,6 +66,22 @@
 .panelContent {
 	display: flow-root;
 	min-height: 100%;
+	transform: translateX(clamp(24px, 7vw, 96px));
+	transition: transform 1s cubic-bezier(0.76, 0, 0.24, 1);
+
+	[data-state='open'] > .panel > & {
+		transform: translateX(0);
+		transition-duration: 1.35s;
+		transition-delay: 0.12s;
+		transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		transform: none;
+		transition: none;
+
+		[data-state='open'] > .panel > & { transition: none; }
+	}
 }
 
 .overlay {
@@ -109,13 +125,23 @@
 	place-items: center;
 	width: 4.3rem;
 	height: 4.3rem;
-	border: 0;
-	background: transparent;
+	border: 1px solid #343434;
+	border-radius: 50%;
+	background: rgb(22 22 22 / 92%);
+	backdrop-filter: blur(20px);
 	color: var(--global-white);
 	cursor: pointer;
 	transition: opacity var(--time-m) var(--easing-bezzy);
 
-	&:hover { opacity: 0.4; }
+	@include heroDesktop {
+		border: 0;
+		background: transparent;
+		backdrop-filter: none;
+
+		@include desktopHover {
+			&:hover { opacity: 0.4; }
+		}
+	}
 
 	// Extend the hover and click target without moving or enlarging the arrow.
 	&::before {
@@ -132,16 +158,6 @@
 
 // Empty scrollable canvas, replaced by profile content through the profile slot.
 .placeholder { min-height: 200dvh; }
-
-.mobileIcon {
-	@include heroDesktop { display: none; }
-}
-
-.desktopIcon {
-	display: none;
-
-	@include heroDesktop { display: block; }
-}
 
 .cursor {
 	position: fixed;
@@ -165,6 +181,13 @@
 		opacity: 1;
 		scale: 1;
 	}
+
+	[data-cursor='soft'] & {
+		opacity: 0.5;
+		scale: 1.4;
+	}
+
+	[data-cursor='cta'] & { scale: 1.2; }
 
 	@media (prefers-reduced-motion: reduce) { transition: none; }
 }
@@ -190,6 +213,19 @@
 		&,
 		[data-cursor='sticky'] & { transition: none; }
 	}
+}
+
+.ctaCursor {
+	position: absolute;
+	top: 0;
+	left: 0;
+	transform: translate(-50%, -50%);
+	opacity: 0;
+	transition: opacity 0.2s ease;
+
+	[data-cursor='cta'] & { opacity: 1; }
+
+	@media (prefers-reduced-motion: reduce) { transition: none; }
 }
 
 .linkCursor {

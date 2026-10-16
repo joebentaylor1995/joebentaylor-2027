@@ -22,7 +22,15 @@
 	width: 100%;
 	height: 240.615%;
 	transform: translateY(-50%);
-	background: url('/images/map/blue-gradient.png') center / cover no-repeat;
+	background: linear-gradient(
+		to bottom,
+		var(--global-black) 12%,
+		var(--brand-c6) 48%,
+		var(--brand-c1) 66%,
+		var(--brand-c7) 83%,
+		var(--brand-c7) 87%,
+		color-mix(in srgb, var(--brand-c1) 45%, var(--brand-c7)) 100%
+	);
 	pointer-events: none;
 }
 

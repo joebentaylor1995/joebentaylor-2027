@@ -101,9 +101,15 @@ const Features = () => (
 					<ul className={s.list}>
 						{features.map(feature => (
 							<li key={feature.title} className={s.item}>
-								<h4 className={s.title}>{feature.title}</h4>
-								<p className={s.text}>{feature.text}</p>
-								<code className={s.where}>{feature.where}</code>
+								<h4 data-type='bodyL' className={s.title}>
+									{feature.title}
+								</h4>
+								<p data-type='bodyS' className={s.text}>
+									{feature.text}
+								</p>
+								<code data-type='captionS' className={s.where}>
+									{feature.where}
+								</code>
 							</li>
 						))}
 					</ul>
@@ -113,7 +119,7 @@ const Features = () => (
 
 		<Grid isFixed className={s.demo}>
 			<Tile tone='glow' className={s.demoTile}>
-				<div className={s.demoCopy}>
+				<div data-type='bodyS' className={s.demoCopy}>
 					<h3 className={s.demoTitle}>Try the consent manager.</h3>
 					<p>Change your choice and watch the gate update.</p>
 				</div>

@@ -58,7 +58,7 @@ for (const width of [1440, 440]) {
 		};
 		await centred();
 		await expect(marker).toHaveCSS('opacity', '1');
-		await expect(map.locator('div').first()).toHaveCSS('background-image', /blue-gradient\.png/);
+		await expect(map.locator('div').first()).toHaveCSS('background-image', /linear-gradient/);
 		await canvas.press('ArrowLeft');
 		await expect(map).toHaveAttribute('data-state', 'exploring');
 		await canvas.press('Home');

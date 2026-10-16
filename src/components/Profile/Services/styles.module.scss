@@ -1,3 +1,91 @@
 .jacket {
-	// Add section styles here.
+	position: relative;
+	padding-block: var(--gap-huge);
+	background: var(--brand-c4);
+
+	> :global(waffl-grid) {
+		padding-inline: var(--gap-l);
+		row-gap: var(--gap-l);
+	}
+
+	@include bp(l) {
+		padding-block: var(--gap-uber);
+
+		> :global(waffl-grid) { padding-inline: var(--gap-xl); }
+	}
+}
+
+.heading {
+	position: relative;
+	left: 0;
+	align-self: end;
+
+	@include bp(l) {
+		position: sticky;
+		bottom: var(--gap-xl);
+		padding-top: var(--gap-xl);
+	}
+}
+
+.intro {
+	color: alpha(--global-white, 40);
+	text-wrap: pretty;
+
+	mark {
+		color: var(--global-white);
+		background: none;
+	}
+}
+
+.list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-s);
+	padding-top: var(--gap-huge);
+	list-style: none;
+
+	@include bp(l) { padding-top: var(--gap-uber); }
+}
+
+.service {
+	--service-image-size: calc(1lh + var(--gap-s));
+
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: var(--gap-sm);
+	min-height: var(--service-image-size);
+
+	@include bp(l) {
+		--service-image-size: 7.2rem;
+		gap: var(--gap-m);
+		min-height: 7.2rem;
+	}
+}
+
+.image {
+	position: absolute;
+	left: 0;
+	width: var(--service-image-size);
+	height: var(--service-image-size);
+	flex: none;
+	transform-origin: left center;
+	border-radius: var(--br-s);
+	overflow: hidden;
+	img { object-fit: cover; }
+
+	@include bp(l) { position: relative; }
+}
+
+.title {
+	color: var(--global-white);
+	min-width: 0;
+	margin-left: calc(var(--service-image-size) + var(--gap-sm));
+
+	@include bp(l) { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.image { display: none; }
+	.title { margin-left: 0; }
 }
