@@ -58,7 +58,9 @@ uniform float waterReveal,revealAspect,fluidActive;
 uniform vec3 revealDark;
 uniform float rippleStrength,rippleWidth;
 float field(vec2 p){return texture2D(source,p).r*.4+(texture2D(source,p+vec2(px.x,0.)).r+texture2D(source,p-vec2(px.x,0.)).r+texture2D(source,p+vec2(0.,px.y)).r+texture2D(source,p-vec2(0.,px.y)).r)*.15;}
-void main(){float l=0.,r=0.,b=0.,t=0.;
+void main(){
+if(waterReveal>=1. && fluidActive<.5 && inFront>.5){gl_FragColor=vec4(texture2D(scene,uv).rgb,1.);return;}
+float l=0.,r=0.,b=0.,t=0.;
 // The intro wave is analytical; only pointer-driven fluid needs height sampling.
 if(fluidActive>.5){l=field(uv-vec2(px.x,0.));r=field(uv+vec2(px.x,0.));
 b=field(uv-vec2(0.,px.y));t=field(uv+vec2(0.,px.y));}

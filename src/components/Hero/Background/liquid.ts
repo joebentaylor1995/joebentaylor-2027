@@ -42,11 +42,12 @@ export async function createLiquidLayer(
 ): Promise<LiquidLayer> {
 	const bindProgram = gl.useProgram.bind(gl);
 	const desktopLayout = window.matchMedia(HERO_DESKTOP_QUERY);
+	const mobile = !desktopLayout.matches;
 	const parallel = gl.getExtension('KHR_parallel_shader_compile');
-	if (!gl.getExtension('OES_texture_float') || !gl.getExtension('OES_texture_float_linear')) {
+	if (!mobile && (!gl.getExtension('OES_texture_float') || !gl.getExtension('OES_texture_float_linear'))) {
 		throw new Error('Liquid glass requires filtered float textures');
 	}
-	gl.getExtension('WEBGL_color_buffer_float');
+	if (!mobile) gl.getExtension('WEBGL_color_buffer_float');
 	const trackElement = host.querySelector<HTMLElement>('[data-logo-track]');
 	if (!trackElement) throw new Error('Logo track missing');
 	const track = trackElement;
@@ -81,6 +82,19 @@ export async function createLiquidLayer(
 	let simWidth = 1,
 		simHeight = 1;
 	const maxTexture = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+	// Colour reads must not flush the large, GPU-backed logo raster.
+	const colourRaster = document.createElement('canvas');
+	colourRaster.width = colourRaster.height = 1;
+	const colourContext = colourRaster.getContext('2d', { willReadFrequently: true });
+	if (!colourContext) throw new Error('Unable to resolve scene colours');
+	const resolveColour = (colour: string) => {
+		colourContext.clearRect(0, 0, 1, 1);
+		colourContext.fillStyle = colour;
+		colourContext.fillRect(0, 0, 1, 1);
+		return Array.from(colourContext.getImageData(0, 0, 1, 1).data)
+			.slice(0, 3)
+			.map(n => n / 255);
+	};
 
 	function destroy() {
 		for (const target of targets) gl.deleteFramebuffer(target.fbo);
@@ -194,24 +208,24 @@ export async function createLiquidLayer(
 			'composite',
 			'display',
 		] as const;
-		const results = await Promise.allSettled(
-			[
-				shaders.advect,
-				shaders.splat,
-				shaders.curl,
-				shaders.vorticity,
-				shaders.divergence,
-				shaders.pressure,
-				shaders.gradient,
-				shaders.composite,
-				shaders.display,
-			].map(makeProgram)
-		);
+		const activeNames = names.filter(name => !mobile || name === 'composite' || name === 'display');
+		const sources = {
+			advect: shaders.advect,
+			splat: shaders.splat,
+			curl: shaders.curl,
+			vorticity: shaders.vorticity,
+			divergence: shaders.divergence,
+			pressure: shaders.pressure,
+			gradient: shaders.gradient,
+			composite: shaders.composite,
+			display: shaders.display,
+		};
+		const results = await Promise.allSettled(activeNames.map(name => makeProgram(sources[name])));
 		const compiled = results.map(result => {
 			if (result.status === 'rejected') throw result.reason;
 			return result.value;
 		});
-		const passes = Object.fromEntries(names.map((name, index) => [name, compiled[index]])) as Record<
+		const passes = Object.fromEntries(activeNames.map((name, index) => [name, compiled[index]])) as Record<
 			(typeof names)[number],
 			Program
 		>;
@@ -241,6 +255,8 @@ export async function createLiquidLayer(
 		};
 		const content = { texture: texture() };
 		const textRaster = document.createElement('canvas');
+		// Mobile text stays in the DOM: no layout reads or full-screen uploads per frame.
+		if (!desktopLayout.matches) textRaster.width = textRaster.height = 1;
 		const textElement = host.querySelector<HTMLElement>('[data-hero-content]');
 		let textFrame: string | undefined;
 		let allocatedResolution = settings.resolution;
@@ -275,11 +291,17 @@ export async function createLiquidLayer(
 				simHeight = nextSimHeight;
 				portrait = target(canvas.width, canvas.height, gl.UNSIGNED_BYTE);
 				scene = target(canvas.width, canvas.height, gl.UNSIGNED_BYTE);
-				velocity = pair();
-				height = pair();
-				pressure = pair();
-				divergence = target(simWidth, simHeight, gl.FLOAT);
-				curl = target(simWidth, simHeight, gl.FLOAT);
+				if (mobile) {
+					// The radial intro needs no fluid simulation or float render targets.
+					// A valid sampler is still required by WebGL even with fluidActive = 0.
+					height = { read: portrait, write: portrait, swap() {} };
+				} else {
+					velocity = pair();
+					height = pair();
+					pressure = pair();
+					divergence = target(simWidth, simHeight, gl.FLOAT);
+					curl = target(simWidth, simHeight, gl.FLOAT);
+				}
 				previous = null;
 				queued = [];
 				activeTime = 0;
@@ -329,26 +351,15 @@ export async function createLiquidLayer(
 					gl.RGBA,
 					gl.RGBA,
 					gl.UNSIGNED_BYTE,
-					drawHeroContent(canvas, host, maxTexture)
+					desktopLayout.matches ? drawHeroContent(canvas, host, maxTexture) : textRaster
 				);
 			} finally {
 				gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 			}
 			// Resolve token colours through the browser, including modern CSS colour syntax.
-			ctx.setTransform(1, 0, 0, 1, 0, 0);
-			ctx.globalAlpha = 1;
-			ctx.filter = 'none';
-			ctx.fillStyle = getComputedStyle(host).backgroundColor;
-			ctx.fillRect(0, 0, 1, 1);
-			background = Array.from(ctx.getImageData(0, 0, 1, 1).data)
-				.slice(0, 3)
-				.map(n => n / 255);
+			background = resolveColour(getComputedStyle(host).backgroundColor);
 			const cover = host.querySelector<HTMLElement>('[data-scene-cover]');
-			ctx.fillStyle = cover ? getComputedStyle(cover).backgroundColor : getComputedStyle(host).color;
-			ctx.fillRect(0, 0, 1, 1);
-			revealDark = Array.from(ctx.getImageData(0, 0, 1, 1).data)
-				.slice(0, 3)
-				.map(n => n / 255);
+			revealDark = resolveColour(cover ? getComputedStyle(cover).backgroundColor : getComputedStyle(host).color);
 			textFrame = textElement?.dataset.textFrame;
 		}
 		resize();
@@ -360,6 +371,7 @@ export async function createLiquidLayer(
 				gl.viewport(0, 0, portrait.width, portrait.height);
 			},
 			move(x, y) {
+				if (mobile) return;
 				const p: [number, number] = [x, 1 - y];
 				if (previous) {
 					queued.push([...p, ...previous]);
@@ -376,7 +388,7 @@ export async function createLiquidLayer(
 					labelGesture = gesture;
 					uploadDecoration();
 				}
-				if (textFrame !== textElement?.dataset.textFrame) {
+				if (desktopLayout.matches && textFrame !== textElement?.dataset.textFrame) {
 					textFrame = textElement?.dataset.textFrame;
 					gl.bindTexture(gl.TEXTURE_2D, content.texture);
 					gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -502,7 +514,7 @@ export async function createLiquidLayer(
 					dispersion: settings.dispersion,
 					iridescence: settings.iridescence,
 				});
-				host.dataset.liquidReady = 'true';
+				if (host.dataset.liquidReady !== 'true') host.dataset.liquidReady = 'true';
 			},
 			destroy,
 		};

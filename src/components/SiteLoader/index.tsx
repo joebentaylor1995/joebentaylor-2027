@@ -78,6 +78,7 @@ const SiteLoader = () => {
 			const width = window.innerWidth;
 			const height = window.innerHeight;
 			const mobile = !window.matchMedia(HERO_DESKTOP_QUERY).matches;
+			delete root.dataset.webglReveal;
 			gsap.set(root, { autoAlpha: 1, pointerEvents: 'auto' });
 			gsap.set(circle, { attr: { cx: width / 2, cy: height / 2, r: 0 } });
 			gsap.set(wash, { attr: { r: 0 } });
@@ -117,14 +118,24 @@ const SiteLoader = () => {
 				// Keep both reveals paused until the GPU has actually drawn a frame.
 				tl.addPause(revealAt, () => {
 					const hero = document.querySelector('[data-scene-cover]')?.parentElement;
-					if (!hero || hero.dataset.liquidReady === 'true') {
-						tl.resume();
-						return;
-					}
 					const resume = () => {
 						stopWaitingForScene();
-						tl.resume();
+						if (mobile && hero?.dataset.liquidReady === 'true') root.dataset.webglReveal = 'true';
+						// Let the first GPU frame and overlay change paint before starting either clock.
+						let frames = 0;
+						const release = () => {
+							if (++frames < 2) return;
+							gsap.ticker.remove(release);
+							revealScene();
+							tl.resume();
+						};
+						gsap.ticker.add(release);
+						stopWaitingForScene = () => gsap.ticker.remove(release);
 					};
+					if (!hero || hero.dataset.liquidReady === 'true') {
+						resume();
+						return;
+					}
 					const observer = new MutationObserver(() => {
 						if (hero.dataset.liquidReady === 'true') resume();
 					});
@@ -135,8 +146,7 @@ const SiteLoader = () => {
 						window.clearTimeout(timeout);
 					};
 				});
-				tl.call(revealScene, [], revealAt)
-					.set(ring, { opacity: 0.45 }, revealAt)
+				tl.set(ring, { opacity: 0.45 }, revealAt)
 					.to(
 						wave,
 						{

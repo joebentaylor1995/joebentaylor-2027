@@ -349,6 +349,7 @@ export function createMatrix(canvas: HTMLCanvasElement, section: HTMLElement): M
 		else cancel();
 		if (ready && visible && !document.hidden) draw(0);
 	}
+	let portraitWorker: Worker | undefined;
 	const img = new Image();
 	img.onload = () => {
 		if (disposed) return;
@@ -357,51 +358,31 @@ export function createMatrix(canvas: HTMLCanvasElement, section: HTMLElement): M
 		map.height = Math.round((512 * img.height) / img.width);
 		const context = required(map.getContext('2d'));
 		context.drawImage(img, 0, 0, map.width, map.height);
-		const pixels = context.getImageData(0, 0, map.width, map.height),
-			data = pixels.data;
-		const background = new Uint8Array(map.width * map.height),
-			queue = new Int32Array(background.length);
-		let head = 0,
-			tail = 0;
-		const enqueue = (p: number) => {
-			if (background[p]) return;
-			const i = p * 4;
-			if (Math.min(data[i], data[i + 1], data[i + 2]) < 232 && data[i + 3] > 0) return;
-			background[p] = 1;
-			queue[tail++] = p;
+		const pixels = context.getImageData(0, 0, map.width, map.height);
+		const worker = new Worker(new URL('./portrait.worker.ts', import.meta.url));
+		portraitWorker = worker;
+		worker.onmessage = (event: MessageEvent<ImageData>) => {
+			worker.terminate();
+			portraitWorker = undefined;
+			if (disposed) return;
+			context.putImageData(event.data, 0, 0);
+			gl.activeTexture(gl.TEXTURE1);
+			gl.bindTexture(gl.TEXTURE_2D, portrait);
+			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, map);
+			// biome-ignore lint/correctness/useHookAtTopLevel: WebGL API, not a React hook.
+			gl.useProgram(program);
+			scalar('aspect', img.width / img.height);
+			ready = true;
+			section.dataset.state = 'ready';
+			resize();
+			syncTicker();
 		};
-		for (let x = 0; x < map.width; x++) {
-			enqueue(x);
-			enqueue((map.height - 1) * map.width + x);
-		}
-		for (let y = 0; y < map.height; y++) {
-			enqueue(y * map.width);
-			enqueue(y * map.width + map.width - 1);
-		}
-		while (head < tail) {
-			const p = queue[head++],
-				x = p % map.width;
-			if (x > 0) enqueue(p - 1);
-			if (x < map.width - 1) enqueue(p + 1);
-			if (p >= map.width) enqueue(p - map.width);
-			if (p < background.length - map.width) enqueue(p + map.width);
-		}
-		for (let i = 0; i < data.length; i += 4) {
-			const value = background[i / 4]
-				? 0
-				: ((0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) * data[i + 3]) / 255;
-			data[i] = data[i + 1] = data[i + 2] = value;
-			data[i + 3] = 255;
-		}
-		context.putImageData(pixels, 0, 0);
-		gl.activeTexture(gl.TEXTURE1);
-		gl.bindTexture(gl.TEXTURE_2D, portrait);
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, map);
-		scalar('aspect', img.width / img.height);
-		ready = true;
-		section.dataset.state = 'ready';
-		resize();
-		syncTicker();
+		worker.onerror = () => {
+			worker.terminate();
+			portraitWorker = undefined;
+			if (!disposed) section.dataset.state = 'fallback';
+		};
+		worker.postMessage(pixels, [pixels.data.buffer]);
 	};
 	img.onerror = () => {
 		if (!disposed) section.dataset.state = 'fallback';
@@ -453,6 +434,7 @@ export function createMatrix(canvas: HTMLCanvasElement, section: HTMLElement): M
 			unsubscribeSettings();
 			gsap.ticker.remove(tick);
 			img.onload = null;
+			portraitWorker?.terminate();
 			img.onerror = null;
 			for (const item of textures) gl.deleteTexture(item);
 			for (const shader of shaders) gl.deleteShader(shader);

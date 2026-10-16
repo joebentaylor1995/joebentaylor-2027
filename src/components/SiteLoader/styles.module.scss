@@ -9,6 +9,11 @@
   &[data-complete='true'] {
     display: none;
   }
+
+  // WebGL already supplies the dark boundary and ring on mobile.
+  &[data-webgl-reveal='true'] {
+    .veil, .ring { display: none; }
+  }
 }
 
 // Fail open even if hydration fails.

@@ -7,7 +7,23 @@ test('mobile wave reduces transient pixels then restores portrait detail', async
 		const names = new WeakMap<WebGLUniformLocation, string>();
 		const locate = WebGLRenderingContext.prototype.getUniformLocation;
 		const uniform = WebGLRenderingContext.prototype.uniform1f;
-		const state = { movingWidths: [] as number[], settledWidth: 0, fluid: false };
+		const state = {
+			movingWidths: [] as number[],
+			settledWidth: 0,
+			fluid: false,
+			heroRasterDraws: 0,
+			floatTargets: 0,
+		};
+		const upload = WebGLRenderingContext.prototype.texImage2D;
+		WebGLRenderingContext.prototype.texImage2D = function (...args: unknown[]) {
+			if (args[7] === this.FLOAT) state.floatTargets++;
+			Reflect.apply(upload, this, args);
+		};
+		const fillText = CanvasRenderingContext2D.prototype.fillText;
+		CanvasRenderingContext2D.prototype.fillText = function (...args: Parameters<typeof fillText>) {
+			if (args[0].includes('Building')) state.heroRasterDraws++;
+			Reflect.apply(fillText, this, args);
+		};
 		Object.assign(window, { waveBudget: state });
 		WebGLRenderingContext.prototype.getUniformLocation = function (program, name) {
 			const location = locate.call(this, program, name);
@@ -28,12 +44,25 @@ test('mobile wave reduces transient pixels then restores portrait detail', async
 	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete', { timeout: 20000 });
 	const state = await page.evaluate(
 		() =>
-			(window as unknown as { waveBudget: { movingWidths: number[]; settledWidth: number; fluid: boolean } })
-				.waveBudget
+			(
+				window as unknown as {
+					waveBudget: {
+						movingWidths: number[];
+						settledWidth: number;
+						fluid: boolean;
+						heroRasterDraws: number;
+						floatTargets: number;
+					};
+				}
+			).waveBudget
 	);
 	expect(state.movingWidths.length).toBeGreaterThan(2);
 	expect(new Set(state.movingWidths)).toEqual(new Set([585]));
 	expect(state.settledWidth).toBe(780);
 	expect(state.fluid).toBe(false);
+	expect(state.heroRasterDraws).toBe(0);
+	expect(state.floatTargets).toBe(0);
+	await expect(page.locator('[data-hero-content]')).toHaveCSS('opacity', '1');
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-webgl-reveal', 'true');
 	await page.screenshot({ path: 'test-results/mobile-wave-settled.png' });
 });
