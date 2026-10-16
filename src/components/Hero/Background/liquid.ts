@@ -221,11 +221,10 @@ export async function createLiquidLayer(
 			composite: mobile ? shaders.mobileComposite : shaders.composite,
 			display: shaders.display,
 		};
-		const results = await Promise.allSettled(activeNames.map(name => makeProgram(sources[name])));
-		const compiled = results.map(result => {
-			if (result.status === 'rejected') throw result.reason;
-			return result.value;
-		});
+		// Drivers can compile synchronously even with the parallel extension present.
+		// Submit one program per yielded task instead of blocking on all nine at once.
+		const compiled: Program[] = [];
+		for (const name of activeNames) compiled.push(await makeProgram(sources[name]));
 		const passes = Object.fromEntries(activeNames.map((name, index) => [name, compiled[index]])) as Record<
 			(typeof names)[number],
 			Program

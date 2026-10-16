@@ -31,12 +31,13 @@ export function drawHeroContent(
 		const parent = node.parentElement;
 		if (parent && !parent.closest('svg') && node.textContent?.trim()) {
 			const css = getComputedStyle(parent);
-			if (css.display !== 'none' && css.visibility !== 'hidden') {
+			const alpha = opacity(parent);
+			if (alpha > 0 && css.display !== 'none' && css.visibility !== 'hidden') {
 				ctx.save();
 				ctx.font = `${css.fontStyle} ${css.fontWeight} ${css.fontSize} ${css.fontFamily}`;
 				ctx.letterSpacing = css.letterSpacing === 'normal' ? '0px' : css.letterSpacing;
 				ctx.fillStyle = css.color;
-				ctx.globalAlpha = opacity(parent);
+				ctx.globalAlpha = alpha;
 				const mask = parent.closest('[data-word-mask]')?.getBoundingClientRect();
 				if (mask) {
 					ctx.beginPath();
@@ -46,18 +47,25 @@ export function drawHeroContent(
 				ctx.textBaseline = 'alphabetic';
 				const range = document.createRange();
 				const lines: { text: string; left: number; top: number; height: number }[] = [];
-				for (let i = 0; i < node.textContent.length; i++) {
-					range.setStart(node, i);
-					range.setEnd(node, i + 1);
-					const rect = range.getBoundingClientRect();
-					if (!rect.width || !rect.height) continue;
-					let line = lines[lines.length - 1];
-					if (!line || Math.abs(line.top - rect.top) > 1) {
-						line = { text: '', left: rect.left, top: rect.top, height: rect.height };
-						lines.push(line);
+				range.selectNodeContents(node);
+				const rects = Array.from(range.getClientRects()).filter(rect => rect.width && rect.height);
+				// Reveal words are single-line runs. Only wrapped runs need character measurements.
+				if (rects.length === 1) {
+					const { left, top, height } = rects[0];
+					lines.push({ text: node.textContent, left, top, height });
+				} else
+					for (let i = 0; i < node.textContent.length; i++) {
+						range.setStart(node, i);
+						range.setEnd(node, i + 1);
+						const rect = range.getBoundingClientRect();
+						if (!rect.width || !rect.height) continue;
+						let line = lines[lines.length - 1];
+						if (!line || Math.abs(line.top - rect.top) > 1) {
+							line = { text: '', left: rect.left, top: rect.top, height: rect.height };
+							lines.push(line);
+						}
+						line.text += node.textContent[i];
 					}
-					line.text += node.textContent[i];
-				}
 				for (const line of lines) {
 					let text = line.text;
 					if (css.textTransform === 'uppercase') text = text.toUpperCase();

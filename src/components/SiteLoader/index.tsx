@@ -113,7 +113,9 @@ const SiteLoader = () => {
 				// One wavefront removes the stationary logo and opens the scene.
 				const revealAt = landedAt + revealGap;
 				const wave = { radius: 0 };
-				const setRingScale = gsap.quickSetter(ring, 'scale');
+				// quickSetter does not expand the CSSPlugin's multi-property "scale" alias.
+				const setRingScaleX = gsap.quickSetter(ring, 'scaleX');
+				const setRingScaleY = gsap.quickSetter(ring, 'scaleY');
 				// Shader compilation and logo decoding can outlast the logo's hold.
 				// Keep both reveals paused until the GPU has actually drawn a frame.
 				tl.addPause(revealAt, () => {
@@ -154,7 +156,8 @@ const SiteLoader = () => {
 							duration: 1.35,
 							ease: 'power2.inOut',
 							onUpdate: () => {
-								setRingScale(wave.radius / 100);
+								setRingScaleX(wave.radius / 100);
+								setRingScaleY(wave.radius / 100);
 								if (mobile && ring instanceof HTMLElement)
 									ring.style.setProperty('--ring-width', `${1 / Math.max(1, wave.radius / 100)}px`);
 								circle?.setAttribute('r', String(wave.radius));

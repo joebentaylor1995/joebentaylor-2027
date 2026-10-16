@@ -33,6 +33,14 @@ test('global pulse washes away a stationary small logo and releases the homepage
 	if (!bounds) throw new Error('Missing loader logo');
 	expect(bounds.width).toBeLessThanOrEqual(120);
 	await page.waitForFunction(() => Number(document.querySelector('[data-logo-wash]')?.getAttribute('r')) > 12);
+	await expect
+		.poll(() =>
+			page.locator('[data-loader-ring]').evaluate(element => {
+				const transform = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+				return transform.a > 0 && Math.abs(transform.a - transform.d) < 0.001;
+			})
+		)
+		.toBe(true);
 	await expect(mark).toHaveCSS('opacity', '1');
 	await expect(mark).toHaveCSS('transform', 'none');
 	await expect(loader).toHaveAttribute('data-complete', 'true', { timeout: 8000 });
