@@ -1,6 +1,7 @@
 // Imports
 // ------------
 import { getSettings, subscribe } from '@parts/ProfileReveal/Settings/store';
+import { yieldSceneWork } from '@utils/prepareScene';
 import { gsap } from 'gsap';
 import { Body, Sleeping } from 'matter-js';
 import * as THREE from 'three';
@@ -23,7 +24,8 @@ async function loadImage(src: string) {
 	return image;
 }
 
-async function artwork(item: ToolkitItem) {
+async function artwork(item: ToolkitItem, signal?: AbortSignal) {
+	signal?.throwIfAborted();
 	const canvas = document.createElement('canvas');
 	canvas.width = canvas.height = SIZE * RESOLUTION;
 	const context = canvas.getContext('2d');
@@ -42,6 +44,8 @@ async function artwork(item: ToolkitItem) {
 		}))
 	);
 	for (const { layer, image, mask } of images) {
+		await yieldSceneWork();
+		signal?.throwIfAborted();
 		const stamp = document.createElement('canvas');
 		stamp.width = Math.ceil(layer.width * RESOLUTION);
 		stamp.height = Math.ceil(layer.height * RESOLUTION);
@@ -64,7 +68,7 @@ async function artwork(item: ToolkitItem) {
 // Scene
 // ------------
 export async function createToolkit(element: HTMLElement, items: readonly ToolkitItem[], signal?: AbortSignal) {
-	const artworkCanvases = await Promise.all(items.map(artwork));
+	const artworkCanvases = await Promise.all(items.map(item => artwork(item, signal)));
 	signal?.throwIfAborted();
 	const buttons = Array.from(element.querySelectorAll('button'));
 	// Keep physics in design units; the camera and hit targets scale with rem sizing.
@@ -120,6 +124,31 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		scene.add(mesh);
 		return mesh;
 	});
+	const releaseAssets = () => {
+		physics.destroy();
+		for (const mesh of meshes) {
+			mesh.geometry.dispose();
+			mesh.material.map?.dispose();
+			mesh.material.dispose();
+		}
+		renderer?.dispose();
+		renderer?.forceContextLoss();
+		canvas.remove();
+	};
+	try {
+		if (renderer) {
+			await renderer.compileAsync(scene, camera);
+			for (const mesh of meshes) {
+				await yieldSceneWork();
+				signal?.throwIfAborted();
+				if (mesh.material.map) renderer.initTexture(mesh.material.map);
+			}
+		}
+		signal?.throwIfAborted();
+	} catch (error) {
+		releaseAssets();
+		throw error;
+	}
 	let visible = false;
 	let listening = false;
 	let destroyed = false;
@@ -296,15 +325,7 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 			events.abort();
 			resizeObserver.disconnect();
 			unsubscribe();
-			physics.destroy();
-			for (const mesh of meshes) {
-				mesh.geometry.dispose();
-				mesh.material.map?.dispose();
-				mesh.material.dispose();
-			}
-			renderer?.dispose();
-			renderer?.forceContextLoss();
-			canvas.remove();
+			releaseAssets();
 		},
 	};
 }

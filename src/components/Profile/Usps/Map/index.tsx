@@ -4,6 +4,7 @@
 // ------------
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
 import { defaults, getSettings, subscribe } from '@parts/ProfileReveal/Settings/store';
+import { prepareScene } from '@utils/prepareScene';
 import { type CSSProperties, use, useEffect, useRef, useSyncExternalStore } from 'react';
 
 // Styles
@@ -25,32 +26,31 @@ const GlobeMap = () => {
 		if (!element || !profilePresent) return;
 		const controller = new AbortController();
 		let disposed = false;
-		let loading = false;
 		let visible = false;
 		let scene: Awaited<ReturnType<typeof import('./engine').createGlobe>> | undefined;
+		const stopPreparing = prepareScene(element, () =>
+			import('./engine')
+				.then(async ({ createGlobe }) => {
+					if (disposed) return;
+					const next = await createGlobe(element, controller.signal);
+					if (disposed) next.destroy();
+					else {
+						scene = next;
+						scene.setVisible(visible);
+					}
+				})
+				.catch(error => {
+					if (!disposed) {
+						element.dataset.state = 'error';
+						console.error('Globe could not load', error);
+					}
+				})
+		);
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				visible = entry.isIntersecting;
 				element.dataset.visible = String(visible);
 				scene?.setVisible(visible);
-				if (!visible || loading) return;
-				loading = true;
-				void import('./engine')
-					.then(async ({ createGlobe }) => {
-						if (disposed) return;
-						const next = await createGlobe(element, controller.signal);
-						if (disposed) next.destroy();
-						else {
-							scene = next;
-							scene.setVisible(visible);
-						}
-					})
-					.catch(error => {
-						if (!disposed) {
-							element.dataset.state = 'error';
-							console.error('Globe could not load', error);
-						}
-					});
 			},
 			{ threshold: 0.1 }
 		);
@@ -58,6 +58,7 @@ const GlobeMap = () => {
 		return () => {
 			disposed = true;
 			controller.abort();
+			stopPreparing();
 			observer.disconnect();
 			scene?.destroy();
 			element.dataset.state = 'loading';

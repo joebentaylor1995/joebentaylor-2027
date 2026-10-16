@@ -3,6 +3,7 @@
 // Imports
 // ------------
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
+import { prepareScene } from '@utils/prepareScene';
 import Image from 'next/image';
 import { use, useEffect, useRef } from 'react';
 
@@ -22,30 +23,29 @@ const Recognition = () => {
 		const section = sectionRef.current;
 		if (!section || !present) return;
 		const controller = new AbortController();
-		let loading = false;
 		let visible = false;
 		let scene: ReturnType<typeof import('./engine').createRecognition> | undefined;
+		const stopPreparing = prepareScene(section, async () => {
+			try {
+				const { createRecognition } = await import('./engine');
+				if (controller.signal.aborted) return;
+				scene = createRecognition(section, controller.signal);
+				scene.setVisible(visible);
+			} catch {
+				if (!controller.signal.aborted) section.dataset.state = 'fallback';
+			}
+		});
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				visible = entry.isIntersecting;
 				scene?.setVisible(visible);
-				if (!visible || loading) return;
-				loading = true;
-				void import('./engine')
-					.then(({ createRecognition }) => {
-						if (controller.signal.aborted) return;
-						scene = createRecognition(section, controller.signal);
-						scene.setVisible(visible);
-					})
-					.catch(() => {
-						if (!controller.signal.aborted) section.dataset.state = 'fallback';
-					});
 			},
 			{ root: section.closest('#profile-panel') }
 		);
 		observer.observe(section);
 		return () => {
 			controller.abort();
+			stopPreparing();
 			observer.disconnect();
 			scene?.destroy();
 			section.dataset.state = 'loading';

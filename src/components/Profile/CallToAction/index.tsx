@@ -7,6 +7,7 @@ import { introDefaults } from '@parts/Hero/Background/scene-intro';
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
 import SpecialHeading from '@parts/SpecialHeading';
 import { canHover } from '@utils/desktopHover';
+import { prepareScene } from '@utils/prepareScene';
 import { useAnimation } from '@utils/useAnimation';
 import gsap from 'gsap';
 import Image from 'next/image';
@@ -175,9 +176,9 @@ const CallToAction = () => {
 			visible = false;
 		let scene: MatrixScene | undefined;
 		const load = () => {
-			if (loading || disposed) return;
+			if (loading || disposed) return Promise.resolve();
 			loading = true;
-			void import('./engine')
+			return import('./engine')
 				.then(({ createMatrix }) => {
 					if (disposed) return;
 					scene = createMatrix(canvas, section);
@@ -194,17 +195,18 @@ const CallToAction = () => {
 			load();
 		};
 		section.addEventListener('matrixrestore', restore);
+		const stopPreparing = prepareScene(section, load);
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				visible = entry.isIntersecting;
 				scene?.setVisible(visible);
-				if (visible) load();
 			},
 			{ root: section.closest('#profile-panel'), threshold: 0 }
 		);
 		observer.observe(section);
 		return () => {
 			disposed = true;
+			stopPreparing();
 			observer.disconnect();
 			scene?.destroy();
 			section.removeEventListener('matrixrestore', restore);

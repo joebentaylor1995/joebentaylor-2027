@@ -3,6 +3,7 @@
 // Imports
 // ------------
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
+import { prepareScene } from '@utils/prepareScene';
 import { use, useEffect, useRef } from 'react';
 import type { ToolkitProps } from './interface';
 import s from './styles.module.scss';
@@ -17,31 +18,30 @@ const Toolkit = ({ items, label }: ToolkitProps) => {
 		if (!element || !profilePresent) return;
 		const controller = new AbortController();
 		let disposed = false;
-		let loading = false;
 		let visible = false;
 		let scene: Awaited<ReturnType<typeof import('./engine').createToolkit>> | undefined;
+		const stopPreparing = prepareScene(element, () =>
+			import('./engine')
+				.then(async ({ createToolkit }) => {
+					if (disposed) return;
+					const next = await createToolkit(element, items, controller.signal);
+					if (disposed) next.destroy();
+					else {
+						scene = next;
+						scene.setVisible(visible);
+					}
+				})
+				.catch(error => {
+					if (!disposed) {
+						element.dataset.state = 'error';
+						console.error('Toolkit could not load', error);
+					}
+				})
+		);
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				visible = entry.isIntersecting;
 				scene?.setVisible(visible);
-				if (!visible || loading) return;
-				loading = true;
-				void import('./engine')
-					.then(async ({ createToolkit }) => {
-						if (disposed) return;
-						const next = await createToolkit(element, items, controller.signal);
-						if (disposed) next.destroy();
-						else {
-							scene = next;
-							scene.setVisible(visible);
-						}
-					})
-					.catch(error => {
-						if (!disposed) {
-							element.dataset.state = 'error';
-							console.error('Toolkit could not load', error);
-						}
-					});
 			},
 			{ threshold: 0.1 }
 		);
@@ -49,6 +49,7 @@ const Toolkit = ({ items, label }: ToolkitProps) => {
 		return () => {
 			disposed = true;
 			controller.abort();
+			stopPreparing();
 			observer.disconnect();
 			scene?.destroy();
 			element.dataset.state = 'loading';

@@ -3,6 +3,7 @@
 
 import { getSettings, getSettingsTarget } from '@parts/ProfileReveal/Settings/store';
 import { canHover } from '@utils/desktopHover';
+import { yieldSceneWork } from '@utils/prepareScene';
 import gsap from 'gsap';
 import * as THREE from 'three';
 import type { RecognitionScene } from './interface';
@@ -437,7 +438,11 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 		);
 		if (signal.aborted) return;
 		for (const result of results) {
+			await yieldSceneWork();
+			if (signal.aborted) return;
 			if (result.status !== 'fulfilled' || !result.value) continue;
+			// Upload one poster per task rather than all textures on the first scroll frame.
+			renderer.initTexture(result.value);
 			const material = new THREE.ShaderMaterial({
 				vertexShader: posterVertexShader,
 				fragmentShader,
@@ -460,6 +465,8 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 			section.dataset.state = 'fallback';
 			return;
 		}
+		await renderer.compileAsync(scene, camera);
+		if (signal.aborted) return;
 		ready = true;
 		syncTicker();
 		// Place the cards before exposing readiness so immediate keyboard selection can find them.

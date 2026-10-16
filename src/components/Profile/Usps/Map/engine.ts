@@ -3,6 +3,7 @@
 
 import { getSettings, subscribe } from '@parts/ProfileReveal/Settings/store';
 import { canHover } from '@utils/desktopHover';
+import { yieldSceneWork } from '@utils/prepareScene';
 import { gsap } from 'gsap';
 import { loadGeometry } from './loadGeometry';
 import { framing, projectLocation, rotation } from './projection';
@@ -68,8 +69,6 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		shaders.push(next);
 		gl.shaderSource(next, source);
 		gl.compileShader(next);
-		if (!gl.getShaderParameter(next, gl.COMPILE_STATUS))
-			throw new Error(gl.getShaderInfoLog(next) ?? 'Shader compilation failed');
 		return next;
 	}
 	let layers: { name: string; buffer: WebGLBuffer; count: number }[];
@@ -77,6 +76,11 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		gl.attachShader(program, shader(gl.VERTEX_SHADER, VERTEX));
 		gl.attachShader(program, shader(gl.FRAGMENT_SHADER, FRAGMENT));
 		gl.linkProgram(program);
+		const parallel = gl.getExtension('KHR_parallel_shader_compile');
+		do {
+			await yieldSceneWork();
+			signal.throwIfAborted();
+		} while (parallel && !gl.getProgramParameter(program, parallel.COMPLETION_STATUS_KHR));
 		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('Globe shader linking failed');
 		// biome-ignore lint/correctness/useHookAtTopLevel: WebGL useProgram is not a React hook.
 		gl.useProgram(program);
