@@ -25,9 +25,9 @@ export interface DepthController {
 	preview: () => void;
 }
 
-// NOTE • Fewer pixels for the 48-step ray march; the portrait is soft enough
-// that retina screens can't tell 1.5 from 2
+// Keep the settled portrait sharp; the moving mobile wave uses fewer pixels.
 const MAX_PIXEL_RATIO = 2;
+const MOBILE_WAVE_PIXEL_RATIO = 1.5;
 // NOTE • Sub-threshold motion is snapped to rest so the loop can stop drawing
 const SETTLE_EPSILON = 0.0001,
 	CURSOR_SPEED_EPSILON = 0.001;
@@ -295,7 +295,11 @@ export function mountDepthEffect({
 			const now = performance.now(),
 				dt = Math.min(deltaMs / 1000, 0.05) || 0.016,
 				s = getSettings();
-			const dpr = Math.min(devicePixelRatio, MAX_PIXEL_RATIO);
+			const entering = (sceneIntros.get(host)?.waterReveal ?? 1) < 1;
+			const dpr = Math.min(
+				devicePixelRatio,
+				!desktopLayout.matches && entering ? MOBILE_WAVE_PIXEL_RATIO : MAX_PIXEL_RATIO
+			);
 			const w = Math.max(1, Math.round(cssWidth * dpr)),
 				h = Math.max(1, Math.round(cssHeight * dpr));
 			if (canvas.width !== w || canvas.height !== h) {
@@ -318,7 +322,6 @@ export function mountDepthEffect({
 				lastSettings = s;
 				dirty = true;
 			}
-			const entering = (sceneIntros.get(host)?.waterReveal ?? 1) < 1;
 			if (entering) {
 				target = [0, 0];
 				pointer = [0, 0];

@@ -3,7 +3,7 @@
   inset: 0;
   z-index: 3000;
   overflow: hidden;
-  // NOTE • Asset wait (≤1.5s) + glitch intro and settle (~2.9s) + wavefront (~1.35s)
+  // NOTE • Asset wait (≤1.5s) + intro (~2.9s) + GPU wait (≤2s) + wave (~1.35s)
   animation: fail-open 0s 9s forwards;
 
   &[data-complete='true'] {

@@ -83,6 +83,7 @@ const SiteLoader = () => {
 			gsap.set(wash, { attr: { r: 0 } });
 			gsap.set(ring, { scale: 0, opacity: 0 });
 			const { revealGap, speed } = loaderSettings;
+			let stopWaitingForScene = () => {};
 			const tl = gsap.timeline({
 				paused: true,
 				onComplete: () => {
@@ -112,6 +113,28 @@ const SiteLoader = () => {
 				const revealAt = landedAt + revealGap;
 				const wave = { radius: 0 };
 				const setRingScale = gsap.quickSetter(ring, 'scale');
+				// Shader compilation and logo decoding can outlast the logo's hold.
+				// Keep both reveals paused until the GPU has actually drawn a frame.
+				tl.addPause(revealAt, () => {
+					const hero = document.querySelector('[data-scene-cover]')?.parentElement;
+					if (!hero || hero.dataset.liquidReady === 'true') {
+						tl.resume();
+						return;
+					}
+					const resume = () => {
+						stopWaitingForScene();
+						tl.resume();
+					};
+					const observer = new MutationObserver(() => {
+						if (hero.dataset.liquidReady === 'true') resume();
+					});
+					observer.observe(hero, { attributes: true, attributeFilter: ['data-liquid-ready'] });
+					const timeout = window.setTimeout(resume, 2000);
+					stopWaitingForScene = () => {
+						observer.disconnect();
+						window.clearTimeout(timeout);
+					};
+				});
 				tl.call(revealScene, [], revealAt)
 					.set(ring, { opacity: 0.45 }, revealAt)
 					.to(
@@ -154,6 +177,7 @@ const SiteLoader = () => {
 			]).then(start, start);
 			return () => {
 				active = false;
+				stopWaitingForScene();
 				window.clearTimeout(deadline);
 			};
 		},

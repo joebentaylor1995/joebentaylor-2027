@@ -8,11 +8,15 @@ export function drawHeroContent(
 ) {
 	const bounds = canvas.getBoundingClientRect();
 	const ratio = Math.min(window.devicePixelRatio || 1, 2, maxTexture / Math.max(bounds.width, bounds.height));
-	raster.width = Math.max(1, Math.round(bounds.width * ratio));
-	raster.height = Math.max(1, Math.round(bounds.height * ratio));
+	const width = Math.max(1, Math.round(bounds.width * ratio));
+	const height = Math.max(1, Math.round(bounds.height * ratio));
+	if (raster.width !== width) raster.width = width;
+	if (raster.height !== height) raster.height = height;
 	const ctx = raster.getContext('2d');
 	if (!ctx) throw new Error('Hero text canvas unavailable');
-	ctx.scale(raster.width / bounds.width, raster.height / bounds.height);
+	ctx.setTransform(1, 0, 0, 1, 0, 0);
+	ctx.clearRect(0, 0, width, height);
+	ctx.setTransform(width / bounds.width, 0, 0, height / bounds.height, 0, 0);
 	const content = host.querySelector<HTMLElement>('[data-hero-content]');
 	if (!content) return raster;
 	const opacity = (element: Element) => {

@@ -40,7 +40,7 @@ test('global pulse washes away a stationary small logo and releases the homepage
 	await expect(header).toHaveAttribute('data-header-entrance', 'complete');
 	await expect(header).toBeVisible();
 	await expect(header).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
-	await expect(page.locator('[data-entrance]')).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
+	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
 	await page.setViewportSize({ width: 390, height: 844 });
 	await expect(loader).toBeHidden();
 	await expect(header).toHaveAttribute('data-header-entrance', 'complete');
@@ -53,7 +53,7 @@ test('old preview URL has no chooser and reduced motion completes', async ({ pag
 	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 8000 });
 	await expect(page.getByRole('complementary', { name: 'Global loader concepts' })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Replay concept' })).toHaveCount(0);
-	await expect(page.locator('[data-entrance]')).toHaveAttribute('data-entrance', 'complete');
+	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete');
 	await expect(page.locator('header')).toHaveAttribute('data-header-entrance', 'complete');
 });
 

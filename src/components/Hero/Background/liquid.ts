@@ -491,6 +491,7 @@ export async function createLiquidLayer(
 					portrait,
 					content,
 					waterReveal: sceneIntros.get(host)?.waterReveal ?? 1,
+					fluidActive: Number(activeTime > 0),
 					revealAspect: cssWidth / cssHeight,
 					revealDark,
 					rippleStrength: (introSettings.get(host) ?? introDefaults).strength,

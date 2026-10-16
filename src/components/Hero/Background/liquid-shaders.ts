@@ -54,12 +54,14 @@ gl_FragColor=vec4(col,1.);}`;
 // Behind mode composites the premultiplied portrait after water shading,
 // retaining its translucent scroll trails and soft edges.
 export const display = `uniform sampler2D scene,portrait,content;uniform float strength,refraction,dispersion,iridescence,inFront;
-uniform float waterReveal,revealAspect;
+uniform float waterReveal,revealAspect,fluidActive;
 uniform vec3 revealDark;
 uniform float rippleStrength,rippleWidth;
 float field(vec2 p){return texture2D(source,p).r*.4+(texture2D(source,p+vec2(px.x,0.)).r+texture2D(source,p-vec2(px.x,0.)).r+texture2D(source,p+vec2(0.,px.y)).r+texture2D(source,p-vec2(0.,px.y)).r)*.15;}
-void main(){float l=field(uv-vec2(px.x,0.)),r=field(uv+vec2(px.x,0.));
-float b=field(uv-vec2(0.,px.y)),t=field(uv+vec2(0.,px.y));
+void main(){float l=0.,r=0.,b=0.,t=0.;
+// The intro wave is analytical; only pointer-driven fluid needs height sampling.
+if(fluidActive>.5){l=field(uv-vec2(px.x,0.));r=field(uv+vec2(px.x,0.));
+b=field(uv-vec2(0.,px.y));t=field(uv+vec2(0.,px.y));}
 // A single rounded water meniscus reveals the scene in this same optical pass.
 vec2 radial=(uv-vec2(.5,.52))*vec2(revealAspect,1.);
 float distanceFromCentre=length(radial);
