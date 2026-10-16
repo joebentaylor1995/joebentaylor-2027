@@ -2,7 +2,8 @@
 
 // Imports
 // ------------
-import Image from 'next/image';
+import { whenLoaderLanded } from '@parts/SiteLoader/events';
+import { getImageProps } from 'next/image';
 import { type ComponentType, type CSSProperties, useEffect, useRef, useState } from 'react';
 import { HERO_DESKTOP_QUERY } from '../layout';
 import { type DepthSettings, defaultSettings, portraitUrl } from './effect-settings';
@@ -18,6 +19,14 @@ import s from './styles.module.scss';
 
 // Cover sizing uses the landscape source (4046 × 2799), including mobile zoom.
 const PORTRAIT_SIZES = `${HERO_DESKTOP_QUERY} 112vw, max(122vw, 177vh)`;
+
+// NOTE • Art-directed so phones get a lighter encode: the photo is the LCP
+// element, and on mobile networks quality 90 at full cover width is the single
+// biggest drag on it. Desktop keeps the higher quality.
+const PORTRAIT_QUALITY = { desktop: 90, mobile: 75 };
+const portraitProps = { src: portraitUrl, alt: '', fill: true, sizes: PORTRAIT_SIZES } as const;
+const { props: desktopPortrait } = getImageProps({ ...portraitProps, quality: PORTRAIT_QUALITY.desktop });
+const { props: mobilePortrait } = getImageProps({ ...portraitProps, quality: PORTRAIT_QUALITY.mobile });
 
 // Component
 // ------------
@@ -75,13 +84,17 @@ const Background = ({ className }: I.BackgroundProps) => {
 			}
 		};
 
-		start();
+		// NOTE • The WebGL setup (shader compiles, ~425KB of textures) waits until the
+		// loader's logo has landed: the photo underneath is already the LCP paint,
+		// and the loader still covers the hero, so nothing visible is lost
+		const stopWaiting = whenLoaderLanded(() => void start());
 		motion.addEventListener('change', start);
 		desktopLayout.addEventListener('change', start);
 		desktop.addEventListener('change', start);
 
 		return () => {
 			generation++;
+			stopWaiting();
 			motion.removeEventListener('change', start);
 			desktopLayout.removeEventListener('change', start);
 			desktop.removeEventListener('change', start);
@@ -152,17 +165,17 @@ const Background = ({ className }: I.BackgroundProps) => {
 					} as CSSProperties
 				}
 			>
-				<Image
-					ref={photoRef}
-					className={s.fallback}
-					src={portraitUrl}
-					alt=''
-					fill
-					quality={90}
-					sizes={PORTRAIT_SIZES}
-					loading='eager'
-					fetchPriority='high'
-				/>
+				<picture>
+					<source media={HERO_DESKTOP_QUERY} srcSet={desktopPortrait.srcSet} sizes={desktopPortrait.sizes} />
+					<img
+						{...mobilePortrait}
+						alt=''
+						ref={photoRef}
+						className={s.fallback}
+						loading='eager'
+						fetchPriority='high'
+					/>
+				</picture>
 				<canvas ref={canvasRef} className={s.canvas} />
 			</aside>
 			{Controls ? (

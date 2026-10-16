@@ -6,7 +6,7 @@ import { HERO_DESKTOP_QUERY } from '@parts/Hero/layout';
 import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
 import { useEffect, useId, useRef, useState } from 'react';
-import { revealScene, settleLoader } from './events';
+import { landLoader, revealScene, settleLoader } from './events';
 import { BAR_SLOTS, CUT_SLOTS, createIntro, INTRO_FPS, INTRO_FRAMES, INTRO_LAST_FRAME, type IntroIds } from './intro';
 import { BEN, JOE, LOGO, LOGO_BOX } from './logoPaths';
 import { LOADER_REPLAY, loaderControl, loaderSettings } from './settings';
@@ -104,7 +104,9 @@ const SiteLoader = () => {
 
 				// The wordmark lands exactly on the static mark, so it swaps in with no jump.
 				const landedAt = INTRO_LAST_FRAME / INTRO_FPS;
-				tl.set(intro, { visibility: 'hidden' }, landedAt).set(final, { visibility: 'visible' }, landedAt);
+				tl.set(intro, { visibility: 'hidden' }, landedAt)
+					.set(final, { visibility: 'visible' }, landedAt)
+					.call(landLoader, [], landedAt);
 
 				// One wavefront removes the stationary logo and opens the scene.
 				const revealAt = landedAt + revealGap;

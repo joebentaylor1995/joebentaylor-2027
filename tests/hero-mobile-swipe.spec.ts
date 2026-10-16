@@ -27,7 +27,8 @@ test('mobile portrait loads a detailed image and responds to native swipes', asy
 	await expect(page.locator('[data-loader-overlay]')).not.toBeVisible({ timeout: 15000 });
 	const source = await portrait.locator('img').evaluate(image => (image as HTMLImageElement).currentSrc);
 	expect(Number(new URL(source).searchParams.get('w'))).toBeGreaterThanOrEqual(1920);
-	expect(new URL(source).searchParams.get('q')).toBe('90');
+	// Phones get the lighter encode (see PORTRAIT_QUALITY in Hero/Background) — still full cover width
+	expect(new URL(source).searchParams.get('q')).toBe('75');
 	const client = await page.context().newCDPSession(page);
 	await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 195, y: 650 }] });
 	for (const y of [625, 590, 550, 500, 440]) {

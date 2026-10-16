@@ -42,6 +42,10 @@ function smoothstep(edge0: number, edge1: number, x: number) {
 }
 
 // Bakes the corrected depth once, so each ray-march step costs one fetch instead of three
+// Hands the main thread back between heavy setup steps, so the WebGL start-up
+// is several short tasks rather than one long one
+const yieldToMain = () => new Promise(resolve => setTimeout(resolve, 0));
+
 function bakeDepth(source: HTMLImageElement) {
 	const width = source.naturalWidth,
 		height = source.naturalHeight;
@@ -58,14 +62,27 @@ function bakeDepth(source: HTMLImageElement) {
 			right = Math.min(width - 1, left + 1);
 		return rgba[(row * width + left) * 4] * (1 - (x - left)) + rgba[(row * width + right) * 4] * (x - left);
 	};
-	for (let y = 0; y < height; y++) {
+	// NOTE • Only pixels inside the small nose ellipse are reshaped; everything
+	// else is the red channel as-is. Copying first and then visiting just the
+	// ellipse's rows and columns keeps this to a few ms on a phone instead of a
+	// Math.hypot per pixel across the whole 1.5MP map — the output is identical.
+	for (let i = 0; i < depth.length; i++) depth[i] = rgba[i * 4];
+	const top = Math.max(0, Math.floor((NOSE.y - NOSE.h) * height)),
+		bottom = Math.min(height - 1, Math.ceil((NOSE.y + NOSE.h) * height));
+	for (let y = top; y <= bottom; y++) {
+		const noseY = ((y + 0.5) / height - NOSE.y) / NOSE.h;
+		if (Math.abs(noseY) >= 1) continue;
 		const face = (column(FACE_COLUMNS[0], y) + column(FACE_COLUMNS[1], y)) / 2,
-			noseY = ((y + 0.5) / height - NOSE.y) / NOSE.h;
-		for (let x = 0; x < width; x++) {
+			reach = Math.sqrt(1 - noseY * noseY) * NOSE.w,
+			left = Math.max(0, Math.floor((NOSE.x - reach) * width) - 1),
+			right = Math.min(width - 1, Math.ceil((NOSE.x + reach) * width) + 1);
+		for (let x = left; x <= right; x++) {
 			const z = rgba[(y * width + x) * 4],
 				distance = Math.hypot(((x + 0.5) / width - NOSE.x) / NOSE.w, noseY);
-			depth[y * width + x] =
-				distance < 1 ? Math.round(z - Math.max(z - face, 0) * (1 - smoothstep(0.35, 1, distance)) * 0.85) : z;
+			if (distance < 1)
+				depth[y * width + x] = Math.round(
+					z - Math.max(z - face, 0) * (1 - smoothstep(0.35, 1, distance)) * 0.85
+				);
 		}
 	}
 	return { depth, width, height };
@@ -583,9 +600,13 @@ export function mountDepthEffect({
 			main = compiled;
 			quad = makeBuffer(new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]));
 			photoTexture = texture(0, () => gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, photo));
+			await yieldToMain();
+			if (disposed || lost || current !== generation) return;
 			colourTexture = texture(2, () =>
 				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, colourImage || photo)
 			);
+			await yieldToMain();
+			if (disposed || lost || current !== generation) return;
 			depthTexture = texture(1, () => {
 				const { depth, width, height } = bakedDepth;
 				gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
@@ -636,7 +657,10 @@ export function mountDepthEffect({
 			if (disposed) return;
 			colourImage = colour;
 			bakedDepth = bakeDepth(depth);
-			void initialize();
+			// The bake and the shader compile each get their own task
+			return yieldToMain().then(() => {
+				if (!disposed) void initialize();
+			});
 		})
 		.catch(() => {
 			if (!disposed) onReady(false);

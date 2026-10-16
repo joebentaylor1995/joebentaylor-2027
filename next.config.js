@@ -100,7 +100,9 @@ const nextConfig = {
 		// deviceSizes defines the set of viewport widths (in pixels) that Next.js considers when generating
 		// responsive images. These values are used to create different image versions for various device screen
 		// sizes, enabling optimal image loading and performance across mobile, tablet, and desktop devices.
-		deviceSizes: [390, 640, 750, 828, 1080, 1200, 1400, 1920, 2048, 3840],
+		// NOTE • 2560 bridges 2048 → 3840, so a phone's full-bleed cover image
+		// (≈2,100–2,550px at 1.75–2× DPR) isn't rounded all the way up to 3840
+		deviceSizes: [390, 640, 750, 828, 1080, 1200, 1400, 1920, 2048, 2560, 3840],
 		remotePatterns: [
 			{
 				protocol: 'https',
