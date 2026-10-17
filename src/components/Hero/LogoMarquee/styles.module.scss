@@ -27,6 +27,12 @@
 	padding-block: calc(var(--gap-sm) + 1rem) 0;
 	height: calc(4.1rem + var(--gap-sm) + 1rem);
 	user-select: none;
+	transition: opacity var(--time-l) var(--easing-bezzy);
+
+	// Mobile logos sit above the WebGL wave, so hold them back until it has passed.
+	:global([data-scene-cover]:not([data-complete])) ~ & {
+		opacity: 0;
+	}
 
 	h2 {
 		--offset: var(--gap-s);
@@ -58,6 +64,7 @@
 
 		position: absolute;
 		z-index: -1;
+		transition: none;
 		padding-block: var(--gap-l);
 		height: auto;
 		border-top: 1px solid alpha(var(--brand-c4), 5);

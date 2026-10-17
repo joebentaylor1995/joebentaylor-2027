@@ -18,3 +18,16 @@ test('mobile marquee stays in HTML while desktop uses WebGL', async ({ page }) =
 	await expect(marquee).toHaveCSS('opacity', '0');
 	await expect(track).toHaveCSS('animation-play-state', 'paused');
 });
+
+test('mobile marquee waits for the intro wave to settle', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/');
+	const cover = page.locator('[data-scene-cover]');
+	const marquee = page.locator('[data-logo-marquee]');
+	await expect(cover).toHaveAttribute('data-complete', 'true', { timeout: 20000 });
+	await expect(marquee).toHaveCSS('opacity', '1');
+	await cover.evaluate(element => element.removeAttribute('data-complete'));
+	await expect(marquee).toHaveCSS('opacity', '0');
+	await cover.evaluate(element => element.setAttribute('data-complete', 'true'));
+	await expect(marquee).toHaveCSS('opacity', '1');
+});
