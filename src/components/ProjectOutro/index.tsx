@@ -97,16 +97,12 @@ const ProjectOutro = ({ review, nextProject }: ProjectOutroProps) => {
 				<figure className={s.review}>
 					<div className={s.portraitSlot}>
 						<div className={s.portrait} data-outro-portrait>
-							{review.imageBase && (
-								<Image className={s.portraitBase} src={review.imageBase} alt='' fill sizes='64px' />
-							)}
 							<Image
 								className={s.portraitImage}
 								src={review.image}
 								alt={review.author}
-								width={174}
-								height={254}
-								sizes='174px'
+								fill
+								sizes='64px'
 							/>
 						</div>
 					</div>

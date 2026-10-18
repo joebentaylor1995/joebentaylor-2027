@@ -11,6 +11,7 @@ import { CommentIcon } from '@sanity/icons/Comment';
 import { HomeIcon } from '@sanity/icons/Home';
 import { ThListIcon } from '@sanity/icons/ThList';
 import { UserIcon } from '@sanity/icons/User';
+import { UsersIcon } from '@sanity/icons/Users';
 import type { StructureBuilder, StructureResolver } from 'sanity/structure';
 
 // Helpers
@@ -57,4 +58,5 @@ export const structure: StructureResolver = S =>
 				),
 			S.documentTypeListItem('projectTag').title('Project Tags').icon(ThListIcon),
 			S.documentTypeListItem('review').title('Reviews').icon(CommentIcon),
+			S.documentTypeListItem('person').title('People').icon(UsersIcon),
 		]);

@@ -39,7 +39,8 @@ export const review = defineType({
 			title: 'Portrait',
 			type: 'image',
 			options: { hotspot: true },
-			description: 'Square headshot on its own (no logo) — shown in a circle in the reviews carousel.',
+			description:
+				'Square headshot on its own (no logo) — shown in a circle in the reviews carousel and case-study outros.',
 			validation: rule => rule.required(),
 		}),
 		defineField({
@@ -49,18 +50,6 @@ export const review = defineType({
 			options: { hotspot: true },
 			description:
 				'Square logo, at least 48 × 48px. Shown as a small round badge on the portrait’s bottom-right, ringed in the panel’s background colour.',
-		}),
-		defineField({
-			name: 'cutout',
-			title: 'Cut-out portrait',
-			type: 'image',
-			description: 'Transparent PNG (≈174 × 254) for case-study outros. Falls back to the avatar.',
-		}),
-		defineField({
-			name: 'cutoutBase',
-			title: 'Cut-out background',
-			type: 'image',
-			description: 'The circle behind the cut-out portrait.',
 		}),
 	],
 	preview: {

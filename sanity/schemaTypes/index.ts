@@ -6,6 +6,7 @@
 
 // Imports
 // ------------
+import { person } from './documents/person';
 import { project } from './documents/project';
 import { projectTag } from './documents/projectTag';
 import { review } from './documents/review';
@@ -32,6 +33,7 @@ export const schemaTypes = [
 	project,
 	projectTag,
 	review,
+	person,
 	// Objects
 	seo,
 	mediaItem,

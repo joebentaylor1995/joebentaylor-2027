@@ -216,7 +216,8 @@ export const project = defineType({
 			type: 'array',
 			group: 'caseStudy',
 			fieldset: 'details',
-			description: 'Collaborators. Leave empty to hide the Credits section.',
+			description:
+				'Collaborators. Pick someone from People (or create them inline) and type their role on this project. Leave empty to hide the Credits section.',
 			hidden: isListingOnly,
 			of: [
 				defineArrayMember({
@@ -224,17 +225,24 @@ export const project = defineType({
 					name: 'credit',
 					fields: [
 						defineField({
-							name: 'name',
-							title: 'Name',
-							type: 'string',
+							name: 'person',
+							title: 'Person',
+							type: 'reference',
+							to: [{ type: 'person' }],
 							validation: rule => rule.required(),
 						}),
-						defineField({ name: 'role', title: 'Role', type: 'string' }),
-						defineField({ name: 'image', title: 'Photo', type: 'image', options: { hotspot: true } }),
+						defineField({ name: 'role', title: 'Role', type: 'string', placeholder: 'e.g. 3D' }),
 					],
-					preview: { select: { title: 'name', subtitle: 'role', media: 'image' } },
+					preview: {
+						select: { title: 'person.name', subtitle: 'role', media: 'person.image' },
+					},
 				}),
 			],
+			validation: rule =>
+				rule.custom((credits?: { person?: { _ref?: string } }[]) => {
+					const refs = (credits ?? []).map(credit => credit.person?._ref).filter(Boolean);
+					return new Set(refs).size === refs.length ? true : 'Each person can only be credited once';
+				}),
 		}),
 		defineField({
 			name: 'recognition',

@@ -81,7 +81,7 @@ One document per piece of work. A project is either a full **case study** or a
 | Case study | `heroImage` | Full-bleed hero |
 | Case study | `introduction` | Intro paragraph under the hero, also the meta description fallback |
 | Case study | `objectives[]` | Overview → objectives paragraphs |
-| Case study | `deliverables[]`, `website`, `credits[]` (name, role, photo), `recognition[]` (award, organisation) | Overview sidebar |
+| Case study | `deliverables[]`, `website`, `credits[]` (`person` → `person`, free-text `role`), `recognition[]` (award, organisation) | Overview sidebar |
 | Case study | `caseBuilder[]` — **visual builder** of blocks: `caseSingle` (one full-width media) and `caseDual` (two side by side); each media is an image (alt required) or a short video loop with poster | Rendered by `ProjectCaseBuilder`; new block types slot into this array |
 | Case study | `reviews[]` → `review` | Outro testimonial (first review is featured) |
 | Case study | `nextProject` → `project` | “Next Project” link |
@@ -95,10 +95,15 @@ filled. Until then the site renders dummy stand-ins (`projectDummy` in
 reaches the meta description. Optional: Credits and Awards — their sections are
 hidden when empty.
 
+## Person — `person`
+
+`name`, `image` (square headshot). A pool of collaborators managed under **People**;
+a case study's Credits pick a person and add a free-text role for that project.
+
 ## Review — `review`
 
-`quote`, `author`, `role`, `company`, `avatar` (portrait on its own — shown in a circle), `logo` (company logo — a round badge on the portrait's bottom-right, ringed in the panel colour), `cutout`
-(transparent portrait for case-study outros, optional), `cutoutBase` (optional).
+`quote`, `author`, `role`, `company`, `avatar` (portrait on its own — shown in a circle in the
+carousel and case-study outros), `logo` (company logo — a round badge on the portrait's bottom-right, ringed in the panel colour).
 One review can appear in the profile panel **and** any number of case studies.
 
 ---

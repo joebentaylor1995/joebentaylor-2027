@@ -101,14 +101,18 @@ export const GET_PROJECT = defineQuery(`
 			quote,
 			author,
 			"role": coalesce(role, company, ""),
-			"image": coalesce(cutout.asset->url, avatar.asset->url),
-			"imageBase": cutoutBase.asset->url
+			"image": avatar.asset->url
 		},
 		"nextProject": nextProject->{ "href": "/projects/" + slug.current },
 		"overview": {
 			objectives,
 			deliverables,
-			"credits": credits[]{ name, "role": coalesce(role, ""), "image": image.asset->url },
+			// NOTE • Falls back to legacy inline credits until migrations/credits-to-people has run
+			"credits": credits[defined(person) || defined(name)]{
+				"name": coalesce(person->name, name),
+				"role": coalesce(role, ""),
+				"image": coalesce(person->image.asset->url, image.asset->url)
+			},
 			"recognition": recognition[]{ name, "organisation": coalesce(organisation, "") },
 			website
 		},

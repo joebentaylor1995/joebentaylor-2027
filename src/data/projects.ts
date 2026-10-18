@@ -31,7 +31,6 @@ export interface ProjectReview {
 	author: string;
 	role: string;
 	image: string;
-	imageBase?: string | null;
 }
 
 // Fallback Content
@@ -47,8 +46,7 @@ export const pocketchange: Project = {
 		quote: '“Exceeded every expectation, combining care and genius execution that few in the industry can match.”',
 		author: 'Jillian Phyllis',
 		role: 'Founder + CEO',
-		image: '/images/projects/pocketchange/review-avatar.png',
-		imageBase: '/images/projects/pocketchange/review-avatar-base.png',
+		image: '/images/reviews/people/jillian-phyllis.png',
 	},
 	nextProject: null,
 	description:
@@ -209,7 +207,6 @@ export const projectDummy = {
 		author: 'Client name',
 		role: 'Role, Company',
 		image: PLACEHOLDER_IMAGE,
-		imageBase: null,
 	} satisfies ProjectReview,
 	caseBuilder: [
 		{ id: 'placeholder', type: 'single', media: { type: 'image', src: PLACEHOLDER_IMAGE, alt: '' } },

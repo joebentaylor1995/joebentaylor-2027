@@ -82,16 +82,7 @@
 	border-radius: var(--br-round);
 }
 
-.portraitBase { object-fit: cover; }
-
-.portraitImage {
-	position: absolute;
-	top: -99.1%;
-	left: -164.18%;
-	width: 270.62%;
-	max-width: none;
-	height: 396.88%;
-}
+.portraitImage { object-fit: cover; }
 
 .quote {
 	width: min(100%, 43rem);

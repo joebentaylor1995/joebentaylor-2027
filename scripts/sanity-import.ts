@@ -137,10 +137,6 @@ const importReviews = async () => {
 			...(isOutroReview && { role: outro.role }),
 			avatar: await image(publicPath(review.image)),
 			...(review.logo && { logo: await image(publicPath(review.logo)) }),
-			...(isOutroReview && {
-				cutout: await image(publicPath(outro.image)),
-				...(outro.imageBase && { cutoutBase: await image(publicPath(outro.imageBase)) }),
-			}),
 		});
 		ids.set(review.author, id);
 	}
@@ -180,13 +176,15 @@ const importCaseStudy = async (reviewIds: Map<string, string>) => {
 
 	const credits = [];
 	for (const credit of project.overview.credits) {
-		credits.push(
-			withKey({
+		const personId = await upsert(
+			await findId('*[_type == "person" && name == $name][0]._id', { name: credit.name }),
+			{
+				_type: 'person',
 				name: credit.name,
-				role: credit.role,
 				...(credit.image && { image: await image(publicPath(credit.image)) }),
-			})
+			}
 		);
+		credits.push(withKey({ person: ref(personId), role: credit.role }));
 	}
 
 	return upsert(await findId('*[_type == "project" && slug.current == $slug][0]._id', { slug: project.slug }), {
