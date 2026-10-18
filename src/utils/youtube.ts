@@ -32,29 +32,12 @@ export const getYouTubeId = (url: string | null | undefined): string | null => {
 	}
 };
 
-export const YOUTUBE_ORIGIN = 'https://www.youtube-nocookie.com';
+// NOTE • YouTube's standard player — its own controls, thumbnail and play
+// button, nothing overridden
+export const getYouTubeEmbedUrl = (id: string) => `https://www.youtube-nocookie.com/embed/${id}`;
 
-// NOTE • Muted, looping and chromeless — `playlist` set to the same video is
-// what makes a single embed loop. Pass the page's origin to switch on the
-// player's postMessage API (play/pause, state), as the site player does.
-export const getYouTubeEmbedUrl = (id: string, origin?: string) =>
-	`${YOUTUBE_ORIGIN}/embed/${id}?${new URLSearchParams({
-		autoplay: '1',
-		mute: '1',
-		loop: '1',
-		playlist: id,
-		controls: '0',
-		playsinline: '1',
-		disablekb: '1',
-		rel: '0',
-		iv_load_policy: '3',
-		fs: '0',
-		...(origin && { enablejsapi: '1', origin }),
-	})}`;
-
-// NOTE • The shape of the recordings (not YouTube's 16:9 player) — full-width
-// tiles take it, and the player is scaled to crop to it (ProjectCaseBuilder styles)
-export const YOUTUBE_ASPECT = 16 / 10;
+// NOTE • The player's shape — full-width tiles take it
+export const YOUTUBE_ASPECT = 16 / 9;
 
 // NOTE • maxresdefault is 16:9 but missing on some (older, low-res) videos;
 // hqdefault always exists but is 4:3 with letterboxing — use it as the fallback

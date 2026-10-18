@@ -88,7 +88,7 @@ export const mediaItem = defineType({
 			title: 'YouTube link',
 			type: 'url',
 			description:
-				'Paste the video’s link, e.g. https://youtu.be/… — it autoplays muted, loops and hides the controls. Visitors who haven’t accepted marketing cookies see its thumbnail instead.',
+				'Paste the video’s link, e.g. https://youtu.be/… — it plays in YouTube’s own player, with its controls. Visitors who haven’t accepted marketing cookies see its thumbnail instead.',
 			placeholder: 'https://www.youtube.com/watch?v=…',
 			components: { input: YouTubeInput },
 			hidden: ({ parent }) => kindOf(parent) !== 'youtube',

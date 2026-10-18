@@ -38,43 +38,20 @@
 		height: 100%;
 		object-fit: cover;
 	}
-
-	// NOTE • Sizes the YouTube player against the tile, for a cover crop
-	&:has(.youtube) { container-type: size; }
 }
 
-// NOTE • An iframe can't object-fit. The recordings are 16:10, which YouTube
-// pillarboxes inside its 16:9 player — so the player is sized until the 16:10
-// picture (player height × 1.6) covers the tile, then centred. A 16:9 upload
-// still covers, just cropped slightly at the sides. Keep 16:10 in step with
-// YOUTUBE_ASPECT in src/utils/youtube.ts.
-.youtube,
-.youtubePlayer {
-	--player-height: max(100cqh, calc(100cqw * 10 / 16));
-
+// NOTE • YouTube's own player, filling the tile — in a two-up tile it
+// letterboxes the 16:9 video as YouTube does
+.youtube {
 	position: absolute;
-	top: 50%;
-	left: 50%;
-	width: calc(var(--player-height) * 16 / 9);
-	height: var(--player-height);
-	transform: translate(-50%, -50%);
-}
-
-// NOTE • Hidden until it's actually playing (so YouTube's title and play
-// button never show) and pointer events off so its hover UI never appears —
-// play/pause goes through the toggle below instead
-.youtubePlayer {
+	inset: 0;
+	width: 100%;
+	height: 100%;
 	border: 0;
-	opacity: 0;
-	pointer-events: none;
-	transition: opacity var(--time-m) var(--easing-bezzy);
-
-	&:not([data-state='loading']) { opacity: 1; }
 }
 
-// NOTE • The whole tile is the play/pause button; its label shows on hover,
-// on keyboard focus and whenever the video is paused
-.youtubeToggle {
+// NOTE • Shown over the thumbnail until marketing cookies are allowed
+.youtubeConsent {
 	position: absolute;
 	inset: 0;
 	display: flex;
@@ -91,13 +68,7 @@
 		border-radius: var(--br-round);
 		background: alpha(--brand-c4, 70);
 		backdrop-filter: blur(8px);
-		opacity: 0;
-		transition: opacity var(--time-m) var(--easing-bezzy);
 	}
-
-	&:hover span,
-	&:focus-visible span,
-	&[data-state='paused'] span { opacity: 1; }
 }
 
 .mediaSlot {

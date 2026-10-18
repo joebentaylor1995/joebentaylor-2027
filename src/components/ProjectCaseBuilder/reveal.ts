@@ -16,7 +16,8 @@ export function mountMediaReveal(root: HTMLElement) {
 	const reveal = (tile: HTMLElement) => {
 		if (!visible.has(tile) || tile.dataset.revealComplete === 'true' || animations.has(tile)) return;
 		const figure = tile.querySelector('figure');
-		const media = tile.querySelector('img, video');
+		// NOTE • A YouTube iframe has no load state worth waiting on — it reveals straight away
+		const media = tile.querySelector('img, video, iframe');
 		if (!figure || !media) return;
 		if (media instanceof HTMLImageElement && (!media.complete || !media.naturalWidth)) return;
 		if (media instanceof HTMLVideoElement && media.readyState < 2) return;

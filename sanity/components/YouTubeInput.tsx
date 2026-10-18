@@ -1,7 +1,7 @@
 // YouTube input
 // ------------
-// NOTE • Sanity's own URL field, with a live preview underneath playing the
-// video exactly as the site will: muted, looping and without controls.
+// NOTE • Sanity's own URL field, with a live preview underneath — the same
+// YouTube player the site shows.
 
 // Imports
 // ------------
@@ -30,6 +30,7 @@ export const YouTubeInput = (props: UrlInputProps) => {
 						src={getYouTubeEmbedUrl(id)}
 						title='YouTube preview'
 						allow='autoplay; encrypted-media; picture-in-picture'
+						allowFullScreen
 						style={PREVIEW_STYLE}
 					/>
 				</Card>
