@@ -26,7 +26,7 @@ import type { ToolkitItem, ToolkitLayer } from '@parts/Profile/Usps/Toolkit/inte
 import ribbonFeatured from '@public/projects-ribbon/featured.json';
 import ribbonAll from '@public/projects-ribbon/projects.json';
 import { stegaClean } from 'next-sanity';
-import { fallbackProjects, type Project, type ProjectMedia, projectDummy } from './projects';
+import { fallbackProjects, type NextProject, type Project, type ProjectMedia, projectDummy } from './projects';
 import {
 	type AboutImage,
 	fallbackHome,
@@ -257,6 +257,17 @@ export const getProjectsPage = async (): Promise<ProjectsPageContent> => {
 	return { featured, all: [...featured, ...rest], seo: data?.seo ?? null };
 };
 
+// NOTE • The case study after this one in the ribbon's Featured order,
+// wrapping round to the first — or the first featured one if this case study
+// isn't featured. Null when there's nowhere else to go.
+export const getNextProject = async (slug: string): Promise<NextProject | null> => {
+	const { featured } = await getProjectsPage();
+	const current = `/projects/${slug}`;
+	const caseStudies = featured.filter(({ href }) => href?.startsWith('/projects/'));
+	const next = caseStudies[(caseStudies.findIndex(({ href }) => href === current) + 1) % caseStudies.length];
+	return next?.href && next.href !== current ? { href: `${next.href}/`, title: next.name } : null;
+};
+
 export const getProjectSlugs = async (): Promise<string[]> => {
 	const slugs = await fetchContent<string[]>(GET_PROJECT_SLUGS);
 	return slugs?.length ? stegaClean(slugs) : fallbackProjects.map(({ slug }) => slug);
@@ -279,7 +290,6 @@ export const getProject = async (slug: string): Promise<Project | null> => {
 		hero: { src: project.hero?.src || PLACEHOLDER_IMAGE, alt: project.hero?.alt || project.title },
 		caseBuilder: caseBuilder.length ? caseBuilder : projectDummy.caseBuilder,
 		review: project.review?.quote ? withQuoteMarks(project.review) : projectDummy.review,
-		nextProject: project.nextProject ?? null,
 		overview: {
 			objectives: objectives.length ? objectives : projectDummy.objectives,
 			deliverables: deliverables.length ? deliverables : projectDummy.deliverables,

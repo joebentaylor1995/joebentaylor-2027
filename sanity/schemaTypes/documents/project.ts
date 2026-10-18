@@ -294,20 +294,6 @@ export const project = defineType({
 			validation: rule =>
 				rule.unique().custom(requiredForCaseStudy('Add at least one review for the case study outro')),
 		}),
-		defineField({
-			name: 'nextProject',
-			title: 'Next project',
-			type: 'reference',
-			group: 'caseStudy',
-			to: [{ type: 'project' }],
-			options: {
-				filter: ({ document }) => ({
-					filter: 'hasCaseStudy == true && !(_id in [$id, "drafts." + $id])',
-					params: { id: document._id.replace(/^drafts\./, '') },
-				}),
-			},
-			hidden: isListingOnly,
-		}),
 
 		// Visual builder
 		defineField({

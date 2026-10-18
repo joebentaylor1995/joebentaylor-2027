@@ -1,6 +1,6 @@
-import type { Project } from '@/data/projects';
+import type { NextProject, Project } from '@/data/projects';
 
 export interface ProjectOutroProps {
 	review: Project['review'];
-	nextProject: Project['nextProject'];
+	nextProject: NextProject | null;
 }

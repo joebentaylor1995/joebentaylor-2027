@@ -15,7 +15,6 @@ export interface Project {
 	hero: { src: string; alt: string };
 	caseBuilder: ProjectCaseBlock[];
 	review: ProjectReview | null;
-	nextProject: { href: string; title?: string } | null;
 	overview: {
 		objectives: string[];
 		deliverables: string[];
@@ -24,6 +23,11 @@ export interface Project {
 		website?: string | null;
 	};
 	seo?: Seo | null;
+}
+
+export interface NextProject {
+	href: string;
+	title: string;
 }
 
 export interface ProjectReview {
@@ -48,7 +52,6 @@ export const pocketchange: Project = {
 		role: 'Founder + CEO',
 		image: '/images/reviews/people/jillian-phyllis.png',
 	},
-	nextProject: null,
 	description:
 		'Pocketchange entrusted me with shaping their brand and digital ecosystem from the ground up, creating a distinctive identity, mobile experience, and launch platform designed to generate demand and establish a scalable foundation for national rollout and future global growth.',
 	hero: {

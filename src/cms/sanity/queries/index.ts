@@ -103,7 +103,6 @@ export const GET_PROJECT = defineQuery(`
 			"role": coalesce(role, company, ""),
 			"image": avatar.asset->url
 		},
-		"nextProject": nextProject->{ "href": "/projects/" + slug.current },
 		"overview": {
 			objectives,
 			deliverables,

@@ -84,7 +84,6 @@ One document per piece of work. A project is either a full **case study** or a
 | Case study | `deliverables[]`, `website`, `credits[]` (`person` → `person`, free-text `role`), `recognition[]` (award, organisation) | Overview sidebar |
 | Case study | `caseBuilder[]` — **visual builder** of blocks: `caseSingle` (one full-width media) and `caseDual` (two side by side); each media is an image (alt required) or a short video loop with poster | Rendered by `ProjectCaseBuilder`; new block types slot into this array |
 | Case study | `reviews[]` → `review` | Outro testimonial (first review is featured) |
-| Case study | `nextProject` → `project` | “Next Project” link |
 | SEO | `seo` | Per-page title/description/share image |
 
 **Required vs optional (case studies).** Required: introduction, at least one

@@ -92,7 +92,7 @@ const ProjectOutro = ({ review, nextProject }: ProjectOutroProps) => {
 	// Render
 	return (
 		<section ref={ref} className={s.jacket} aria-label='Project review and next project' data-project-outro>
-			{nextProject && <Matrix title={nextProject.title ?? 'Next Project'} />}
+			{nextProject && <Matrix title={nextProject.title} />}
 			{review && (
 				<figure className={s.review}>
 					<div className={s.portraitSlot}>

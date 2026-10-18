@@ -9,7 +9,7 @@ import ProjectOverview from '@parts/ProjectOverview';
 import { toMetadata } from '@utils/metadata';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { areProjectsVisible, getProject, getProjectSlugs } from '@/data/content';
+import { areProjectsVisible, getNextProject, getProject, getProjectSlugs } from '@/data/content';
 import { projectDummy } from '@/data/projects';
 
 // Types
@@ -48,14 +48,8 @@ const CaseStudy = async ({ params }: Params) => {
 	// NOTE • A 404 until “Projects live” is on in Sanity (draft preview always sees it)
 	if (!(await areProjectsVisible())) notFound();
 	const { slug } = await params;
-	const project = await getProject(slug);
+	const [project, nextProject] = await Promise.all([getProject(slug), getNextProject(slug)]);
 	if (!project) notFound();
-	const slugs = project.nextProject ? [] : await getProjectSlugs();
-	const nextSlug = slugs.length > 1 ? slugs[(slugs.indexOf(slug) + 1) % slugs.length] : null;
-	const nextLink = project.nextProject ?? (nextSlug ? { href: `/projects/${nextSlug}/` } : null);
-	const destinationSlug = nextLink?.href.split('/').filter(Boolean).at(-1);
-	const destination = destinationSlug ? await getProject(decodeURIComponent(destinationSlug)) : null;
-	const nextProject = nextLink ? { ...nextLink, title: destination?.title ?? 'Next Project' } : null;
 
 	return (
 		<PageTransition>
