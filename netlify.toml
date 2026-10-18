@@ -6,7 +6,7 @@
   command = "bun run build"
 
 [build.environment]
-  NODE_VERSION = "24"
+  NODE_VERSION = "25"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
