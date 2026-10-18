@@ -1,6 +1,7 @@
 'use client';
 
 import { preloadNearbyMedia } from '@utils/preloadNearbyMedia';
+import { YOUTUBE_ASPECT } from '@utils/youtube';
 // Imports
 // ------------
 import Image from 'next/image';
@@ -13,10 +14,6 @@ import { MEDIA_REPLAY, MEDIA_SETTINGS_CHANGED } from './settings';
 import s from './styles.module.scss';
 import Video from './Video';
 import YouTube from './YouTube';
-
-// Constants
-// ------------
-const YOUTUBE_ASPECT = 16 / 9;
 
 // Component
 // ------------

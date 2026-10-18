@@ -43,21 +43,61 @@
 	&:has(.youtube) { container-type: size; }
 }
 
-// NOTE • An iframe can't object-fit, so the 16:9 player is scaled to cover the
-// tile from its centre; pointer events off so YouTube's hover UI never shows
-.youtube {
+// NOTE • An iframe can't object-fit. The recordings are 16:10, which YouTube
+// pillarboxes inside its 16:9 player — so the player is sized until the 16:10
+// picture (player height × 1.6) covers the tile, then centred. A 16:9 upload
+// still covers, just cropped slightly at the sides. Keep 16:10 in step with
+// YOUTUBE_ASPECT in src/utils/youtube.ts.
+.youtube,
+.youtubePlayer {
+	--player-height: max(100cqh, calc(100cqw * 10 / 16));
+
 	position: absolute;
 	top: 50%;
 	left: 50%;
-	width: max(100cqw, calc(100cqh * 16 / 9));
-	height: max(100cqh, calc(100cqw * 9 / 16));
+	width: calc(var(--player-height) * 16 / 9);
+	height: var(--player-height);
+	transform: translate(-50%, -50%);
+}
+
+// NOTE • Hidden until it's actually playing (so YouTube's title and play
+// button never show) and pointer events off so its hover UI never appears —
+// play/pause goes through the toggle below instead
+.youtubePlayer {
 	border: 0;
 	opacity: 0;
 	pointer-events: none;
-	transform: translate(-50%, -50%);
 	transition: opacity var(--time-m) var(--easing-bezzy);
 
-	&[data-state='ready'] { opacity: 1; }
+	&:not([data-state='loading']) { opacity: 1; }
+}
+
+// NOTE • The whole tile is the play/pause button; its label shows on hover,
+// on keyboard focus and whenever the video is paused
+.youtubeToggle {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: flex-end;
+	justify-content: flex-end;
+	padding: var(--gap-s);
+	border: 0;
+	background: none;
+	color: var(--brand-c5);
+	cursor: pointer;
+
+	span {
+		padding: 0.4rem 1rem;
+		border-radius: var(--br-round);
+		background: alpha(--brand-c4, 70);
+		backdrop-filter: blur(8px);
+		opacity: 0;
+		transition: opacity var(--time-m) var(--easing-bezzy);
+	}
+
+	&:hover span,
+	&:focus-visible span,
+	&[data-state='paused'] span { opacity: 1; }
 }
 
 .mediaSlot {

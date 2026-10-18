@@ -16,6 +16,10 @@ export interface MediaProps {
 export interface VideoProps {
 	media: Extract<ProjectMedia, { type: 'video' }>;
 }
+export interface YouTubePlayerProps {
+	id: string;
+	title: string;
+}
 export interface YouTubeProps {
 	media: Extract<ProjectMedia, { type: 'youtube' }>;
 	sizes: string;
