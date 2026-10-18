@@ -9,10 +9,8 @@ test('Recognition settings update live, persist, reset, and scrolling controls d
 	await settings.locator('#modal-awardSize').fill('120');
 	await settings.locator('#modal-awardSpeed').fill('2');
 	await settings.locator('#modal-awardDragEasing').fill('0.4');
-	await settings.locator('#modal-awardBendStrength').fill('1.5');
 	await settings.locator('#modal-awardHoverIntensity').fill('0.5');
 	await settings.locator('#modal-awardFocusDuration').fill('1.2');
-	await expect(section).toHaveAttribute('data-bend-strength', '1.5');
 	await expect(section).toHaveAttribute('data-hover-intensity', '0.5');
 	await expect(section).toHaveAttribute('data-focus-duration', '1.2');
 	await expect(settings.locator('#modal-awardMotionBlur')).toHaveCount(0);
@@ -35,7 +33,6 @@ test('Recognition settings update live, persist, reset, and scrolling controls d
 	await expect(settings.locator('#modal-awardSize')).toHaveValue('120');
 	await expect(settings.locator('#modal-awardSpeed')).toHaveValue('2');
 	await expect(settings.locator('#modal-awardDragEasing')).toHaveValue('0.4');
-	await expect(settings.locator('#modal-awardBendStrength')).toHaveValue('1.5');
 	await expect(settings.locator('#modal-awardHoverIntensity')).toHaveValue('0.5');
 	await expect(settings.locator('#modal-awardFocusDuration')).toHaveValue('1.2');
 	await settings.getByRole('button', { name: 'Reset defaults' }).click();
@@ -43,7 +40,6 @@ test('Recognition settings update live, persist, reset, and scrolling controls d
 	await expect(settings.locator('#modal-awardSpeed')).toHaveValue('2.4');
 	await expect(settings.locator('#modal-awardDragEasing')).toHaveValue('0.18');
 	await expect(settings.locator('#modal-awardScrollBoost')).toHaveValue('2');
-	await expect(settings.locator('#modal-awardBendStrength')).toHaveValue('2.7');
 	await expect(settings.locator('#modal-awardHoverIntensity')).toHaveValue('0.1');
 	await expect(settings.locator('#modal-awardFocusDuration')).toHaveValue('0.6');
 });
@@ -88,22 +84,21 @@ test('Recognition isolates an award, returns without closing Profile, and reopen
 	const canvas = section.locator('canvas');
 	await canvas.press('Enter');
 	await expect(section).toHaveAttribute('data-focus', 'true');
-	await expect
-		.poll(async () => Number(await section.getAttribute('data-paper-curl')), { intervals: [30, 50] })
-		.toBeGreaterThan(0.2);
-	await expect(section).toHaveAttribute('data-paper-curl', '0.000');
+	await expect.poll(async () => Number(await section.getAttribute('data-focus-progress'))).toBeGreaterThan(0);
+	await expect(section).toHaveAttribute('data-focus-progress', '1.000');
 	const canvasBounds = await canvas.boundingBox();
 	if (!canvasBounds) throw new Error('Award canvas is missing');
 	await page.mouse.move(canvasBounds.x + canvasBounds.width * 0.6, canvasBounds.y + canvasBounds.height * 0.45);
-	await expect.poll(async () => Number(await section.getAttribute('data-paper-flex'))).toBeGreaterThan(0.1);
+	await expect.poll(async () => Number(await section.getAttribute('data-card-tilt'))).toBeGreaterThan(0.1);
+	await expect.poll(async () => Number(await section.getAttribute('data-card-glare'))).toBeGreaterThan(0.1);
 	await page.mouse.move(0, 0);
-	await expect.poll(async () => Number(await section.getAttribute('data-paper-flex'))).toBeLessThan(0.01);
+	await expect.poll(async () => Number(await section.getAttribute('data-card-tilt'))).toBeLessThan(0.01);
+	await expect.poll(async () => Number(await section.getAttribute('data-card-glare'))).toBeLessThan(0.01);
 	await expect(page.getByRole('button', { name: 'Return to spiral' })).toBeVisible();
 	await canvas.press('Escape');
-	await expect
-		.poll(async () => Number(await section.getAttribute('data-paper-curl')), { intervals: [30, 50] })
-		.toBeGreaterThan(0.2);
+	await expect.poll(async () => Number(await section.getAttribute('data-focus-progress'))).toBeGreaterThan(0);
 	await expect(section).toHaveAttribute('data-focus', 'false');
+	await expect(section).toHaveAttribute('data-focus-progress', '0.000');
 	await expect(page.locator('#profile-panel')).toHaveAttribute('aria-hidden', 'false');
 	await expect(section.locator('[data-recognition-pause]')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Close profile', exact: true }).click();

@@ -3,13 +3,13 @@
 // Imports
 // ------------
 import ConsentGate from '@parts/ConsentGate';
-import { GlobalContext } from '@parts/Contexts';
+import { ContactContext, GlobalContext } from '@parts/Contexts';
 import { getConsent, noConsent, saveConsent } from '@parts/CookieBar/consent';
 import { canHover } from '@utils/desktopHover';
 import Image from 'next/image';
 import type { PointerEvent } from 'react';
 import { lazy, Suspense, use, useEffect, useRef, useState } from 'react';
-import { BOOKING_URL } from './config';
+import { bookingUrl } from './config';
 // Styles + Interfaces
 // ------------
 import type * as I from './interface';
@@ -26,6 +26,7 @@ const CLOSE_MAGNET_LIMIT = 5;
 const ContactModal = ({ onClose }: I.ContactModalProps) => {
 	// Context
 	const { lenisRef } = use(GlobalContext);
+	const { bookingLink } = use(ContactContext);
 
 	// Refs
 	const dialogRef = useRef<HTMLDialogElement>(null);
@@ -126,13 +127,18 @@ const ContactModal = ({ onClose }: I.ContactModalProps) => {
 							<h2 data-type='titleS'>Let’s talk.</h2>
 							<p data-type='bodyM'>Book a 30-minute call to talk about your next project.</p>
 							<p data-type='bodyS'>
-								The calendar is provided by Cal.com. Allow marketing cookies to load it here, or book
+								The calendar is provided by Cal.com. Allow calendar cookies to load it here, or book
 								directly on Cal.com.
 							</p>
 							<button data-type='bodyS' type='button' className={s.allowButton} onClick={allowCalendar}>
 								Allow cookies and load calendar
 							</button>
-							<a data-type='bodyS' href={BOOKING_URL} target='_blank' rel='noopener noreferrer'>
+							<a
+								data-type='bodyS'
+								href={bookingUrl(bookingLink)}
+								target='_blank'
+								rel='noopener noreferrer'
+							>
 								Book on Cal.com ↗
 							</a>
 						</section>

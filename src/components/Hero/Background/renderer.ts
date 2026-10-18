@@ -120,6 +120,7 @@ export function mountDepthEffect({
 	let cssWidth = canvas.clientWidth,
 		cssHeight = canvas.clientHeight,
 		lastSettings: DepthSettings | null = null;
+	let lastIntroTint = -1;
 	let target = [0, 0],
 		pointer = [0, 0],
 		cursor = [0.5, 0.5],
@@ -345,6 +346,9 @@ export function mountDepthEffect({
 			);
 			previousCursor = [...cursor];
 			scroll.step(dt);
+			// Cache the full-colour portrait during the fade; the final pass desaturates it.
+			const introTint = (sceneIntros.get(host)?.colour ?? 0) > 0 ? 1 : 0;
+			if (introTint !== lastIntroTint) dirty = true;
 			const settled =
 				(sceneIntros.get(host)?.waterReveal ?? 1) === 1 &&
 				(sceneIntros.get(host)?.portrait ?? 1) === 1 &&
@@ -416,7 +420,8 @@ export function mountDepthEffect({
 			gl.uniform1f(u.debug, s.depth ? 1 : 0);
 			gl.uniform1fv(u['scrollFX[0]'], scrollValues);
 			gl.uniform1f(u.scrollVelocity, scroll.pulse);
-			gl.uniform1f(u.colourMix, colourImage ? scroll.colour : 0);
+			gl.uniform1f(u.colourMix, colourImage ? scroll.colour + (1 - scroll.colour) * introTint : 0);
+			lastIntroTint = introTint;
 			gl.drawArrays(gl.TRIANGLES, 0, 6);
 			if (liquid) {
 				try {
@@ -457,6 +462,21 @@ export function mountDepthEffect({
 		dirty = true;
 	}
 	host.addEventListener('pointermove', track, { signal: events.signal });
+	window.addEventListener(
+		'pointermove',
+		event => {
+			if (!(event.target instanceof Element) || !event.target.closest('header')) return;
+			const bounds = canvas.getBoundingClientRect();
+			if (!bounds.width || !bounds.height || event.clientY < bounds.top || event.clientY > bounds.bottom) return;
+			track(event);
+			if (canHover() && event.pointerType === 'mouse' && (sceneIntros.get(host)?.waterReveal ?? 1) === 1)
+				liquid?.move(
+					(event.clientX - bounds.left) / bounds.width,
+					(event.clientY - bounds.top) / bounds.height
+				);
+		},
+		{ signal: events.signal }
+	);
 	host.addEventListener(
 		'pointerleave',
 		() => {

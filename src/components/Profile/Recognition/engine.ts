@@ -7,7 +7,7 @@ import { yieldSceneWork } from '@utils/prepareScene';
 import gsap from 'gsap';
 import * as THREE from 'three';
 import type { RecognitionScene } from './interface';
-import { AWARD_IDS, clamp } from './motion';
+import { clamp } from './motion';
 import { fragmentShader, posterVertexShader } from './shaders';
 
 // Scene
@@ -15,7 +15,6 @@ import { fragmentShader, posterVertexShader } from './shaders';
 const RADIUS = 3.85;
 const PITCH = 6.5;
 const PER_TURN = 10;
-const TURNS = AWARD_IDS.length / PER_TURN;
 const CARD_WIDTH = 2.4;
 const CARD_HEIGHT = (CARD_WIDTH * 595) / 420;
 const FOCUS_SCALE = 1.75;
@@ -27,7 +26,14 @@ function required<T>(element: T | null): T {
 	return element;
 }
 
-export function createRecognition(section: HTMLElement, signal: AbortSignal): RecognitionScene {
+// NOTE • posters are the award image URLs (Sanity, or the local fallback) — the
+// spiral's length follows however many there are
+export function createRecognition(
+	section: HTMLElement,
+	signal: AbortSignal,
+	posters: readonly string[]
+): RecognitionScene {
+	const TURNS = posters.length / PER_TURN;
 	const stage = required(section.querySelector<HTMLElement>('[data-recognition-stage]'));
 	const scroller = required(section.closest<HTMLElement>('#profile-panel'));
 	const canvas = required(section.querySelector<HTMLCanvasElement>('canvas'));
@@ -44,7 +50,6 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 	const raycaster = new THREE.Raycaster();
 	const tilt = new THREE.Vector2();
 	const tiltTarget = new THREE.Vector2();
-	const paperVelocity = new THREE.Vector2();
 	const rotation = new THREE.Quaternion();
 	const euler = new THREE.Euler();
 	const focusPosition = new THREE.Vector3();
@@ -52,6 +57,7 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 	let visible = false;
 	let disposed = false;
 	let ready = false;
+	let preparingFrame = false;
 	let playing = !reduced.matches;
 	let phase = 0.035;
 	let targetPhase = phase;
@@ -64,51 +70,6 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 	let focused = false;
 	let focusBlend = 0;
 	let focusProgress = 0;
-	let floatTime = 0;
-	let floatStrength = 0;
-	let rippleStrength = 0;
-	let paperSurfaces: { mesh: THREE.Mesh; original: THREE.BufferGeometry; source: Float32Array }[] = [];
-
-	function restorePaper() {
-		for (const surface of paperSurfaces) {
-			surface.mesh.geometry.dispose();
-			surface.mesh.geometry = surface.original;
-		}
-		if (selected) {
-			selected.material.uniforms.paperBend.value = 0;
-		}
-		paperSurfaces = [];
-	}
-
-	function bendPaper(amount: number) {
-		const { awardBendStrength, awardHoverIntensity } = getSettings();
-		// Cursor-centred, damped surface waves inspired by Curtains.js's simple-plane example.
-		for (const { mesh, source } of paperSurfaces) {
-			const positions = mesh.geometry.getAttribute('position');
-			for (let i = 0; i < positions.count; i++) {
-				const x = source[i * 3];
-				const y = source[i * 3 + 1];
-				const z = source[i * 3 + 2];
-				const nx = x / (CARD_WIDTH / 2);
-				const ny = y / (CARD_HEIGHT / 2);
-				const dx = tilt.x - nx;
-				const dy = tilt.y - ny;
-				const distance = Math.hypot(dx, dy);
-				const falloff = 1 / (1 + distance * 2.5);
-				const wave = Math.cos(distance * 5 - floatTime * 4);
-				const movementWave = Math.cos(distance * 5 - focusProgress * 6);
-				const flex =
-					falloff *
-					(wave * (rippleStrength * 0.12 * focusBlend * awardHoverIntensity + floatStrength * 0.25) +
-						movementWave * Math.abs(amount) * 0.42) *
-					awardBendStrength;
-				positions.setXYZ(i, x + flex * dx * 0.35, y + flex * dy * 0.35, z + flex);
-			}
-			positions.needsUpdate = true;
-			mesh.geometry.computeVertexNormals();
-			mesh.geometry.computeBoundingSphere();
-		}
-	}
 	let glare = 0;
 	let velocity = 0;
 	let pointerId: number | null = null;
@@ -124,19 +85,6 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 		if (card) {
 			selected = card;
 			targetPhase = phase;
-			paperSurfaces = [card, ...(card.children as THREE.Mesh[])].map(mesh => {
-				const original = mesh.geometry;
-				mesh.geometry =
-					mesh === card ? new THREE.PlaneGeometry(CARD_WIDTH, CARD_HEIGHT, 32, 40) : original.clone();
-				if (mesh !== card) {
-					mesh.updateMatrix();
-					mesh.geometry.applyMatrix4(mesh.matrix);
-					mesh.position.set(0, 0, 0);
-					mesh.rotation.set(0, 0, 0);
-					mesh.scale.setScalar(1);
-				}
-				return { mesh, original, source: new Float32Array(mesh.geometry.getAttribute('position').array) };
-			});
 		}
 		focused = Boolean(card);
 		velocity = 0;
@@ -271,7 +219,7 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 	function tick(_time: number, deltaTime: number) {
 		const scrollDelta = scroller.scrollTop - lastScroll;
 		lastScroll = scroller.scrollTop;
-		if (!visible || disposed || !ready || document.hidden) {
+		if ((!visible && !preparingFrame) || disposed || !ready || document.hidden) {
 			scrollSpeed = 0;
 			return;
 		}
@@ -311,27 +259,15 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 				? 1
 				: 0
 			: clamp(focusProgress + ((focused ? 1 : -1) * dt) / settings.awardFocusDuration);
-		section.dataset.bendStrength = String(settings.awardBendStrength);
 		section.dataset.hoverIntensity = String(settings.awardHoverIntensity);
 		section.dataset.focusDuration = String(settings.awardFocusDuration);
 		// Zero velocity and acceleration at both ends keeps the return from
 		// accelerating into its spiral position and stopping abruptly.
 		focusBlend = THREE.MathUtils.smootherstep(focusProgress, 0, 1);
-		// A quick pull loads the sheet early; the small reversed bend is its settling recoil.
-		const curl =
-			reduced.matches || focusProgress === 0 || focusProgress === 1
-				? 0
-				: Math.sin(focusProgress * Math.PI * 2) *
-					Math.sin(focusProgress * Math.PI) *
-					Math.exp(-focusProgress * 3) *
-					1.8;
-		if (selected && playing && !reduced.matches) floatTime += dt;
-		floatStrength = reduced.matches ? 0 : THREE.MathUtils.smoothstep(focusProgress, 0.8, 1) * 0.055;
-		section.dataset.paperCurl = (selected ? curl : 0).toFixed(3);
+		section.dataset.focusProgress = focusProgress.toFixed(3);
 		if (!focused && focusProgress === 0) {
 			focusBlend = 0;
 			focusProgress = 0;
-			restorePaper();
 			selected = null;
 		}
 		focusPosition.set(0, 0, RADIUS + 0.8);
@@ -345,38 +281,18 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 			overSelected = Math.abs(x) < 1 && Math.abs(y) < 1;
 			if (overSelected && !reduced.matches) tiltTarget.set(x, y);
 		}
-		if (reduced.matches) {
-			tilt.set(0, 0);
-			paperVelocity.set(0, 0);
-		} else {
-			// Substeps keep this lightly damped paper spring stable on slower frames.
-			const steps = Math.ceil(dt / 0.008);
-			const step = dt / steps;
-			for (let i = 0; i < steps; i++) {
-				paperVelocity.x += ((tiltTarget.x - tilt.x) * 65 - paperVelocity.x * 10) * step;
-				paperVelocity.y += ((tiltTarget.y - tilt.y) * 65 - paperVelocity.y * 10) * step;
-				tilt.addScaledVector(paperVelocity, step);
-			}
-		}
-		section.dataset.paperFlex = tilt.length().toFixed(3);
-		const rippleTarget = reduced.matches || !focused ? 0 : Math.min(paperVelocity.length() * 0.3, 1);
-		rippleStrength = THREE.MathUtils.lerp(
-			rippleStrength,
-			rippleTarget,
-			1 - Math.exp(-dt * (rippleTarget > rippleStrength ? 9 : 2.5))
+		// Damp the rigid card tilt without paper wobble or surface ripples.
+		if (reduced.matches) tilt.set(0, 0);
+		else tilt.lerp(tiltTarget, 1 - Math.exp(-dt * 10));
+		const hoverStrength = Math.min(settings.awardHoverIntensity * 10, 2);
+		section.dataset.cardTilt = tilt.length().toFixed(3);
+		glare = THREE.MathUtils.lerp(
+			glare,
+			overSelected && !reduced.matches ? Math.min(hoverStrength, 1) : 0,
+			1 - Math.exp(-dt * 8)
 		);
-		if (reduced.matches) rippleStrength = 0;
-		focusPosition.x += tilt.x * 0.08 * settings.awardHoverIntensity;
-		focusPosition.y += tilt.y * 0.06 * settings.awardHoverIntensity;
-		focusPosition.y += Math.sin(floatTime * 1.1) * floatStrength * 0.4;
-		glare = THREE.MathUtils.lerp(glare, overSelected ? Math.min(settings.awardHoverIntensity, 1) : 0, ease);
-		rotation.setFromEuler(
-			euler.set(
-				-tilt.y * 0.08 * settings.awardHoverIntensity,
-				tilt.x * 0.1 * settings.awardHoverIntensity,
-				-tilt.x * 0.02 * settings.awardHoverIntensity
-			)
-		);
+		section.dataset.cardGlare = glare.toFixed(3);
+		rotation.setFromEuler(euler.set(-tilt.y * 0.1 * hoverStrength, tilt.x * 0.12 * hoverStrength, 0));
 		const hovered = canHover() && !selected && pointerId === null ? pick() : null;
 		section.dataset.hover = String(Boolean(hovered));
 		cards.forEach((card, index) => {
@@ -393,10 +309,8 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 			card.material.uniforms.lightPosition.value.copy(tilt);
 			if (card === selected) {
 				card.position.lerp(focusPosition, focusBlend);
-				card.material.uniforms.paperBend.value = Math.max(Math.abs(curl), tilt.length() * 0.7, floatStrength);
 				card.quaternion.slerp(rotation, focusBlend);
 				card.scale.setScalar(size * (1 + (FOCUS_SCALE - 1) * focusBlend));
-				bendPaper(curl);
 				card.material.uniforms.depth.value = THREE.MathUtils.lerp(depth, 1, focusBlend);
 			}
 		});
@@ -424,8 +338,8 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 	const loadAwards = async () => {
 		if (signal.aborted) return;
 		const results = await Promise.allSettled(
-			AWARD_IDS.map(async id => {
-				const texture = await loader.loadAsync(`/images/recognition/award-${String(id).padStart(2, '0')}.jpg`);
+			posters.map(async poster => {
+				const texture = await loader.loadAsync(poster);
 				if (signal.aborted) {
 					texture.dispose();
 					return null;
@@ -449,7 +363,6 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 				transparent: true,
 				side: THREE.DoubleSide,
 				uniforms: {
-					paperBend: { value: 0 },
 					poster: { value: result.value },
 					depth: { value: 1 },
 					fade: { value: 1 },
@@ -468,11 +381,13 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 		await renderer.compileAsync(scene, camera);
 		if (signal.aborted) return;
 		ready = true;
-		syncTicker();
-		// Place the cards before exposing readiness so immediate keyboard selection can find them.
+		// Draw the complete layout offscreen before allowing the canvas to fade in.
+		preparingFrame = true;
 		tick(0, 0);
+		preparingFrame = false;
 		section.dataset.state = 'ready';
 		section.dataset.awards = String(cards.length);
+		syncTicker();
 	};
 	void loadAwards().catch(() => {
 		if (!signal.aborted) section.dataset.state = 'fallback';
@@ -485,7 +400,6 @@ export function createRecognition(section: HTMLElement, signal: AbortSignal): Re
 		},
 		destroy() {
 			disposed = true;
-			restorePaper();
 			gsap.ticker.remove(tick);
 			observer.disconnect();
 			for (const card of cards) card.material.dispose();

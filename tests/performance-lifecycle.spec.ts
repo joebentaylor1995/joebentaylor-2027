@@ -25,7 +25,10 @@ for (const width of [390, 768, 1024, 1440]) {
 					.some(entry => entry.name.includes('/images/map/blue-gradient.png'))
 			)
 		).toBe(false);
-		await expect(page.locator('html')).toHaveCSS('font-size', width >= 700 && width < 1024 ? '16px' : '10px');
+		expect(await page.locator('html').evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeCloseTo(
+			width >= 700 && width < 1024 ? 16 : 10,
+			2
+		);
 		const settings = page.getByRole('complementary', { name: 'Modal settings' });
 		const panel = page.locator('#profile-panel');
 		const count = (selector: string) =>
@@ -40,7 +43,7 @@ for (const width of [390, 768, 1024, 1440]) {
 		for (const [button, selector] of [
 			['Show Recognition', '[data-recognition]'],
 			['Show rain', '[data-connect]'],
-			['Show Design toolkit', '[data-toolkit="Design toolkit"]'],
+			['Show Design toolkit', '[data-toolkit="Design toolkit" i]'],
 			['Show globe', '[data-globe]'],
 		]) {
 			await settings.getByRole('button', { name: button, exact: true }).click();

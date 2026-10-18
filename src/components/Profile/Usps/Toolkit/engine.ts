@@ -19,6 +19,9 @@ const KEY_STEP = 20;
 
 async function loadImage(src: string) {
 	const image = new Image();
+	// NOTE • Sanity CDN logos are cross-origin; without CORS the canvas would be
+	// tainted and couldn't become a WebGL texture
+	image.crossOrigin = 'anonymous';
 	image.src = src;
 	await image.decode();
 	return image;

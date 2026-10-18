@@ -8,6 +8,7 @@ export interface SettingsProps {
 	onIntroTargetChange: (target: 'mobile' | 'desktop') => void;
 	onIntroChange: (settings: IntroSettings) => void;
 	onReplay: () => void;
+	onSaveIntro: () => boolean;
 	liquid: LiquidSettings;
 	onLiquidChange: (settings: LiquidSettings) => void;
 	children?: ReactNode;

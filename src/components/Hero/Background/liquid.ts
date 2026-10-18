@@ -1,6 +1,8 @@
 // Imports
 // ------------
 
+import { MOBILE_COLOUR_DURATION, MOBILE_SCALE_DURATION, MOBILE_SCALE_EASE } from '@parts/SiteLoader/mobile-intro';
+import { gsap } from 'gsap';
 import { HERO_DESKTOP_QUERY } from '../layout';
 import { drawHeroContent } from './hero-content-texture';
 import type { LiquidSettings } from './liquid-settings';
@@ -38,10 +40,12 @@ export async function createLiquidLayer(
 	canvas: HTMLCanvasElement,
 	host: HTMLElement,
 	settings: LiquidSettings,
-	isCancelled = () => false
+	isCancelled = () => false,
+	portraitOnly = false,
+	desktopQuery = HERO_DESKTOP_QUERY
 ): Promise<LiquidLayer> {
 	const bindProgram = gl.useProgram.bind(gl);
-	const desktopLayout = window.matchMedia(HERO_DESKTOP_QUERY);
+	const desktopLayout = window.matchMedia(desktopQuery);
 	const mobile = !desktopLayout.matches;
 	const parallel = gl.getExtension('KHR_parallel_shader_compile');
 	if (!mobile && (!gl.getExtension('OES_texture_float') || !gl.getExtension('OES_texture_float_linear'))) {
@@ -49,9 +53,9 @@ export async function createLiquidLayer(
 	}
 	if (!mobile) gl.getExtension('WEBGL_color_buffer_float');
 	const trackElement = host.querySelector<HTMLElement>('[data-logo-track]');
-	if (!trackElement) throw new Error('Logo track missing');
+	if (!trackElement && !portraitOnly) throw new Error('Logo track missing');
 	const track = trackElement;
-	const images = Array.from(track.querySelectorAll('img'));
+	const images = Array.from(track?.querySelectorAll('img') ?? []);
 	if (!mobile && images.some(image => !image.complete || !image.naturalWidth))
 		throw new Error('Logo textures not ready');
 	const textures = new Set<WebGLTexture>();
@@ -185,6 +189,7 @@ export async function createLiquidLayer(
 			if (typeof value === 'number') gl.uniform1f(location, value);
 			else if (Array.isArray(value)) {
 				if (value.length === 2) gl.uniform2fv(location, value);
+				else if (value.length === 4) gl.uniform4fv(location, value);
 				else gl.uniform3fv(location, value);
 			} else {
 				gl.activeTexture(gl.TEXTURE0 + unit);
@@ -218,7 +223,11 @@ export async function createLiquidLayer(
 			divergence: shaders.divergence,
 			pressure: shaders.pressure,
 			gradient: shaders.gradient,
-			composite: mobile ? shaders.mobileComposite : shaders.composite,
+			composite: portraitOnly
+				? 'void main(){gl_FragColor=texture2D(source,uv);}'
+				: mobile
+					? shaders.mobileComposite
+					: shaders.composite,
 			display: shaders.display,
 		};
 		// Drivers can compile synchronously even with the parallel extension present.
@@ -233,7 +242,7 @@ export async function createLiquidLayer(
 		const decoration = { texture: texture() };
 		let labelGesture = 0;
 		const uploadDecoration = () => {
-			if (mobile) return;
+			if (mobile || portraitOnly) return;
 			gl.bindTexture(gl.TEXTURE_2D, decoration.texture);
 			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 			try {
@@ -309,7 +318,7 @@ export async function createLiquidLayer(
 			}
 			allocatedResolution = settings.resolution;
 			// Rasterise only on layout/content changes. Every animation frame scrolls this texture on the GPU.
-			if (!mobile) {
+			if (!mobile && track && !portraitOnly) {
 				const bounds = track.getBoundingClientRect(),
 					hostBounds = canvas.getBoundingClientRect();
 				const style = getComputedStyle(track);
@@ -354,7 +363,7 @@ export async function createLiquidLayer(
 					gl.RGBA,
 					gl.RGBA,
 					gl.UNSIGNED_BYTE,
-					desktopLayout.matches ? drawHeroContent(canvas, host, maxTexture) : textRaster
+					desktopLayout.matches && !portraitOnly ? drawHeroContent(canvas, host, maxTexture) : textRaster
 				);
 			} finally {
 				gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
@@ -362,7 +371,9 @@ export async function createLiquidLayer(
 			// Resolve token colours through the browser, including modern CSS colour syntax.
 			background = resolveColour(getComputedStyle(host).backgroundColor);
 			const cover = host.querySelector<HTMLElement>('[data-scene-cover]');
-			revealDark = resolveColour(cover ? getComputedStyle(cover).backgroundColor : getComputedStyle(host).color);
+			revealDark = portraitOnly
+				? background
+				: resolveColour(cover ? getComputedStyle(cover).backgroundColor : getComputedStyle(host).color);
 			textFrame = textElement?.dataset.textFrame;
 		}
 		resize();
@@ -391,7 +402,7 @@ export async function createLiquidLayer(
 					labelGesture = gesture;
 					uploadDecoration();
 				}
-				if (desktopLayout.matches && textFrame !== textElement?.dataset.textFrame) {
+				if (!portraitOnly && desktopLayout.matches && textFrame !== textElement?.dataset.textFrame) {
 					textFrame = textElement?.dataset.textFrame;
 					gl.bindTexture(gl.TEXTURE_2D, content.texture);
 					gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -500,17 +511,38 @@ export async function createLiquidLayer(
 					phase,
 					logoBlur: (blurAmount * settings.marqueeBlur) / stripWidth,
 				});
+				const introColour = sceneIntros.get(host)?.colour ?? 0;
+				// Recover elapsed progress from the colour's sine easing once per frame.
+				// The zoom throws quickly, settling before the slower colour fade.
+				const introTime = Math.acos(Math.max(-1, Math.min(1, 2 * introColour - 1))) / Math.PI;
+				const zoomProgress = Math.min(1, (introTime * MOBILE_COLOUR_DURATION) / MOBILE_SCALE_DURATION);
+				const zoomRemaining = 1 - gsap.parseEase(MOBILE_SCALE_EASE)(zoomProgress);
+				const waveConfig = introSettings.get(host) ?? introDefaults;
 				draw(passes.display, null, {
 					source: height.read,
 					scene,
 					portrait,
 					content,
 					waterReveal: sceneIntros.get(host)?.waterReveal ?? 1,
+					introColour,
+					introZoom: 1 + 0.45 * zoomRemaining,
 					fluidActive: Number(activeTime > 0),
 					revealAspect: cssWidth / cssHeight,
 					revealDark,
 					rippleStrength: (introSettings.get(host) ?? introDefaults).strength,
 					rippleWidth: (introSettings.get(host) ?? introDefaults).width,
+					waveOrigin: [waveConfig.originX / 100, waveConfig.originY / 100],
+					waveSoftness: waveConfig.softness,
+					waveLensWidth: waveConfig.lensWidth,
+					waveLensFalloff: waveConfig.lensFalloff,
+					waveLensChroma: waveConfig.lensChroma,
+					waveLensShadow: waveConfig.lensShadow,
+					waveBend: waveConfig.bend,
+					waveReflection: waveConfig.reflection,
+					waveCaustic: waveConfig.caustic,
+					waveRings: waveConfig.rings,
+					waveFrequency: waveConfig.frequency,
+					waveDecay: waveConfig.decay,
 					inFront: Number(!desktopLayout.matches || settings.inFront),
 					strength: settings.intensity,
 					refraction: settings.refraction,

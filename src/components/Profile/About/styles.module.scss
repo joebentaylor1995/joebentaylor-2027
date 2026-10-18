@@ -18,8 +18,11 @@
 	overflow: hidden;
 	transform-origin: center;
 
-	img { object-fit: cover; }
-	&[data-image='portrait'] img { object-position: center bottom; }
+	// NOTE • --about-focus comes from each photo's Sanity hotspot
+	img {
+		object-fit: cover;
+		object-position: var(--about-focus, center);
+	}
 	&:not(:first-child) { transform: scale(0); }
 }
 

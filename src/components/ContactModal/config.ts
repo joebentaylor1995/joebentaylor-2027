@@ -1,4 +1,5 @@
 // Booking
 // ------------
-export const CAL_LINK = 'joebentaylor/30min';
-export const BOOKING_URL = `https://cal.com/${CAL_LINK}?overlayCalendar=true`;
+// NOTE • The Cal.com link itself comes from Sanity's Global settings
+// (ContactContext) — this only builds the public booking URL from it
+export const bookingUrl = (calLink: string) => `https://cal.com/${calLink}?overlayCalendar=true`;

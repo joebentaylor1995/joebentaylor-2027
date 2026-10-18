@@ -3,6 +3,15 @@
   inset: 0;
   z-index: 3000;
   overflow: hidden;
+  // Cover the first paint before SVG masks and the animation are ready.
+  background: var(--brand-c4);
+
+  &[data-revealing='true'] { background: transparent; }
+
+  &[data-outro='fade'] {
+    background: var(--brand-c4);
+    .veil, .ring { display: none; }
+  }
   // NOTE • Asset wait (≤1.5s) + intro (~2.9s) + GPU wait (≤2s) + wave (~1.35s)
   animation: fail-open 0s 9s forwards;
 
@@ -10,7 +19,7 @@
     display: none;
   }
 
-  // WebGL already supplies the dark boundary and ring on mobile.
+  // Once ready, WebGL owns the boundary and ring; a second mask hides its wave.
   &[data-webgl-reveal='true'] {
     .veil, .ring { display: none; }
   }
@@ -35,6 +44,12 @@
   inset: 0;
   display: grid;
   place-items: center;
+
+  // The incoming window removes the logo and backdrop together, without a fade.
+  [data-outro='window'] & {
+    mask-image: var(--loader-window-mask, none);
+    mask-mode: luminance;
+  }
 }
 .mark { width: min(120px, 22vw); }
 

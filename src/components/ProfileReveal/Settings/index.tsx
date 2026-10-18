@@ -25,8 +25,8 @@ const sections: Record<string, string> = {
 	Globe: '[data-globe]',
 	'Keycap placement': '[data-keycap]',
 	Connect: '[data-connect]',
-	'Design toolkit': '[data-toolkit="Design toolkit"]',
-	'Development toolkit': '[data-toolkit="Development toolkit"]',
+	'Design toolkit': '[data-toolkit="Design toolkit" i]',
+	'Development toolkit': '[data-toolkit="Development toolkit" i]',
 };
 
 const fields: { title: string; controls: [NumberSetting, string, string][] }[] = [
@@ -52,7 +52,6 @@ const fields: { title: string; controls: [NumberSetting, string, string][] }[] =
 			['awardSpeed', 'Spiral speed', '×'],
 			['awardDragEasing', 'Drag smoothing', 's · higher is softer'],
 			['awardScrollBoost', 'Scroll acceleration', '×'],
-			['awardBendStrength', 'Bending strength', '×'],
 			['awardHoverIntensity', 'Hover intensity', '×'],
 			['awardFocusDuration', 'Move to centre duration', 's · lower is faster'],
 		],

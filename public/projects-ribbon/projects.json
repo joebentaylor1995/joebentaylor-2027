@@ -1,0 +1,208 @@
+[
+  {
+    "index": 0,
+    "name": "Jillian Phyllis",
+    "type": "video",
+    "source": "https://cdn.dribbble.com/userupload/46394847/file/94a4fbd8d30b41bc602748dfc0baf30e.mp4",
+    "file": "featured-01.mp4",
+    "video": "assets/featured/01.mp4",
+    "poster": "assets/featured/01.jpg"
+  },
+  {
+    "index": 1,
+    "name": "Featured 02",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/43487569/file/original-94998be74f0a1a58005a3ba5ad5ad5e6.png?resize=1200x896&vertical=center",
+    "file": "featured-02.png",
+    "poster": "assets/featured/02.jpg"
+  },
+  {
+    "index": 2,
+    "name": "Featured 03",
+    "type": "video",
+    "source": "https://assets.awwwards.com/awards/element/2026/09/6a9dd49c30465448347785.mp4",
+    "file": "featured-03.mp4",
+    "video": "assets/featured/03.mp4",
+    "poster": "assets/featured/03.jpg"
+  },
+  {
+    "index": 3,
+    "name": "Featured 04",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/47857792/file/35a0fbc08f541b6ac938db528a533748.jpg?resize=1504x1128&vertical=center",
+    "file": "featured-04.jpg",
+    "poster": "assets/featured/04.jpg"
+  },
+  {
+    "index": 4,
+    "name": "Featured 05",
+    "type": "video",
+    "source": "https://assets.awwwards.com/awards/element/2026/02/698d4e7f3ac1f042199814.mp4",
+    "file": "featured-05.mp4",
+    "video": "assets/featured/05.mp4",
+    "poster": "assets/featured/05.jpg"
+  },
+  {
+    "index": 5,
+    "name": "Featured 06",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/15261949/file/original-82b19ff0addefbf448730b8b00f92e58.jpg?resize=2048x2048&vertical=center",
+    "file": "featured-06.jpg",
+    "poster": "assets/featured/06.jpg"
+  },
+  {
+    "index": 6,
+    "name": "Featured 07",
+    "type": "video",
+    "source": "https://cdn.dribbble.com/userupload/16787073/file/original-98457e9a277c88379b08c439769ba837.mp4",
+    "file": "featured-07.mp4",
+    "video": "assets/featured/07.mp4",
+    "poster": "assets/featured/07.jpg"
+  },
+  {
+    "index": 7,
+    "name": "Featured 08",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/6426625/file/original-c2b355905af48c64c3aa3452b38727ff.jpg?resize=1504x1128&vertical=center",
+    "file": "featured-08.jpg",
+    "poster": "assets/featured/08.jpg"
+  },
+  {
+    "index": 8,
+    "name": "Featured 09",
+    "type": "video",
+    "source": "https://cdn.dribbble.com/userupload/48915840/file/79e2865ad340a8ed169a0d9d13f6c6c0.mp4",
+    "file": "featured-09.mp4",
+    "video": "assets/featured/09.mp4",
+    "poster": "assets/featured/09.jpg"
+  },
+  {
+    "index": 9,
+    "name": "Featured 10",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/6329551/file/original-bf7ba53d6f51dc7b59504c665705b724.jpg?resize=1504x1128&vertical=center",
+    "file": "featured-10.jpg",
+    "poster": "assets/featured/10.jpg"
+  },
+  {
+    "index": 10,
+    "name": "Featured 11",
+    "type": "video",
+    "source": "https://cdn.dribbble.com/userupload/36679303/file/original-0d1d1f3bd5adb7113d196c917c5818e2.mp4",
+    "file": "featured-11.mp4",
+    "video": "assets/featured/11.mp4",
+    "poster": "assets/featured/11.jpg"
+  },
+  {
+    "index": 11,
+    "name": "Spireworks",
+    "type": "image",
+    "source": "https://www.levinriegner.com/_next/image/?url=https%3A%2F%2Fweb-cdn-prod.levinriegner.com%2Fdesktop%2FSpireworks2.0_D10.1_1by1.jpg&w=2048&q=75",
+    "file": "featured-12.jpg",
+    "poster": "assets/featured/12.jpg"
+  },
+  {
+    "id": "dribbble-27723510",
+    "name": "Forge Automotive Website",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/48992405/file/b5fb0ecdab43c3f7358d5b369a4d6f99.jpg?resize=1000x0",
+    "page": "https://dribbble.com/shots/27723510-Forge-Automotive-Website",
+    "poster": "assets/projects/13.jpg"
+  },
+  {
+    "id": "dribbble-27702297",
+    "name": "ONYX: Website",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/48915837/file/75540b8f1a75bda67921c6204c38eae8.jpg?resize=1000x0",
+    "page": "https://dribbble.com/shots/27702297-ONYX-Website",
+    "poster": "assets/projects/14.jpg"
+  },
+  {
+    "id": "dribbble-27413221",
+    "name": "WIP: Forge Automotive Website",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/47859054/file/77a7d959749139e88d3b536ed1aa7ac2.jpg?resize=1000x0",
+    "page": "https://dribbble.com/shots/27413221-WIP-Forge-Automotive-Website",
+    "poster": "assets/projects/15.jpg"
+  },
+  {
+    "id": "dribbble-27412830",
+    "name": "Unused Flying Felon Concept",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/47857791/file/c1dd0236fd69595a81706d046cdaea91.jpg?resize=1000x0",
+    "page": "https://dribbble.com/shots/27412830-Unused-Flying-Felon-Concept",
+    "poster": "assets/projects/16.jpg"
+  },
+  {
+    "id": "dribbble-27333333",
+    "name": "Forge Automotive",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/47576242/file/still-9e7079ca6ab3f1197c4fb3524a2565a5.png?resize=1000x0",
+    "page": "https://dribbble.com/shots/27333333-Forge-Automotive",
+    "poster": "assets/projects/17.jpg"
+  },
+  {
+    "id": "dribbble-27288792",
+    "name": "The Flying Felon",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/47421957/file/31ae09c7bc1a1c5aba02492ad617e9f5.jpg?resize=1000x0",
+    "page": "https://dribbble.com/shots/27288792-The-Flying-Felon",
+    "poster": "assets/projects/18.jpg"
+  },
+  {
+    "id": "dribbble-27017513",
+    "name": "Onyx Stone",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/46500884/file/still-bbd78c73cb1aaa3e40fd91634e555964.png?resize=1000x0",
+    "page": "https://dribbble.com/shots/27017513-Onyx-Stone",
+    "poster": "assets/projects/19.jpg"
+  },
+  {
+    "id": "dribbble-26985518",
+    "name": "Jillian Phyllis \u2014\u00a0Infinite Scroll Micro Site",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/46394846/file/still-c4c1bcd8c4ee432e56420592cd43703d.png?resize=1000x0",
+    "page": "https://dribbble.com/shots/26985518-Jillian-Phyllis-Infinite-Scroll-Micro-Site",
+    "poster": "assets/projects/20.jpg"
+  },
+  {
+    "id": "dribbble-26847116",
+    "name": "Rewards Marketplace (WIP)",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/45943283/file/81e8fed8209d9e20f54c7f5476ae92ac.png?resize=1000x0",
+    "page": "https://dribbble.com/shots/26847116-Rewards-Marketplace-WIP",
+    "poster": "assets/projects/21.jpg"
+  },
+  {
+    "id": "dribbble-26910484",
+    "name": "Portfolio_Final_v21_Final_Final",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/46145564/file/bd6564d32b95d2657acd8d7463da7744.jpg?resize=1000x0",
+    "page": "https://dribbble.com/shots/26910484-Portfolio-Final-v21-Final-Final",
+    "poster": "assets/projects/22.jpg"
+  },
+  {
+    "id": "dribbble-26708719",
+    "name": "Chefs Hat + Search",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/45499547/file/c1d3e08a37c9db665cc9ba8c7c447a37.jpg?resize=1000x0",
+    "page": "https://dribbble.com/shots/26708719-Chefs-Hat-Search",
+    "poster": "assets/projects/23.jpg"
+  },
+  {
+    "id": "dribbble-26627048",
+    "name": "Pocketchange Social Animation",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/45234657/file/7032ca23801a0cf37a8c3935479ff6f0.png?resize=1000x0",
+    "page": "https://dribbble.com/shots/26627048-Pocketchange-Social-Animation",
+    "poster": "assets/projects/24.jpg"
+  },
+  {
+    "id": "dribbble-26613029",
+    "name": "Animated App Store Button",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/45190294/file/still-5e91153704536a7d140470d7b6a85324.png?resize=1000x0",
+    "page": "https://dribbble.com/shots/26613029-Animated-App-Store-Button",
+    "poster": "assets/projects/25.jpg"
+  }
+]

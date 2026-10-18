@@ -1,0 +1,16 @@
+.jacket {
+	position: absolute;
+	z-index: 0;
+	inset: var(--outro-gradient-top, 55%) 0 0;
+	display: block;
+	pointer-events: none;
+	mask-image: linear-gradient(transparent, rgb(0 0 0 / 5%) 10%, rgb(0 0 0 / 35%) 25%, black 50%);
+
+	canvas {
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+
+	@media (prefers-reduced-motion: reduce) { display: none; }
+}

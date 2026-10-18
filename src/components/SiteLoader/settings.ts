@@ -16,6 +16,13 @@ export type LoaderSettings = {
 	bandWidth: number;
 	// Hold on the landed logo before the circle wipe
 	revealGap: number;
+	// Non-homepage window reveal, after the logo lands.
+	pageRevealAt: number;
+	revealEffect: 'fade' | 'window' | 'wave';
+	revealOrigin: 'lower' | 'logo';
+	revealDuration: number;
+	heroStartScale: number;
+	heroZoomDuration: number;
 };
 
 export const DEFAULT_LOADER_SETTINGS: LoaderSettings = {
@@ -25,10 +32,20 @@ export const DEFAULT_LOADER_SETTINGS: LoaderSettings = {
 	speed: 1,
 	bandWidth: 1,
 	revealGap: 0.5,
+	pageRevealAt: 1.7,
+	revealEffect: 'fade',
+	revealOrigin: 'logo',
+	revealDuration: 0.45,
+	heroStartScale: 1.2,
+	heroZoomDuration: 4,
 };
 
 export const loaderSettings: LoaderSettings = { ...DEFAULT_LOADER_SETTINGS };
 
 // Dev hooks for the tweak panel: the live timeline and a replay trigger
 export const LOADER_REPLAY = 'site-loader:replay';
-export const loaderControl: { timeline: gsap.core.Timeline | null } = { timeline: null };
+export const loaderControl: {
+	timeline: gsap.core.Timeline | null;
+	preview: ((time: number) => void) | null;
+	previewTime: number | null;
+} = { timeline: null, preview: null, previewTime: null };

@@ -1,0 +1,81 @@
+.jacket {
+	--hero-copy-gap: var(--gap-l);
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	overflow: clip;
+	color: var(--global-white);
+	background: var(--brand-c4);
+
+	@include bp(l) {
+		--col-width: calc((100vw - var(--gap-xl) * 11 - var(--gap-xl)) / 12);
+		--hero-copy-gap: calc(var(--col-width) * 2 - var(--gap-xl));
+	}
+
+	&[data-water-text='true'] {
+		.title [data-wave-state='complete'], .description [data-wave-state='complete'] { -webkit-text-fill-color: transparent; }
+	}
+}
+
+.media {
+	position: absolute;
+	inset: 0;
+}
+
+.image {
+	--project-intro-scale: inherit;
+	object-fit: cover;
+	object-position: center center;
+	filter: grayscale(calc(1 - var(--project-image-saturation, 1)));
+	transform: scale(var(--project-intro-scale, 1));
+	transform-origin: 50% 50svh;
+}
+
+.title, .description {
+	position: relative;
+	z-index: 3;
+	opacity: var(--project-text-opacity, 1);
+
+	waffl-grid {
+		padding-inline: var(--gap-l);
+
+		@include bp(l) { padding-inline: var(--gap-xl); }
+	}
+}
+
+.title {
+	position: relative;
+	// Keep the block reveal above the opaque water canvas until text hands over.
+	z-index: 3;
+	display: flex;
+	align-items: flex-end;
+	justify-content: flex-start;
+
+	min-height: 100svh;
+	padding-bottom: var(--hero-copy-gap);
+}
+
+.description { padding-bottom: var(--hero-copy-gap); }
+
+.copy {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	gap: var(--gap-l);
+	width: 100%;
+	padding: var(--gap-l);
+	background: linear-gradient(transparent, alpha(--global-black, 40));
+
+	h1 { overflow-wrap: anywhere; }
+
+	p {
+		text-wrap: balance;
+		max-width: 77.6rem;
+	}
+
+	@include bp(l) {
+		gap: var(--gap-xl);
+		padding: var(--gap-xl);
+	}
+}

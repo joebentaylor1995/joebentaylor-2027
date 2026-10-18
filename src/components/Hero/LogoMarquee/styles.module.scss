@@ -24,6 +24,8 @@
 
 	display: flex;
 	gap: var(--gap);
+	// The duplicated tracks must not widen the page, even after WebGL takes over.
+	overflow-x: clip;
 	padding-block: calc(var(--gap-sm) + 1rem) 0;
 	height: calc(4.1rem + var(--gap-sm) + 1rem);
 	user-select: none;

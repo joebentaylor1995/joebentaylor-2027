@@ -78,6 +78,9 @@
 
 		@include bp(l) { font-size: 62.5%; }
 
+		// Scale laptop layouts against the 1440px design, capped at the existing 10px base.
+		@include bp(xl) { font-size: min(calc(100vw / 144), 62.5%); }
+
 		@include bp(huge) {
 			font-size: 0.625vw; // 10px at 1600px; scale all rem-based dimensions together.
 		}
@@ -102,6 +105,13 @@
 	#page {
 		height: 100%;
 		overflow: hidden;
+
+		&[data-loader-window='true'] {
+			--loader-page-y: 0px;
+
+			transform: translateY(var(--loader-page-y));
+			will-change: transform;
+		}
 	}
 
 	// Focus — invisible for pointer interactions, a clear ring for keyboard

@@ -11,6 +11,10 @@ test('booking modal covers the viewport, traps focus and restores it on close', 
 	expect(bounds?.height).toBe(page.viewportSize()?.height);
 	await expect(page.getByRole('button', { name: 'Close booking form' })).toBeFocused();
 	await expect(dialog.locator('iframe')).toHaveCount(0);
+	await expect(dialog.getByRole('button', { name: 'Allow cookies and load calendar' })).toHaveCSS(
+		'color',
+		'rgb(0, 0, 0)'
+	);
 	expect(await dialog.evaluate(element => element.matches(':modal'))).toBe(true);
 	await page.keyboard.press('Tab');
 	await expect(dialog.getByRole('button', { name: 'Allow cookies and load calendar' })).toBeFocused();
@@ -47,6 +51,7 @@ test('booking modal covers the viewport, traps focus and restores it on close', 
 test('reduced motion closes the modal without a fade', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true');
 	const trigger = page.getByRole('button', { name: 'Open Booking Form' });
 	await trigger.click();
 	const dialog = page.getByRole('dialog');

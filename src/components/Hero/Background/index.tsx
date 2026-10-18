@@ -4,12 +4,13 @@
 // ------------
 import { whenLoaderLanded } from '@parts/SiteLoader/events';
 import { getImageProps } from 'next/image';
-import { type ComponentType, type CSSProperties, useEffect, useRef, useState } from 'react';
+import { type ComponentType, type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HERO_DESKTOP_QUERY } from '../layout';
 import { type DepthSettings, defaultSettings, portraitUrl } from './effect-settings';
 // Styles + Interfaces
 // ------------
 import type * as I from './interface';
+import { INTRO_STORAGE_KEY, readIntroProfiles } from './intro-storage';
 import type { LiquidControlsProps } from './LiquidControls/interface';
 import { type LiquidSettings, liquidSettings as liquidDefaults } from './liquid-settings';
 import type { DepthController } from './renderer';
@@ -53,6 +54,13 @@ const Background = ({ className }: I.BackgroundProps) => {
 	const [LiquidControls, setLiquidControls] = useState<ComponentType<LiquidControlsProps> | null>(null);
 
 	// Effects
+	useLayoutEffect(() => {
+		const profiles = readIntroProfiles();
+		const host = canvasRef.current?.closest('section');
+		if (host) introSettings.set(host, profiles[matchMedia(HERO_DESKTOP_QUERY).matches ? 'desktop' : 'mobile']);
+		setIntroProfiles(profiles);
+	}, []);
+
 	useEffect(() => {
 		const canvas = canvasRef.current,
 			photo = photoRef.current,
@@ -181,6 +189,14 @@ const Background = ({ className }: I.BackgroundProps) => {
 			{Controls ? (
 				<Controls
 					intro={introValues}
+					onSaveIntro={() => {
+						try {
+							localStorage.setItem(INTRO_STORAGE_KEY, JSON.stringify({ version: 2, ...introProfiles }));
+							return true;
+						} catch {
+							return false;
+						}
+					}}
 					introTarget={introTarget}
 					onIntroTargetChange={setIntroTarget}
 					onIntroChange={updateIntro}

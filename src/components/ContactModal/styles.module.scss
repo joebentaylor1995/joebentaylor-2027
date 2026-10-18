@@ -7,7 +7,7 @@
 	height: 100dvh;
 	max-height: none;
 	margin: 0;
-	padding: 8rem var(--gap-m) var(--gap-xl);
+	padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 	border: 0;
 	background: transparent;
 	color: var(--brand-c5);
@@ -59,12 +59,14 @@
 .content {
 	width: 100%;
 	max-width: 104rem;
-	margin: auto;
+	margin: 0 auto;
 	opacity: 1;
 	transform: none;
 	transition:
 		opacity var(--time-l) var(--easing-bezzy2),
 		transform var(--time-l) var(--easing-bezzy2);
+
+	@include bp(l) { margin: auto }
 }
 
 .closeButton {
@@ -72,8 +74,8 @@
 	--magnetic-y: 0px;
 
 	position: fixed;
-	top: calc(var(--gap-m) - 10px);
-	right: calc(var(--gap-m) - 10px);
+	top: calc(env(safe-area-inset-top) + var(--gap-m) - 10px);
+	right: calc(env(safe-area-inset-right) + var(--gap-m) - 10px);
 	z-index: 1;
 	display: flex;
 	align-items: center;
@@ -120,11 +122,13 @@
 	align-items: flex-start;
 	gap: var(--gap-m);
 	max-width: 48rem;
-	margin: auto;
+	margin: 8rem var(--gap-m) var(--gap-xl);
 	padding: var(--gap-l);
 	border: 1px solid alpha(--brand-c5, 15);
 	border-radius: var(--br-m);
 	background: var(--brand-c4);
+
+	@include bp(l) { margin: auto }
 
 	a {
 		text-decoration: underline;
@@ -132,12 +136,12 @@
 	}
 }
 
-.allowButton {
+.permission .allowButton {
 	min-height: 44px;
 	padding: var(--gap-s) var(--gap-m);
 	border-radius: var(--br-s);
 	background: var(--brand-c5);
-	color: var(--brand-c4);
+	color: var(--global-black);
 	cursor: pointer;
 }
 

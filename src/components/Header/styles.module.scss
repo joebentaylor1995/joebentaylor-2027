@@ -14,6 +14,7 @@
 	.logo { fill: var(--header-foreground); }
 
 	position: fixed;
+	pointer-events: none;
 	z-index: 12;
 	inset: 0 0 auto;
 
@@ -21,6 +22,8 @@
 	justify-content: space-between;
 	align-items: center;
 	padding: var(--gap-m);
+
+	a, button { pointer-events: auto; }
 
 	@include bp(sm) {
 		padding: var(--gap-l);
@@ -33,6 +36,8 @@
 }
 
 .left {
+	position: relative;
+	z-index: 1;
 	display: flex;
 	align-items: center;
 	gap: var(--gap-m);
@@ -74,6 +79,9 @@
 .right {
 	--pad: calc(var(--gap-m) / 2);
 
+	position: relative;
+	z-index: 1;
+
 	display: flex;
 	align-items: center;
 	transform: translateX(var(--pad));
@@ -89,7 +97,6 @@
 		padding: var(--pad);
 
 		color: var(--header-foreground);
-		transition: color var(--time-m) var(--easing-bezzy);
 
 		// NOTE • Block reveal — a block wipes in from the left behind the text on
 		// hover, then carries on out to the right on unhover
@@ -131,6 +138,48 @@
 			&,
 			&::before { transition-duration: 0s; }
 		}
+	}
+}
+
+.blur {
+	position: absolute;
+	z-index: 0;
+	inset: 0 0 calc(-4 * var(--gap-xl));
+	pointer-events: none;
+
+	span {
+		position: absolute;
+		// Overscan keeps backdrop sampling edges outside the visible fade.
+		inset: -48px -48px -64px;
+		pointer-events: none;
+		opacity: var(--header-blur-opacity, 0);
+		backdrop-filter: blur(0.5px);
+		mask-image: linear-gradient(black 8%, rgb(0 0 0 / 80%) 30%, rgb(0 0 0 / 35%) 50%, rgb(0 0 0 / 7%) 65%, transparent 80%);
+	}
+
+	span:nth-child(2) {
+		backdrop-filter: blur(1px);
+		mask-image: linear-gradient(black 8%, rgb(0 0 0 / 75%) 26%, rgb(0 0 0 / 25%) 46%, rgb(0 0 0 / 4%) 61%, transparent 76%);
+	}
+
+	span:nth-child(3) {
+		backdrop-filter: blur(2px);
+		mask-image: linear-gradient(black 8%, rgb(0 0 0 / 70%) 22%, rgb(0 0 0 / 20%) 40%, rgb(0 0 0 / 3%) 56%, transparent 72%);
+	}
+
+	span:nth-child(4) {
+		backdrop-filter: blur(4px);
+		mask-image: linear-gradient(black 8%, rgb(0 0 0 / 65%) 20%, rgb(0 0 0 / 18%) 35%, rgb(0 0 0 / 2%) 50%, transparent 66%);
+	}
+
+	span:nth-child(5) {
+		backdrop-filter: blur(8px);
+		mask-image: linear-gradient(black 8%, rgb(0 0 0 / 60%) 17%, rgb(0 0 0 / 15%) 30%, rgb(0 0 0 / 2%) 44%, transparent 60%);
+	}
+
+	span:nth-child(6) {
+		backdrop-filter: blur(16px);
+		mask-image: linear-gradient(black 8%, rgb(0 0 0 / 55%) 15%, rgb(0 0 0 / 12%) 26%, rgb(0 0 0 / 1%) 38%, transparent 54%);
 	}
 }
 

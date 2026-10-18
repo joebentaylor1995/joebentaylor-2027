@@ -1,0 +1,44 @@
+.jacket {
+	--tfw-fill: 111;
+	--wave-start: #{alpha(--global-white, 40)};
+	color: var(--global-white);
+
+	&[data-transparent-start='true'] { --wave-start: transparent; }
+
+	&[data-reveal-variant='wave'][data-wave-state='waiting'], &[data-reveal-variant='wave'][data-wave-state='playing'] {
+		background-image: linear-gradient(97deg, var(--global-white) calc((var(--tfw-fill) - 8) * 1%), var(--wave-start) calc((var(--tfw-fill) + 8) * 1%));
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+	}
+
+	&[data-reveal-variant='block'] {
+		--block-scale: 0;
+		--block-origin: 0%;
+		--block-text: 0;
+
+		position: relative;
+		display: inline-block;
+
+		&::after {
+			content: '';
+			position: absolute;
+			inset: 0;
+			background: var(--global-white);
+			transform: scaleX(var(--block-scale));
+			transform-origin: var(--block-origin) center;
+			pointer-events: none;
+		}
+
+		&[data-wave-state='waiting'] > span { opacity: 0; }
+		&[data-wave-state='playing'] > span { opacity: var(--block-text); }
+		&[data-wave-state='complete']::after { display: none; }
+	}
+}
+
+.wordMask {
+	display: inline-block;
+	overflow: hidden;
+	vertical-align: bottom;
+
+	> span { display: inline-block; }
+}

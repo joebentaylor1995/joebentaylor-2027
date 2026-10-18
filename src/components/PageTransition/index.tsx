@@ -11,15 +11,17 @@ import type * as I from './interface';
 // NOTE • Tag a navigation with a type to pick its animation:
 // <Link href='/work' transitionTypes={[NAV_FORWARD]}> or
 // router.push('/', { transitionTypes: [NAV_BACK] }). Untyped navigations —
-// including the browser's back/forward buttons — crossfade.
+// including the browser's back/forward buttons — use the enclosing NavigationWave.
 export const NAV_FORWARD = 'nav-forward';
 export const NAV_BACK = 'nav-back';
 
 // Transition type → view-transition-class (the CSS lives in src/css/_page-transitions.scss)
 const pageAnimation = {
+	'project-mesh': 'none',
+	'next-project': 'none',
 	[NAV_FORWARD]: 'navForward',
 	[NAV_BACK]: 'navBack',
-	default: 'pageFade',
+	default: 'none',
 };
 
 // Component

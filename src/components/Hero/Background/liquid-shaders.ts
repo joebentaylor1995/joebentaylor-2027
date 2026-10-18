@@ -59,29 +59,43 @@ gl_FragColor=vec4(col,1.);}`;
 // Behind mode composites the premultiplied portrait after water shading,
 // retaining its translucent scroll trails and soft edges.
 export const display = `uniform sampler2D scene,portrait,content;uniform float strength,refraction,dispersion,iridescence,inFront;
-uniform float waterReveal,revealAspect,fluidActive;
+uniform float waterReveal,revealAspect,fluidActive,introColour,introZoom;
 uniform vec3 revealDark;
 uniform float rippleStrength,rippleWidth;
+uniform vec2 waveOrigin;
+uniform float waveSoftness,waveBend,waveReflection,waveCaustic,waveRings,waveFrequency,waveDecay;
+uniform float waveLensWidth,waveLensFalloff,waveLensChroma,waveLensShadow;
 float field(vec2 p){return texture2D(source,p).r*.4+(texture2D(source,p+vec2(px.x,0.)).r+texture2D(source,p-vec2(px.x,0.)).r+texture2D(source,p+vec2(0.,px.y)).r+texture2D(source,p-vec2(0.,px.y)).r)*.15;}
 void main(){
-if(waterReveal>=1. && fluidActive<.5 && inFront>.5){gl_FragColor=vec4(texture2D(scene,uv).rgb,1.);return;}
+if(waterReveal>=1. && fluidActive<.5 && inFront>.5){
+// Mobile intro only: zoom the cached scene in the cheap display pass,
+// settling at its exact configured size before the colour fade finishes.
+vec2 introUV=(uv-vec2(.5))/introZoom+vec2(.5);
+vec3 settled=texture2D(scene,introUV).rgb;
+if(introColour>0.)settled=mix(vec3(dot(settled,vec3(.299,.587,.114))),settled,introColour);
+gl_FragColor=vec4(settled,1.);return;}
 float l=0.,r=0.,b=0.,t=0.;
 // The intro wave is analytical; only pointer-driven fluid needs height sampling.
 if(fluidActive>.5){l=field(uv-vec2(px.x,0.));r=field(uv+vec2(px.x,0.));
 b=field(uv-vec2(0.,px.y));t=field(uv+vec2(0.,px.y));}
 // A single rounded water meniscus reveals the scene in this same optical pass.
-vec2 radial=(uv-vec2(.5,.52))*vec2(revealAspect,1.);
+vec2 radial=(uv-waveOrigin)*vec2(revealAspect,1.);
 float distanceFromCentre=length(radial);
 float envelope=smoothstep(0.,.06,waterReveal)*(1.-smoothstep(.88,1.,waterReveal));
-float radius=mix(-.22*rippleWidth,length(vec2(revealAspect*.5,.52))+.28*rippleWidth,waterReveal);
-float edge=(distanceFromCentre-radius)/(.13*rippleWidth);
-float meniscus=exp(-edge*edge)*envelope*rippleStrength;
-float lens=edge*meniscus*3.2;
+float feather=.16*rippleWidth*waveSoftness;
+float radius=mix(-feather*2.,length(max(waveOrigin,1.-waveOrigin)*vec2(revealAspect,1.))+feather*2.,waterReveal);
+float edge=(distanceFromCentre-radius)/(.22*rippleWidth*max(.1,waveLensWidth));
+float meniscus=exp(-pow(abs(edge),max(1.,waveLensFalloff*2.)))*envelope*rippleStrength;
+float trailing=min(edge,0.);
+float rings=sin(trailing*waveFrequency)*exp(trailing*waveDecay)*smoothstep(0.,.4,-edge)*waveRings*envelope*rippleStrength;
+// A broad, single-direction lens shoulder avoids the folded double ridge.
+float lens=(meniscus*.85+rings)*waveBend;
 vec2 lensNormal=radial/max(distanceFromCentre,.001)*lens;
 vec2 revealBend=lensNormal/vec2(revealAspect,1.)*.095;
 vec2 slope=vec2(r-l,t-b)*3.4+lensNormal*.35,bend=(slope-lensNormal*.35)*refraction+revealBend;vec3 n=normalize(vec3(-slope,1.));
 vec3 col=texture2D(scene,uv+bend).rgb;
-col.r=texture2D(scene,uv+bend*(1.+dispersion)).r;col.b=texture2D(scene,uv+bend*(1.-dispersion)).b;
+vec2 chromaticBend=(bend-revealBend)*dispersion+revealBend*dispersion*waveLensChroma;
+col.r=texture2D(scene,uv+bend+chromaticBend).r;col.b=texture2D(scene,uv+bend-chromaticBend).b;
 float ridge=clamp(length(slope)*2.6,0.,1.),light=dot(n,normalize(vec3(-.45,.65,.7)));
 float shine=pow(max(0.,dot(n,normalize(vec3(-.35,.5,1.)))),28.);
 float opposite=pow(max(0.,dot(n,normalize(vec3(.5,-.35,1.)))),22.);
@@ -92,14 +106,14 @@ col+=vec3(.035,.065,.08)*opposite*ridge*strength;col-=vec3(.015,.012,.008)*ridge
 col=clamp(col,0.,1.);
 if(inFront<.5){vec4 person=texture2D(portrait,uv+revealBend);col=person.rgb+col*(1.-person.a);vec4 text=texture2D(content,uv+bend);col=mix(col,text.rgb,text.a);}
 // Refract the dark/light boundary too: it belongs to the glass, not a CSS cutout.
-float revealed=1.-smoothstep(-.045,.025,distanceFromCentre-radius+ lens*.028);
+float revealed=1.-smoothstep(-feather,feather,distanceFromCentre-radius);
 if(waterReveal>=1.) revealed=1.;
 col=mix(revealDark,col,revealed);
 vec3 waveNormal=normalize(vec3(-lensNormal*1.8,1.));
 float fresnel=pow(1.-waveNormal.z,3.);
 float reflection=pow(max(0.,dot(waveNormal,normalize(vec3(-.45,.65,1.)))),32.);
-float caustic=exp(-pow((edge+.65)*5.,2.))*envelope*rippleStrength;
-col*=1.-meniscus*.24;
-col+=meniscus*(vec3(.72,.84,.9)*fresnel*.5+vec3(1.)*reflection*.65);
-col+=vec3(.8,.91,1.)*caustic*.22;
+float caustic=exp(-pow((edge+.65)*2.,2.))*envelope*rippleStrength;
+col*=1.-clamp(meniscus*.035*waveLensShadow,0.,.9);
+col+=meniscus*(vec3(.72,.84,.9)*fresnel*.12+vec3(1.)*reflection*.06)*waveReflection;
+col+=vec3(.8,.91,1.)*caustic*.025*waveCaustic;
 gl_FragColor=vec4(col,1.);}`;

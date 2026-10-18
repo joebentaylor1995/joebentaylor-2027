@@ -26,6 +26,12 @@ const googleAnalytics = {
 	],
 };
 
+// NOTE • The embedded Studio at /studio talks to Sanity's API (HTTPS + live
+// listeners over WebSockets). Site pages fetch Sanity on the server only.
+const sanity = {
+	connect: ['https://*.sanity.io', 'wss://*.sanity.io'],
+};
+
 const contentSecurityPolicy = {
 	'default-src': ["'self'"],
 	// NOTE • React needs eval in development only, for its debugging stacks
@@ -41,7 +47,7 @@ const contentSecurityPolicy = {
 	'img-src': ["'self'", 'blob:', 'data:', 'https:'],
 	'media-src': ["'self'", 'blob:', 'https:'],
 	'font-src': ["'self'"],
-	'connect-src': ["'self'", ...(hasGoogleAnalytics ? googleAnalytics.connect : [])],
+	'connect-src': ["'self'", ...sanity.connect, ...(hasGoogleAnalytics ? googleAnalytics.connect : [])],
 	'frame-src': [
 		"'self'",
 		'https://cal.com',
@@ -107,6 +113,16 @@ const nextConfig = {
 			{
 				protocol: 'https',
 				hostname: 'picsum.photos',
+			},
+			// Sanity image + file CDN
+			{
+				protocol: 'https',
+				hostname: 'cdn.sanity.io',
+			},
+			// Stand-in for missing project imagery (PLACEHOLDER_IMAGE in src/data/site.ts)
+			{
+				protocol: 'https',
+				hostname: 'via.placeholder.com',
 			},
 		],
 	},
@@ -233,6 +249,13 @@ const nextConfig = {
 	// loads its own scripts and APIs and manages its own policy
 	async headers() {
 		return [{ source: '/((?!studio).*)', headers: securityHeaders }];
+	},
+
+	// The profile panel is an overlay, not a page — /profile/ is the address
+	// Sanity's Presentation tool uses for it (src/utils/profileRoute.ts). Loading
+	// it directly lands on the homepage with the panel open.
+	async redirects() {
+		return [{ source: '/profile', destination: '/?profile', permanent: false }];
 	},
 
 	// Compiler settings

@@ -4,9 +4,10 @@
 // ------------
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
 import SpecialHeading from '@parts/SpecialHeading';
+import { splitStega } from '@utils/stega';
 import Image from 'next/image';
 import { use, useEffect, useRef, useState } from 'react';
-import { reviews } from './reviews';
+import type { Review } from '@/data/site';
 
 // Styles
 // ------------
@@ -14,7 +15,7 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
-const Reviews = () => {
+const Reviews = ({ reviews }: { reviews: Review[] }) => {
 	// Context + Refs
 	const present = use(ProfilePresenceContext);
 	const sectionRef = useRef<HTMLElement>(null);
@@ -48,6 +49,11 @@ const Reviews = () => {
 			destroy?.();
 		};
 	}, [present]);
+
+	// Derived
+	// NOTE • SplitText splits each quote's clean text; the Visual Editing payload
+	// is rendered beside it so the quote stays click-to-edit
+	const quotes = reviews.map(({ quote }) => splitStega(quote));
 
 	// Handlers
 	const navigate = (direction: number) => {
@@ -97,18 +103,21 @@ const Reviews = () => {
 						data-active={active === index}
 						aria-hidden={active !== index}
 					>
-						<blockquote data-type='bodyL' className={s.quote}>
-							<p data-review-quote>{review.quote}</p>
+						{/* NOTE • The quote is split into lines, so Visual Editing outlines the whole quote */}
+						<blockquote data-type='bodyL' className={s.quote} data-sanity-edit-target>
+							<p data-review-quote>{quotes[index].clean}</p>
+							{quotes[index].encoded}
 						</blockquote>
 						<figcaption className={s.author}>
-							<div className={s.portrait} data-review-portrait>
-								<Image
-									src={review.image}
-									width={66}
-									height={66}
-									sizes='66px'
-									alt={`${review.author}, ${review.company}`}
-								/>
+							<div className={s.portrait}>
+								<div className={s.face} data-review-face>
+									<Image src={review.image} fill sizes='64px' alt={review.author} />
+								</div>
+								{review.logo && (
+									<span className={s.logo} data-review-logo>
+										<Image src={review.logo} fill sizes='24px' alt={review.company} />
+									</span>
+								)}
 							</div>
 							<div data-type='bodyM' className={s.details}>
 								<div className={s.mask}>

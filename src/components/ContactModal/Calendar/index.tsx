@@ -3,8 +3,9 @@
 // Imports
 // ------------
 import Cal, { getCalApi } from '@calcom/embed-react';
-import { useEffect, useRef, useState } from 'react';
-import { BOOKING_URL, CAL_LINK } from '../config';
+import { ContactContext } from '@parts/Contexts';
+import { use, useEffect, useRef, useState } from 'react';
+import { bookingUrl } from '../config';
 
 // Styles
 // ------------
@@ -13,6 +14,9 @@ import s from './styles.module.scss';
 // Component
 // ------------
 const Calendar = () => {
+	// Context
+	const { bookingLink } = use(ContactContext);
+
 	// Refs
 	const embedRef = useRef<HTMLDivElement>(null);
 
@@ -86,7 +90,7 @@ const Calendar = () => {
 				{isListening && (
 					<Cal
 						namespace='contact'
-						calLink={CAL_LINK}
+						calLink={bookingLink}
 						config={{
 							theme: 'dark',
 							layout: 'month_view',
@@ -101,7 +105,7 @@ const Calendar = () => {
 					<a
 						data-type='bodyS'
 						className={s.fallback}
-						href={BOOKING_URL}
+						href={bookingUrl(bookingLink)}
 						target='_blank'
 						rel='noopener noreferrer'
 					>

@@ -5,4 +5,4 @@
 // and this export follows. Application code imports from '@cms' only —
 // never from an adapter folder directly — so swapping CMS never touches
 // component code.
-export * from './dato';
+export * from './sanity';

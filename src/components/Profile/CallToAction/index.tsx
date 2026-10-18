@@ -1,6 +1,7 @@
 'use client';
 
 import ContactModal from '@parts/ContactModal';
+import { ContactContext } from '@parts/Contexts';
 import { introDefaults } from '@parts/Hero/Background/scene-intro';
 // Imports
 // ------------
@@ -12,25 +13,52 @@ import { useAnimation } from '@utils/useAnimation';
 import gsap from 'gsap';
 import Image from 'next/image';
 import { use, useEffect, useRef, useState } from 'react';
+import type { ContactDetails } from '@/data/site';
 
 // Styles + Interfaces
 // ------------
 import type { MatrixScene } from './interface';
 import s from './styles.module.scss';
 
-const links = [
-	{ label: 'Linkedin', href: 'https://www.linkedin.com/in/joebentaylor/', icon: 'linkedin', width: 24, height: 24 },
-	{ label: 'Dribbble', href: 'https://dribbble.com/joebentaylor', icon: 'dribbble', width: 24, height: 24 },
-	{ label: 'Github', href: 'https://github.com/joebentaylor1995', icon: 'github', width: 24.15, height: 23.4298 },
-	{ label: 'Resume', href: '/downloads/joe-ben-taylor-resume.pdf', icon: 'resume', width: 24, height: 24 },
-	{ label: 'Email', href: 'mailto:hey@joebentaylor.co.uk', icon: 'email', width: 23.1626, height: 24.0033 },
-];
+// NOTE • Link targets come from Sanity's Global settings (ContactContext);
+// the icon artwork is fixed, so only platforms with an icon are shown
+const ICONS = {
+	linkedin: { label: 'Linkedin', width: 24, height: 24 },
+	dribbble: { label: 'Dribbble', width: 24, height: 24 },
+	github: { label: 'Github', width: 24.15, height: 23.4298 },
+	resume: { label: 'Resume', width: 24, height: 24 },
+	email: { label: 'Email', width: 23.1626, height: 24.0033 },
+} as const;
+
+type IconName = keyof typeof ICONS;
+const RESUME_FILENAME = 'Joe Ben Taylor Resume.pdf';
+
+const hasIcon = (platform: string): platform is IconName => platform in ICONS;
+
+const toLinks = ({ socials, resumeUrl, email }: ContactDetails) =>
+	[
+		...socials
+			.filter(({ platform }) => hasIcon(platform))
+			.map(({ platform, url }) => ({ icon: platform, href: url })),
+		// NOTE • Sanity's CDN serves ?dl= as a download — the download attribute
+		// is ignored cross-origin
+		...(resumeUrl
+			? [
+					{
+						icon: 'resume',
+						href: resumeUrl.startsWith('https:') ? `${resumeUrl}?dl=${RESUME_FILENAME}` : resumeUrl,
+					},
+				]
+			: []),
+		{ icon: 'email', href: `mailto:${email}` },
+	].map(link => ({ ...link, ...ICONS[link.icon as IconName], icon: link.icon as IconName }));
 
 // Component
 // ------------
 const CallToAction = () => {
 	// Context
 	const present = use(ProfilePresenceContext);
+	const links = toLinks(use(ContactContext));
 	// Refs
 	const sectionRef = useRef<HTMLElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -240,7 +268,7 @@ const CallToAction = () => {
 								data-cursor-sticky
 								href={link.href}
 								data-type='bodyL'
-								download={link.icon === 'resume' ? 'Joe Ben Taylor Resume.pdf' : undefined}
+								download={link.icon === 'resume' ? RESUME_FILENAME : undefined}
 								target={link.href.startsWith('https:') ? '_blank' : undefined}
 								rel={link.href.startsWith('https:') ? 'noopener noreferrer' : undefined}
 							>

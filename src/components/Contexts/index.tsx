@@ -4,6 +4,7 @@
 // ------------
 import type { LenisRef } from 'lenis/react';
 import { createContext, useMemo, useRef, useState } from 'react';
+import { type ContactDetails, fallbackContact } from '@/data/site';
 // Interface
 // ------------
 import type * as I from './interface';
@@ -19,6 +20,10 @@ export const GlobalContext = createContext({
 	profileOpen: false,
 	setProfileOpen: (_value: boolean) => {},
 });
+
+// NOTE • Contact details from Sanity's Global settings, provided once by
+// app/(site)/Providers.tsx for the contact modal and profile links
+export const ContactContext = createContext<ContactDetails>(fallbackContact);
 
 // Component
 // ------------

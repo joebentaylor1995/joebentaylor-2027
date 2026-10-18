@@ -62,6 +62,7 @@ export default function Settings({
 	onIntroTargetChange,
 	onIntroChange,
 	onReplay,
+	onSaveIntro,
 	settings,
 	onChange,
 	onPreview,
@@ -73,6 +74,7 @@ export default function Settings({
 	// State
 	const [open, setOpen] = useState(true);
 	const [copyStatus, setCopyStatus] = useState('');
+	const [saveStatus, setSaveStatus] = useState('');
 	const panelRef = useRef<HTMLElement>(null);
 	const expand = (value: boolean) =>
 		panelRef.current?.querySelectorAll('details').forEach(detail => {
@@ -135,7 +137,7 @@ export default function Settings({
 						Reset saved defaults
 					</button>
 					<details className={s.group} open>
-						<summary>Intro ripple</summary>
+						<summary>Introduction</summary>
 						<label>
 							Intro settings device
 							<select
@@ -147,87 +149,134 @@ export default function Settings({
 							</select>
 						</label>
 						<p>
-							Each device has its own intro settings. Replay uses the current viewport. Copy settings to
-							keep your changes.
+							Each device has its own intro settings. Replay uses the current viewport. Save wave settings
+							to keep your changes in this browser.
 						</p>
-						<p>Shape one outward glass wave. Replay to preview your changes.</p>
-						{(
-							[
-								['strength', 'Ripple strength', 0, 2, 0.05],
-								['width', 'Ripple width', 0.25, 3, 0.05],
-								['speed', 'Ripple speed', 0.25, 3, 0.05],
-								['portraitScale', 'Portrait intro scale', 0.3, 3, 0.01],
-								['portraitFinish', 'Portrait finish by (%)', 5, 100, 1],
-							] as const
-						).map(([key, label, min, max, step]) => (
-							<label key={key} className={s.control}>
-								<span>{label}</span>
-								<input
-									type='number'
-									aria-label={`${label} value`}
-									min={min}
-									max={max}
-									step={step}
-									value={intro[key]}
-									onChange={event => {
-										const value = event.target.valueAsNumber;
-										if (Number.isFinite(value))
-											onIntroChange({ ...intro, [key]: Math.min(max, Math.max(min, value)) });
-									}}
-								/>
-								<input
-									type='range'
-									aria-label={label}
-									min={min}
-									max={max}
-									step={step}
-									value={intro[key]}
-									onChange={event => onIntroChange({ ...intro, [key]: Number(event.target.value) })}
-								/>
-							</label>
-						))}
-						<p>
-							Speed {intro.speed.toFixed(2)}× · {(1 / intro.speed).toFixed(2)} seconds
-						</p>
-						<label className={s.easing}>
-							Easing preset
-							<select
-								value={intro.ease}
-								onChange={event =>
-									onIntroChange({ ...intro, ease: event.target.value as IntroSettings['ease'] })
-								}
-							>
-								{Object.entries(introEasings).map(([value, label]) => (
-									<option key={value} value={value}>
-										{label}
-									</option>
+						{introTarget === 'mobile' ? (
+							<p>
+								Mobile uses a quick loader fade with no wave or portrait zoom. Text timing remains
+								customisable below.
+							</p>
+						) : (
+							<>
+								<p>
+									Edge softness controls the feathered reveal. Lens width and falloff shape the
+									distortion independently. Replay to preview, then save your preferred values.
+								</p>
+								{(
+									[
+										['strength', 'Ripple strength', 0, 2, 0.05],
+										['width', 'Ripple width', 0.25, 3, 0.05],
+										['speed', 'Ripple speed', 0.25, 3, 0.05],
+										['start', 'Wave start delay (s)', 0, 3, 0.05],
+										['originX', 'Wave centre X (%)', 0, 100, 1],
+										['originY', 'Wave centre Y (%)', 0, 100, 1],
+										['softness', 'Reveal edge softness', 0.1, 4, 0.05],
+										['lensWidth', 'Lens distortion width', 0.1, 3, 0.05],
+										['lensFalloff', 'Lens edge falloff', 0.5, 3, 0.05],
+										['lensChroma', 'Lens colour separation', 0, 5, 0.05],
+										['lensShadow', 'Lens edge shading', 0, 5, 0.05],
+										['bend', 'Glass refraction', 0, 3, 0.05],
+										['reflection', 'Wave reflection', 0, 2, 0.05],
+										['caustic', 'Caustic highlight', 0, 2, 0.05],
+										['rings', 'Trailing ripple strength', 0, 1, 0.05],
+										['frequency', 'Trailing ripple frequency', 2, 20, 0.5],
+										['decay', 'Trailing ripple decay', 0.5, 5, 0.1],
+										['portraitScale', 'Portrait intro scale', 0.3, 3, 0.01],
+										['portraitFinish', 'Portrait finish by (%)', 5, 100, 1],
+									] as const
+								).map(([key, label, min, max, step]) => (
+									<label key={key} className={s.control}>
+										<span>{label}</span>
+										<input
+											type='number'
+											aria-label={`${label} value`}
+											min={min}
+											max={max}
+											step={step}
+											value={intro[key]}
+											onChange={event => {
+												const value = event.target.valueAsNumber;
+												if (Number.isFinite(value))
+													onIntroChange({
+														...intro,
+														[key]: Math.min(max, Math.max(min, value)),
+													});
+											}}
+										/>
+										<input
+											type='range'
+											aria-label={label}
+											min={min}
+											max={max}
+											step={step}
+											value={intro[key]}
+											onChange={event =>
+												onIntroChange({ ...intro, [key]: Number(event.target.value) })
+											}
+										/>
+									</label>
 								))}
-							</select>
-						</label>
-						<p>
-							The portrait settles to your current scale by {intro.portraitFinish}% of the ripple’s
-							progress.
-						</p>
-						<label className={s.easing}>
-							Portrait easing
-							<select
-								value={intro.portraitEase}
-								aria-label='Portrait easing'
-								onChange={event =>
-									onIntroChange({
-										...intro,
-										portraitEase: event.target.value as IntroSettings['portraitEase'],
-									})
-								}
-							>
-								{Object.entries(introEasings).map(([value, label]) => (
-									<option key={value} value={value}>
-										{label}
-									</option>
-								))}
-							</select>
-						</label>
+								<p>
+									Speed {intro.speed.toFixed(2)}× · {(1 / intro.speed).toFixed(2)} seconds
+								</p>
+								<label className={s.easing}>
+									Easing preset
+									<select
+										value={intro.ease}
+										aria-label='Easing preset'
+										onChange={event =>
+											onIntroChange({
+												...intro,
+												ease: event.target.value as IntroSettings['ease'],
+											})
+										}
+									>
+										{Object.entries(introEasings).map(([value, label]) => (
+											<option key={value} value={value}>
+												{label}
+											</option>
+										))}
+									</select>
+								</label>
+								<p>
+									The portrait settles to your current scale by {intro.portraitFinish}% of the
+									ripple’s progress.
+								</p>
+								<label className={s.easing}>
+									Portrait easing
+									<select
+										value={intro.portraitEase}
+										aria-label='Portrait easing'
+										onChange={event =>
+											onIntroChange({
+												...intro,
+												portraitEase: event.target.value as IntroSettings['portraitEase'],
+											})
+										}
+									>
+										{Object.entries(introEasings).map(([value, label]) => (
+											<option key={value} value={value}>
+												{label}
+											</option>
+										))}
+									</select>
+								</label>
+							</>
+						)}
 						<div className={s.toolbar}>
+							<button
+								type='button'
+								onClick={() =>
+									setSaveStatus(
+										onSaveIntro()
+											? 'Wave settings saved in this browser.'
+											: 'Browser storage is unavailable; settings could not be saved.'
+									)
+								}
+							>
+								Save wave settings
+							</button>
 							<button type='button' onClick={onReplay}>
 								Replay introduction
 							</button>
@@ -242,6 +291,11 @@ export default function Settings({
 								Reset intro
 							</button>
 						</div>
+						<p role='status'>{saveStatus}</p>
+						<p>
+							Save keeps both desktop and mobile introduction settings, including text timing. Reset intro
+							then Save to restore the defaults.
+						</p>
 					</details>
 					<IntroTimings intro={intro} onChange={onIntroChange} onReplay={onReplay} />
 					<details className={s.group} open>

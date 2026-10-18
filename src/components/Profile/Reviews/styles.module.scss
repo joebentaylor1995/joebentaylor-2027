@@ -84,15 +84,43 @@
 }
 
 .portrait {
+	position: relative;
 	width: var(--gap-huge);
 	height: var(--gap-huge);
 	flex: none;
 	transform-origin: center;
+}
+
+.face {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	border-radius: var(--br-round);
 
 	img {
-		max-width: none;
-		width: 6.6rem;
-		height: 6.6rem;
+		object-fit: cover;
+	}
+}
+
+// NOTE • The company badge (Figma: 28px circle, 2px ring) overhangs the 64px
+// portrait by 2px at the bottom-right. The ring is the panel's background
+// colour, so the badge reads as cut out of the portrait.
+.logo {
+	position: absolute;
+	right: -0.2rem;
+	bottom: -0.2rem;
+	width: 2.8rem;
+	height: 2.8rem;
+	overflow: hidden;
+	border: 0.2rem solid var(--brand-c4);
+	border-radius: var(--br-round);
+	background: var(--brand-c4);
+	// NOTE • Scales in and out from its top-left corner (motion.ts), growing out
+	// of the portrait towards the corner
+	transform-origin: top left;
+
+	img {
+		object-fit: cover;
 	}
 }
 

@@ -1,30 +1,20 @@
 // Imports
 // ------------
 import PageTransition from '@parts/PageTransition';
+import { toMetadata } from '@utils/metadata';
 import type { Metadata } from 'next';
+import { getHome } from '@/data/content';
 
 // SEO
 // ------------
-// NOTE • The home page uses the site-wide title and description; it only adds
-// its canonical URL (set per route, so other pages never inherit '/')
-export const metadata: Metadata = {
-	alternates: { canonical: '/' },
-};
+// NOTE • The home page keeps the site-wide title unless the Homepage singleton
+// sets its own; it always adds its canonical URL (set per route, so other
+// pages never inherit '/')
+export const generateMetadata = async (): Promise<Metadata> => {
+	const { seo } = await getHome();
 
-// NOTE • Site-wide defaults live in app/(site)/layout.tsx — only add what this route
-// changes. With a CMS wired up, swap the static object for generateMetadata:
-//
-// export async function generateMetadata(): Promise<Metadata> {
-// 	const data = await getHomeData();
-//
-// 	return {
-// 		title: data?.seo?.title,
-// 		description: data?.seo?.desc,
-// 		openGraph: {
-// 			images: [{ url: data?.seo?.image?.url, width: 1200, height: 630 }],
-// 		},
-// 	};
-// }
+	return { ...toMetadata(seo, { absoluteTitle: true }), alternates: { canonical: '/' } };
+};
 
 // Component
 // ------------

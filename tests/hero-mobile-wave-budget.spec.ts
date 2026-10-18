@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 
-test('mobile wave reduces transient pixels then restores portrait detail', async ({ page }) => {
+test('mobile keeps the detailed portrait without running the wave', async ({ page }) => {
 	await page.addInitScript(() => {
 		const names = new WeakMap<WebGLUniformLocation, string>();
 		const locate = WebGLRenderingContext.prototype.getUniformLocation;
@@ -56,13 +56,12 @@ test('mobile wave reduces transient pixels then restores portrait detail', async
 				}
 			).waveBudget
 	);
-	expect(state.movingWidths.length).toBeGreaterThan(2);
-	expect(new Set(state.movingWidths)).toEqual(new Set([585]));
+	expect(state.movingWidths).toEqual([]);
 	expect(state.settledWidth).toBe(780);
 	expect(state.fluid).toBe(false);
 	expect(state.heroRasterDraws).toBe(0);
 	expect(state.floatTargets).toBe(0);
 	await expect(page.locator('[data-hero-content]')).toHaveCSS('opacity', '1');
-	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-webgl-reveal', 'true');
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true');
 	await page.screenshot({ path: 'test-results/mobile-wave-settled.png' });
 });
