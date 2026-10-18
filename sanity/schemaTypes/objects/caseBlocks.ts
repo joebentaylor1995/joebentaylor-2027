@@ -9,6 +9,7 @@
 import { BlockElementIcon } from '@sanity/icons/BlockElement';
 import { SplitHorizontalIcon } from '@sanity/icons/SplitHorizontal';
 import { defineArrayMember, defineField, defineType } from 'sanity';
+import { KIND_LABELS, previewMedia } from './mediaItem';
 
 // Exports
 // ------------
@@ -19,11 +20,17 @@ export const caseSingle = defineType({
 	icon: BlockElementIcon,
 	fields: [defineField({ name: 'media', title: 'Media', type: 'mediaItem', validation: rule => rule.required() })],
 	preview: {
-		select: { alt: 'media.alt', kind: 'media.kind', image: 'media.image', poster: 'media.poster' },
-		prepare: ({ alt, kind, image, poster }) => ({
+		select: {
+			alt: 'media.alt',
+			kind: 'media.kind',
+			image: 'media.image',
+			poster: 'media.poster',
+			youtube: 'media.youtube',
+		},
+		prepare: ({ alt, kind, image, poster, youtube }) => ({
 			title: alt || 'Full width',
-			subtitle: `Full width · ${kind === 'video' ? 'video' : 'image'}`,
-			media: kind === 'video' ? poster : image,
+			subtitle: `Full width · ${(KIND_LABELS[kind as keyof typeof KIND_LABELS] ?? KIND_LABELS.image).toLowerCase()}`,
+			media: previewMedia({ kind, image, poster, youtube }),
 		}),
 	},
 });
@@ -43,11 +50,18 @@ export const caseDual = defineType({
 		}),
 	],
 	preview: {
-		select: { left: 'media.0.alt', right: 'media.1.alt', image: 'media.0.image', poster: 'media.0.poster' },
-		prepare: ({ left, right, image, poster }) => ({
+		select: {
+			left: 'media.0.alt',
+			right: 'media.1.alt',
+			kind: 'media.0.kind',
+			image: 'media.0.image',
+			poster: 'media.0.poster',
+			youtube: 'media.0.youtube',
+		},
+		prepare: ({ left, right, kind, image, poster, youtube }) => ({
 			title: [left, right].filter(Boolean).join('  ·  ') || 'Two up',
 			subtitle: 'Two up',
-			media: image || poster,
+			media: previewMedia({ kind, image, poster, youtube }),
 		}),
 	},
 });

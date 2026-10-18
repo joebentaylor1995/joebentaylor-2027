@@ -82,7 +82,7 @@ One document per piece of work. A project is either a full **case study** or a
 | Case study | `introduction` | Intro paragraph under the hero, also the meta description fallback |
 | Case study | `objectives[]` | Overview → objectives paragraphs |
 | Case study | `deliverables[]`, `website`, `credits[]` (`person` → `person`, free-text `role`), `recognition[]` (award, organisation) | Overview sidebar |
-| Case study | `caseBuilder[]` — **visual builder** of blocks: `caseSingle` (one full-width media) and `caseDual` (two side by side); each media is an image (alt required) or a short video loop with poster | Rendered by `ProjectCaseBuilder`; new block types slot into this array |
+| Case study | `caseBuilder[]` — **visual builder** of blocks: `caseSingle` (one full-width media) and `caseDual` (two side by side); each media is an image, a short video loop with poster, or a YouTube link (muted autoplay loop, marketing-consent gated — thumbnail otherwise); alt text is required | Rendered by `ProjectCaseBuilder`; new block types slot into this array |
 | Case study | `reviews[]` → `review` | Outro testimonial (first review is featured) |
 | SEO | `seo` | Per-page title/description/share image |
 

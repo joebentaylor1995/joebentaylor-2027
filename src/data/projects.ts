@@ -2,7 +2,9 @@ import { PLACEHOLDER_IMAGE, type Seo } from './site';
 
 export type ProjectMedia =
 	| { type: 'image'; src: string; alt: string }
-	| { type: 'video'; src: string; alt: string; poster?: string | null };
+	| { type: 'video'; src: string; alt: string; poster?: string | null }
+	// NOTE • `src` is the YouTube link as pasted in Sanity
+	| { type: 'youtube'; src: string; alt: string };
 
 export type ProjectCaseBlock =
 	| { id: string; type: 'single'; media: ProjectMedia }

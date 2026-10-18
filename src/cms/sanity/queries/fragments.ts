@@ -19,7 +19,8 @@ export const MEDIA = /* groq */ `{
 	"type": coalesce(kind, "image"),
 	"alt": coalesce(alt, ""),
 	kind == "video" => { "src": video.asset->url, "poster": poster.asset->url },
-	kind != "video" => { "src": image.asset->url }
+	kind == "youtube" => { "src": youtube },
+	!(kind in ["video", "youtube"]) => { "src": image.asset->url }
 }`;
 
 // NOTE • A physics toolkit tile — layer geometry defaults are applied in

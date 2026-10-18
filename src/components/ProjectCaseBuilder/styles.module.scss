@@ -36,6 +36,26 @@
 		height: 100%;
 		object-fit: cover;
 	}
+
+	// NOTE • Sizes the YouTube player against the tile, for a cover crop
+	&:has(.youtube) { container-type: size; }
+}
+
+// NOTE • An iframe can't object-fit, so the 16:9 player is scaled to cover the
+// tile from its centre; pointer events off so YouTube's hover UI never shows
+.youtube {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: max(100cqw, calc(100cqh * 16 / 9));
+	height: max(100cqh, calc(100cqw * 9 / 16));
+	border: 0;
+	opacity: 0;
+	pointer-events: none;
+	transform: translate(-50%, -50%);
+	transition: opacity var(--time-m) var(--easing-bezzy);
+
+	&[data-state='ready'] { opacity: 1; }
 }
 
 .mediaSlot {

@@ -12,6 +12,7 @@ import { mountMediaReveal } from './reveal';
 import { MEDIA_REPLAY, MEDIA_SETTINGS_CHANGED } from './settings';
 import s from './styles.module.scss';
 import Video from './Video';
+import YouTube from './YouTube';
 
 // Component
 // ------------
@@ -21,6 +22,8 @@ const Media = ({ media, sizes }: MediaProps) => {
 			<figure className={s.media}>
 				{media.type === 'video' ? (
 					<Video key={media.src} media={media} />
+				) : media.type === 'youtube' ? (
+					<YouTube key={media.src} media={media} sizes={sizes} />
 				) : (
 					<Image src={media.src} alt={media.alt} fill sizes={sizes} quality={90} />
 				)}

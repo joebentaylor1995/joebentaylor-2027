@@ -52,6 +52,8 @@ const contentSecurityPolicy = {
 		"'self'",
 		'https://cal.com',
 		'https://app.cal.com',
+		// Case-study YouTube media (marketing-consent gated) and its Studio preview
+		'https://www.youtube-nocookie.com',
 		...(isNetlifyPreview ? ['https://app.netlify.com'] : []),
 	],
 	'object-src': ["'none'"],
@@ -123,6 +125,11 @@ const nextConfig = {
 			{
 				protocol: 'https',
 				hostname: 'via.placeholder.com',
+			},
+			// YouTube thumbnails, the still behind case-study YouTube media
+			{
+				protocol: 'https',
+				hostname: 'i.ytimg.com',
 			},
 		],
 	},

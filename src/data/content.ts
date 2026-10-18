@@ -25,6 +25,7 @@ import {
 import type { ToolkitItem, ToolkitLayer } from '@parts/Profile/Usps/Toolkit/interface';
 import ribbonFeatured from '@public/projects-ribbon/featured.json';
 import ribbonAll from '@public/projects-ribbon/projects.json';
+import { getYouTubeId } from '@utils/youtube';
 import { stegaClean } from 'next-sanity';
 import { fallbackProjects, type NextProject, type Project, type ProjectMedia, projectDummy } from './projects';
 import {
@@ -64,8 +65,12 @@ const withFallback = <T extends object>(data: Nullable<T> | null, fallback: T): 
 // (around any stega characters, so the quote stays click-to-edit)
 const withQuoteMarks = <T extends { quote: string }>(review: T): T => ({ ...review, quote: `“${review.quote}”` });
 
-// NOTE • `type` drives the image/video branch, so it must compare cleanly
-const cleanMediaType = <T extends ProjectMedia>(media: T): T => ({ ...media, type: stegaClean(media.type) });
+// NOTE • `type` drives the media branch, so it must compare cleanly — as must
+// a YouTube link, which is parsed for its video ID
+const cleanMediaType = <T extends ProjectMedia>(media: T): T => {
+	const type = stegaClean(media.type);
+	return { ...media, type, ...(type === 'youtube' && { src: stegaClean(media.src) }) };
+};
 const cleanBlock = (block: Project['caseBuilder'][number]): Project['caseBuilder'][number] =>
 	block.type === 'single'
 		? { ...block, media: cleanMediaType(block.media) }
@@ -142,10 +147,13 @@ const toToolkit = (raw: RawToolkit | null | undefined, fallback: Toolkit): Toolk
 };
 
 const hasSrc = (media: { src?: string | null } | null | undefined) => Boolean(media?.src);
+// NOTE • A YouTube link that doesn't resolve to a video is treated as missing
+const isPlayable = (media: ProjectMedia | null | undefined) =>
+	media?.type === 'youtube' ? Boolean(getYouTubeId(stegaClean(media.src))) : hasSrc(media);
 
 // NOTE • A block whose asset hasn't been uploaded yet is skipped, not crashed on
 const isCompleteBlock = (block: Project['caseBuilder'][number]) =>
-	block.type === 'single' ? hasSrc(block.media) : block.media?.length === 2 && block.media.every(hasSrc);
+	block.type === 'single' ? isPlayable(block.media) : block.media?.length === 2 && block.media.every(isPlayable);
 
 // NOTE • Unpublished references come back null — drop them; a project with
 // no thumbnail yet still shows, on the placeholder
