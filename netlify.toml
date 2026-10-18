@@ -18,5 +18,6 @@
   package = "./plugins/lighthouse"
 
   [plugins.inputs]
-    paths = ["/", "/projects/", "/projects/pocketchange/"]
+    paths = ["/"]
+    optional_paths = ["/projects/", "/projects/pocketchange/"]
     runs = 3

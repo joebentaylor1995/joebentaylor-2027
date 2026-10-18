@@ -10,7 +10,7 @@ The official Netlify plugin's latest release, **6.0.4**, still depends on Lighth
 
 ### Conditions
 
-- Routes: `/`, `/projects/`, `/projects/pocketchange/`.
+- Required route: `/`. Optional CMS-gated routes: `/projects/`, `/projects/pocketchange/`. These are explicitly reported as skipped without scores when they return 404, then audited automatically when published. All other HTTP failures remain errors, including a homepage 404.
 - Desktop: 1440×900, DPR 1, Lighthouse desktop throttling (40ms RTT, 10,240Kbps, 1× CPU).
 - Mobile: Lighthouse's mid-range Android baseline, 412×823, DPR 1.75, slow 4G (150ms RTT, 1,638.4Kbps), 4× CPU. This is not an iPhone simulation.
 - Three fresh-browser runs per route/device, sequentially, with storage reset. Select the report with the median performance score. CDN caches can still warm between runs.

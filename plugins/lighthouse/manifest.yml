@@ -6,3 +6,6 @@ inputs:
   - name: runs
     default: 3
     description: Runs per route and device; report the median performance run.
+  - name: optional_paths
+    default: []
+    description: CMS-gated routes; explicitly report a skip on 404, audit once published.

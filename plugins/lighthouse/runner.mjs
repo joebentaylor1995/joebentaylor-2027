@@ -33,7 +33,7 @@ export async function auditDeploy(baseUrl, paths = ['/'], runs = 3, devices = Ob
 						extends: 'lighthouse:default',
 						settings: { ...profiles[device], throttlingMethod: 'simulate', disableStorageReset: false },
 					});
-					if (!result || result.lhr.runtimeError) throw new Error(result?.lhr.runtimeError?.message || 'No Lighthouse result');
+					if (!result || result.lhr.runtimeError) throw new Error(`${device} ${url.href}: ${result?.lhr.runtimeError?.message || 'No Lighthouse result'}`);
 					if (result.lhr.categories.performance.score === null) throw new Error('No performance score');
 					results.push(result);
 					const name = `${device}-${path.replace(/[^a-z0-9]/gi, '_')}-${run + 1}`;
