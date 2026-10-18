@@ -9,8 +9,7 @@ import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { use, useEffect, useRef, useState, ViewTransition } from 'react';
+import { use, useEffect, useRef, ViewTransition } from 'react';
 
 // Styles + Interfaces
 // ------------
@@ -21,11 +20,9 @@ import s from './styles.module.scss';
 // ------------
 const Header = ({ projects }: I.HeaderProps) => {
 	// Context
-	const { profileOpen, setProfileOpen } = use(GlobalContext);
-	const pathname = usePathname();
+	const { profileOpen, setProfileOpen, contactOpen, setContactOpen, pagePath: pathname } = use(GlobalContext);
 	const isDarkPage = /^\/(cookies|terms-privacy|llms)\/?$/.test(pathname) || /^\/projects(?:\/|$)/.test(pathname);
 	// State
-	const [contactOpen, setContactOpen] = useState(false);
 	// Refs
 	const ref = useRef<HTMLElement>(null);
 	const entered = useRef(false);

@@ -4,10 +4,8 @@
 // ------------
 import { GlobalContext } from '@parts/Contexts';
 import { PerformanceContext } from '@parts/Contexts/Performance';
-import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { DESKTOP_HOVER_QUERY } from '@utils/desktopHover';
 import { preloadNearbyMedia } from '@utils/preloadNearbyMedia';
-import { PROFILE_PARAM } from '@utils/profileRoute';
 import { gsap } from 'gsap';
 import Lenis from 'lenis';
 import Image from 'next/image';
@@ -51,21 +49,6 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 	useEffect(() => {
 		if (profileOpen && panelRef.current) return preloadNearbyMedia(panelRef.current);
 	}, [profileOpen]);
-
-	// NOTE • /?profile (where /profile/ redirects) opens the panel once the site
-	// loader has cleared, then drops the param so a reload doesn't reopen it
-	useEffect(() => {
-		const url = new URL(window.location.href);
-		if (!url.searchParams.has(PROFILE_PARAM)) return;
-		const open = () => {
-			url.searchParams.delete(PROFILE_PARAM);
-			window.history.replaceState(window.history.state, '', url);
-			setProfileOpen(true);
-		};
-		if (isLoaderSettled()) open();
-		else window.addEventListener(LOADER_SETTLED, open, { once: true });
-		return () => window.removeEventListener(LOADER_SETTLED, open);
-	}, [setProfileOpen]);
 
 	useEffect(() => {
 		if (!new URLSearchParams(window.location.search).has('modalSettings')) return;

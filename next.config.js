@@ -254,8 +254,11 @@ const nextConfig = {
 	// The profile panel is an overlay, not a page — /profile/ is the address
 	// Sanity's Presentation tool uses for it (src/utils/profileRoute.ts). Loading
 	// it directly lands on the homepage with the panel open.
-	async redirects() {
-		return [{ source: '/profile', destination: '/?profile', permanent: false }];
+	async rewrites() {
+		return [
+			{ source: '/profile', destination: '/' },
+			{ source: '/contact', destination: '/' },
+		];
 	},
 
 	// Compiler settings

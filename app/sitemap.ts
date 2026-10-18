@@ -1,6 +1,7 @@
 // Imports
 // ------------
 import type { MetadataRoute } from 'next';
+import { cacheTag } from 'next/cache';
 import { siteUrl } from '@/config';
 import { getProjectSlugs, getSettings } from '@/data/content';
 
@@ -9,11 +10,10 @@ import { getProjectSlugs, getSettings } from '@/data/content';
 // NOTE • Served at /sitemap.xml. Static routes are listed by hand; case
 // studies come from Sanity (or the local fallback) via getProjectSlugs.
 const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
-	// NOTE • With `cacheComponents` on, uncached I/O (`new Date()` here) makes a
-	// route dynamic. `use cache` keeps /sitemap.xml prerendered, pinning
-	// lastModified to build time — swap it for a CMS timestamp when you wire
-	// slugs in above, or drop the directive to regenerate per request.
+	// Next's cache key includes the build ID: every build regenerates this
+	// sitemap and its CMS reads. Publishing also invalidates it between builds.
 	'use cache';
+	cacheTag('sanity');
 
 	// NOTE • Projects stay out of the sitemap until “Projects live” is on
 	const { projectsLive } = await getSettings();

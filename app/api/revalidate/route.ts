@@ -11,7 +11,7 @@
 // Imports
 // ------------
 import { SANITY_CACHE_TAG } from '@cms';
-import { revalidateTag } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { type NextRequest, NextResponse } from 'next/server';
 import { parseBody } from 'next-sanity/webhook';
@@ -28,6 +28,7 @@ export const GET = async (request: NextRequest) => {
 	if (process.env.NODE_ENV !== 'development') return new NextResponse(null, { status: 404 });
 
 	revalidateTag(SANITY_CACHE_TAG, EXPIRE_NOW);
+	revalidatePath('/sitemap.xml');
 
 	// NOTE • Relative paths only — never an open redirect
 	const target = request.nextUrl.searchParams.get('redirect') || '/';
@@ -45,6 +46,7 @@ export const POST = async (request: NextRequest) => {
 		if (!isValidSignature) return NextResponse.json({ message: 'Invalid signature' }, { status: 401 });
 
 		revalidateTag(SANITY_CACHE_TAG, EXPIRE_NOW);
+		revalidatePath('/sitemap.xml');
 		return NextResponse.json({ revalidated: true, type: body?._type ?? null });
 	} catch (error: unknown) {
 		console.error('Revalidation failed:', error);

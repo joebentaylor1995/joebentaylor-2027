@@ -1,15 +1,15 @@
 'use client';
 
+import { GlobalContext } from '@parts/Contexts';
 import { readIntroProfiles } from '@parts/Hero/Background/intro-storage';
 import { lockProjectScroll } from '@utils/lockProjectScroll';
 import { gsap } from 'gsap';
-import { usePathname } from 'next/navigation';
-import { type ReactNode, useEffect, useMemo, useRef, ViewTransition } from 'react';
+import { type ReactNode, use, useEffect, useMemo, useRef, ViewTransition } from 'react';
 import s from './styles.module.scss';
 
 // Native snapshots retain canvases, video and font rendering without DOM rasterisation.
 export default function NavigationWave({ children }: { children: ReactNode }) {
-	const pathname = usePathname();
+	const { pagePath: pathname } = use(GlobalContext);
 	const previous = useRef(pathname);
 	const routeChanged = previous.current !== pathname;
 	// Streaming updates can invoke onUpdate again for the same navigation.

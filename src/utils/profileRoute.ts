@@ -5,9 +5,8 @@
 // panel is open in Presentation the preview reports PROFILE_PATH, which
 // sanity/presentation.ts maps to the “Profile panel” document.
 //
-// PROFILE_PATH isn't a real page: next.config.js redirects it to
-// /?profile, and ProfileReveal opens the panel when it sees PROFILE_PARAM —
-// so reloading Presentation (or sharing the link) lands on the open panel.
+// Direct visits rewrite to the home scene without changing the URL.
+// The shared modal route controller opens Profile after the loader settles.
 export const PROFILE_PATH = '/profile/';
 export const PROFILE_PARAM = 'profile';
 
