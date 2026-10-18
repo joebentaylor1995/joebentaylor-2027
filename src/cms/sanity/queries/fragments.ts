@@ -18,9 +18,11 @@ export const REVIEW = /* groq */ `{
 export const MEDIA = /* groq */ `{
 	"type": coalesce(kind, "image"),
 	"alt": coalesce(alt, ""),
-	kind == "video" => { "src": video.asset->url, "poster": poster.asset->url },
+	// NOTE • Width ÷ height, so full-width tiles keep the media's own shape —
+	// a video's comes from its poster (or its metadata once loaded, see Video.tsx)
+	kind == "video" => { "src": video.asset->url, "poster": poster.asset->url, "aspect": poster.asset->metadata.dimensions.aspectRatio },
 	kind == "youtube" => { "src": youtube },
-	!(kind in ["video", "youtube"]) => { "src": image.asset->url }
+	!(kind in ["video", "youtube"]) => { "src": image.asset->url, "aspect": image.asset->metadata.dimensions.aspectRatio }
 }`;
 
 // NOTE • A physics toolkit tile — layer geometry defaults are applied in

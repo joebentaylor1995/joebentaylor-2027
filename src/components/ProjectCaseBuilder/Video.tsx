@@ -19,6 +19,15 @@ const Video = ({ media }: VideoProps) => {
 		const video = videoRef.current;
 		if (!video) return;
 		if (video.getAttribute('src') !== media.src) video.src = media.src;
+		// NOTE • Without a poster Sanity can't give the shape up front — take it from
+		// the video itself once its metadata loads
+		const figure = video.closest('figure');
+		const applyAspect = () => {
+			if (!figure?.style.getPropertyValue('--media-aspect') && video.videoWidth && video.videoHeight)
+				figure?.style.setProperty('--media-aspect', String(video.videoWidth / video.videoHeight));
+		};
+		applyAspect();
+		video.addEventListener('loadedmetadata', applyAspect);
 		let visible = false;
 		let disposed = false;
 		const motion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -56,6 +65,7 @@ const Video = ({ media }: VideoProps) => {
 			covered.disconnect();
 			document.removeEventListener('visibilitychange', updatePlayback);
 			motion.removeEventListener('change', updatePlayback);
+			video.removeEventListener('loadedmetadata', applyAspect);
 			video.pause();
 			video.removeAttribute('src');
 			video.load();

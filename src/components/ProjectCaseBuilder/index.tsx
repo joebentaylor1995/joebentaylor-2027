@@ -4,7 +4,7 @@ import { preloadNearbyMedia } from '@utils/preloadNearbyMedia';
 // Imports
 // ------------
 import Image from 'next/image';
-import { type ComponentType, useEffect, useRef, useState } from 'react';
+import { type ComponentType, type CSSProperties, useEffect, useRef, useState } from 'react';
 // Styles + Interfaces
 // ------------
 import type { DualMediaProps, MediaProps, ProjectCaseBuilderProps, SingleMediaProps } from './interface';
@@ -14,12 +14,22 @@ import s from './styles.module.scss';
 import Video from './Video';
 import YouTube from './YouTube';
 
+// Constants
+// ------------
+const YOUTUBE_ASPECT = 16 / 9;
+
 // Component
 // ------------
 const Media = ({ media, sizes }: MediaProps) => {
+	// Derived
+	// NOTE • Only full-width tiles read this; two-up tiles keep their fixed shape
+	const aspect = media.type === 'youtube' ? YOUTUBE_ASPECT : media.aspect;
+	const style = aspect ? ({ '--media-aspect': aspect } as CSSProperties) : undefined;
+
+	// Render
 	return (
 		<div className={s.mediaSlot} data-media-tile>
-			<figure className={s.media}>
+			<figure className={s.media} style={style}>
 				{media.type === 'video' ? (
 					<Video key={media.src} media={media} />
 				) : media.type === 'youtube' ? (

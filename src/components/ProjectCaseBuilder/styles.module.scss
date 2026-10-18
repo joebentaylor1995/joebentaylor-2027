@@ -10,7 +10,9 @@
 		@include bp(l) { padding-inline: var(--gap-xl); }
 	}
 
-	&[data-media-layout='single'] .media { aspect-ratio: 894 / 615; }
+	// NOTE • Full-width tiles take their media's own shape (--media-aspect, set
+	// from Sanity's dimensions); the ratio below only applies until it's known
+	&[data-media-layout='single'] .media { aspect-ratio: var(--media-aspect, 894 / 615); }
 
 	&[data-media-layout='dual'] {
 		.media { aspect-ratio: 443 / 560; }
