@@ -113,7 +113,8 @@ export const GET_PROJECT = defineQuery(`
 				"role": coalesce(role, ""),
 				"image": coalesce(person->image.asset->url, image.asset->url)
 			},
-			"recognition": recognition[]{ name, "organisation": coalesce(organisation, "") },
+			// NOTE • organisation is the legacy free-text field, read until migrations/awards-to-organisations has run
+			"recognition": recognition[defined(name)]{ name, "organisation": coalesce(body->name, organisation, "") },
 			website
 		},
 		"seo": seo${SEO}

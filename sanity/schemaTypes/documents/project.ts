@@ -13,6 +13,7 @@ import {
 	defineType,
 	type ValidationContext,
 } from 'sanity';
+import { AwardInput } from '../../components/AwardInput';
 import { CompressedVideoInput } from '../../components/CompressedVideoInput';
 
 // Helpers
@@ -250,7 +251,8 @@ export const project = defineType({
 			type: 'array',
 			group: 'caseStudy',
 			fieldset: 'details',
-			description: 'Leave empty to hide the Recognition section.',
+			description:
+				'Pick an organisation from Award Organisations, then one of its awards. Leave empty to hide the Recognition section.',
 			hidden: isListingOnly,
 			of: [
 				defineArrayMember({
@@ -258,16 +260,28 @@ export const project = defineType({
 					name: 'award',
 					fields: [
 						defineField({
+							name: 'body',
+							title: 'Organisation',
+							type: 'reference',
+							to: [{ type: 'awardBody' }],
+							validation: rule => rule.required(),
+						}),
+						defineField({
 							name: 'name',
 							title: 'Award',
 							type: 'string',
+							components: { input: AwardInput },
 							validation: rule => rule.required(),
 						}),
-						defineField({ name: 'organisation', title: 'Organisation', type: 'string' }),
 					],
-					preview: { select: { title: 'name', subtitle: 'organisation' } },
+					preview: { select: { title: 'name', subtitle: 'body.name' } },
 				}),
 			],
+			validation: rule =>
+				rule.custom((awards?: { body?: { _ref?: string }; name?: string }[]) => {
+					const pairs = (awards ?? []).map(award => `${award.body?._ref}:${award.name}`);
+					return new Set(pairs).size === pairs.length ? true : 'Each award can only be listed once';
+				}),
 		}),
 		defineField({
 			name: 'reviews',

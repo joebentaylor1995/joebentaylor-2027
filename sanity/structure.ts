@@ -9,6 +9,7 @@ import { CaseIcon } from '@sanity/icons/Case';
 import { CogIcon } from '@sanity/icons/Cog';
 import { CommentIcon } from '@sanity/icons/Comment';
 import { HomeIcon } from '@sanity/icons/Home';
+import { StarIcon } from '@sanity/icons/Star';
 import { ThListIcon } from '@sanity/icons/ThList';
 import { UserIcon } from '@sanity/icons/User';
 import { UsersIcon } from '@sanity/icons/Users';
@@ -59,4 +60,5 @@ export const structure: StructureResolver = S =>
 			S.documentTypeListItem('projectTag').title('Project Tags').icon(ThListIcon),
 			S.documentTypeListItem('review').title('Reviews').icon(CommentIcon),
 			S.documentTypeListItem('person').title('People').icon(UsersIcon),
+			S.documentTypeListItem('awardBody').title('Award Organisations').icon(StarIcon),
 		]);

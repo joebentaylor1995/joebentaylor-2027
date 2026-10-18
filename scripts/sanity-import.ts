@@ -20,6 +20,7 @@ import { basename, join } from 'node:path';
 import { createClient } from 'next-sanity';
 import featuredJson from '../public/projects-ribbon/featured.json';
 import allJson from '../public/projects-ribbon/projects.json';
+import { awardBodies, awardBodyId } from '../src/data/awards';
 import { type ProjectMedia, pocketchange } from '../src/data/projects';
 import { fallbackHome, fallbackProfilePanel, fallbackReviews, fallbackSettings } from '../src/data/site';
 import { toSanityColour } from './lib/colour';
@@ -120,6 +121,14 @@ const upsert = async (match: string | null, doc: { _type: string } & Record<stri
 	return (await withRetry(doc._type, () => client.create(doc)))._id;
 };
 
+// Award organisations
+// ------------
+// NOTE • Fixed IDs from the name, so projects can reference them directly
+const importAwardBodies = async () => {
+	console.log('Award organisations');
+	for (const body of awardBodies) await save({ _id: awardBodyId(body.name), _type: 'awardBody', ...body });
+};
+
 // Reviews
 // ------------
 const importReviews = async () => {
@@ -200,7 +209,9 @@ const importCaseStudy = async (reviewIds: Map<string, string>) => {
 		deliverables: project.overview.deliverables,
 		website: project.overview.website ?? undefined,
 		credits,
-		recognition: project.overview.recognition.map(award => withKey(award)),
+		recognition: project.overview.recognition.map(award =>
+			withKey({ body: ref(awardBodyId(award.organisation)), name: award.name })
+		),
 		reviews: reviewId ? [withKey(ref(reviewId))] : [],
 		caseBuilder,
 	});
@@ -408,6 +419,7 @@ const addProfileExtras = async () => {
 
 const run = async () => {
 	console.log(`Importing into ${projectId}/${dataset}\n`);
+	await importAwardBodies();
 	const reviewIds = await importReviews();
 	const caseStudyId = await importCaseStudy(reviewIds);
 	await importSettings();

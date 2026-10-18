@@ -170,11 +170,11 @@ export const pocketchange: Project = {
 		credits: [{ name: 'Adam Roberts', role: '3D', image: '/images/projects/pocketchange/adam-roberts.png' }],
 		recognition: [
 			{ name: 'SOTD', organisation: 'CSSDA' },
-			{ name: 'SOTD', organisation: 'BESTCSS' },
+			{ name: 'SOTD', organisation: 'BestCSS' },
 			{ name: 'SOTD', organisation: 'Mindsparkle' },
 			{ name: 'SOTD', organisation: 'Orpetron' },
 			{ name: 'OWDA', organisation: 'Orpetron' },
-			{ name: 'Honorable Mention', organisation: 'Awwwards' },
+			{ name: 'Honors', organisation: 'Awwwards' },
 			{ name: 'Favourite', organisation: 'WD Awards' },
 			{ name: 'Star', organisation: 'CSS Winner' },
 			{ name: 'UI', organisation: 'CSSDA' },
