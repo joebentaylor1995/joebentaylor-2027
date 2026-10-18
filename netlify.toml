@@ -12,12 +12,11 @@
   package = "@netlify/plugin-nextjs"
 
 
-# NOTE • Informational only — it audits the build output as static files, not
-# the running Next.js server, so its scores can differ from the real site
-# (e.g. Best Practices 92 for a site that scores 100). The 100-or-fail gate
-# is Lighthouse CI in GitHub Actions — see docs/Lighthouse.md.
+# Audit the live deploy with the project's pinned Lighthouse version.
+# Desktop and mobile are separate reports; results never block publication.
 [[plugins]]
-  package = "@netlify/plugin-lighthouse"
+  package = "./plugins/lighthouse"
 
-  [plugins.inputs.settings]
-    preset = "desktop"
+  [plugins.inputs]
+    paths = ["/", "/projects/", "/projects/pocketchange/"]
+    runs = 3

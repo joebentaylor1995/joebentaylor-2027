@@ -55,6 +55,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 	const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
 	const draw = (_time: number, delta: number) => {
 		if (!layer || disposed || !visible || document.hidden || profileScene?.dataset.scenePaused === 'true') return;
+		if (!canvas.clientWidth || !canvas.clientHeight || gl.isContextLost()) return;
 		const mediaBounds = media.getBoundingClientRect();
 		const bounds = canvas.getBoundingClientRect();
 		const mediaTop = mediaBounds.top - bounds.top;
@@ -105,6 +106,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		canvas.dataset.intro = entrance.waterReveal === 1 ? 'complete' : 'playing';
 	};
 	const destroy = () => {
+		if (disposed) return;
 		disposed = true;
 		events.abort();
 		gsap.ticker.remove(draw);
@@ -123,6 +125,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		delete canvas.dataset.intro;
 	};
 	const resize = () => {
+		if (disposed || gl.isContextLost() || !canvas.clientWidth || !canvas.clientHeight) return;
 		const width = Math.max(1, canvas.clientWidth),
 			height = Math.max(1, canvas.clientHeight);
 		const max = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
@@ -134,7 +137,14 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		);
 		canvas.width = Math.round(width * ratio);
 		canvas.height = Math.round(height * ratio);
-		layer?.resize();
+		try {
+			layer?.resize();
+		} catch {
+			// ResizeObserver runs outside initialization's rejection handler. If the
+			// GPU cannot allocate targets, restore the native hero instead of crashing.
+			destroy();
+			return;
+		}
 		if (textTexture) {
 			// Keep the texture opaque on resize; the shader applies the live scroll fade.
 			const opacity = host.style.getPropertyValue('--project-text-opacity');

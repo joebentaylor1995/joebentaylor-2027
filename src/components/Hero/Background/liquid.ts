@@ -273,6 +273,9 @@ export async function createLiquidLayer(
 		let allocatedWidth = 0;
 		let allocatedHeight = 0;
 		function resize() {
+			// Cached routes can briefly have no layout. Zero dimensions produce NaN
+			// simulation sizes and incomplete framebuffers; keep the existing targets.
+			if (gl.isContextLost() || canvas.clientWidth <= 0 || canvas.clientHeight <= 0) return;
 			cssWidth = canvas.clientWidth;
 			cssHeight = canvas.clientHeight;
 			const scale = Math.min(
