@@ -1,13 +1,15 @@
 'use client';
 
-import { mediaScrollRoot, preloadNearbyMedia } from '@utils/preloadNearbyMedia';
+import { preloadNearbyMedia } from '@utils/preloadNearbyMedia';
 // Imports
 // ------------
 import Image from 'next/image';
-import { useEffect, useRef } from 'react';
+import { type ComponentType, useEffect, useRef, useState } from 'react';
 // Styles + Interfaces
 // ------------
 import type { DualMediaProps, MediaProps, ProjectCaseBuilderProps, SingleMediaProps } from './interface';
+import { mountMediaReveal } from './reveal';
+import { MEDIA_REPLAY, MEDIA_SETTINGS_CHANGED } from './settings';
 import s from './styles.module.scss';
 import Video from './Video';
 
@@ -50,50 +52,52 @@ export const DualMedia = ({ media }: DualMediaProps) => (
 
 const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
 	const root = useRef<HTMLElement>(null);
-	const canvas = useRef<HTMLCanvasElement>(null);
+	const [Settings, setSettings] = useState<ComponentType | null>(null);
+	useEffect(() => {
+		if (!new URLSearchParams(location.search).has('mediaSettings')) return;
+		let disposed = false;
+		void import('./Settings/index').then(module => {
+			if (!disposed) setSettings(() => module.default);
+		});
+		return () => {
+			disposed = true;
+		};
+	}, []);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: CMS replacement installs new media elements.
 	useEffect(() => {
 		if (root.current) return preloadNearbyMedia(root.current);
 	}, [blocks]);
-	// biome-ignore lint/correctness/useExhaustiveDependencies: rebuild tile textures when CMS blocks change.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: observe new media elements when CMS blocks change.
 	useEffect(() => {
 		const host = root.current;
-		const surface = canvas.current;
-		if (!host || !surface) return;
+		if (!host) return;
 		const motion = matchMedia('(prefers-reduced-motion: no-preference)');
-		let generation = 0;
 		let dispose: (() => void) | undefined;
-		let preload: IntersectionObserver | undefined;
 		const setup = () => {
-			const request = ++generation;
-			preload?.disconnect();
 			dispose?.();
 			dispose = undefined;
 			if (!motion.matches) return;
-			preload = new IntersectionObserver(
-				entries => {
-					if (!entries.some(entry => entry.isIntersecting)) return;
-					preload?.disconnect();
-					void import('./reveal')
-						.then(({ mountMediaReveal }) => {
-							if (request === generation) dispose = mountMediaReveal(host, surface);
-						})
-						.catch(() => {
-							// Native media remains visible if the optional renderer cannot load.
-						});
-				},
-				{ root: mediaScrollRoot(host), rootMargin: `${innerHeight}px 0px` }
-			);
-			preload.observe(host);
+			dispose = mountMediaReveal(host);
 		};
 		void setup();
+		const replay = () => {
+			dispose?.();
+			dispose = undefined;
+			for (const tile of host.querySelectorAll<HTMLElement>('[data-media-tile]'))
+				delete tile.dataset.revealComplete;
+			setup();
+		};
+		window.addEventListener(MEDIA_SETTINGS_CHANGED, setup);
+		window.addEventListener(MEDIA_REPLAY, replay);
+		window.addEventListener('resize', setup);
 		const experience = host.closest('[data-project-experience]');
 		const layout = new MutationObserver(setup);
 		if (experience) layout.observe(experience, { attributes: true, attributeFilter: ['data-enhanced'] });
 		motion.addEventListener('change', setup);
 		return () => {
-			generation++;
-			preload?.disconnect();
+			window.removeEventListener(MEDIA_SETTINGS_CHANGED, setup);
+			window.removeEventListener(MEDIA_REPLAY, replay);
+			window.removeEventListener('resize', setup);
 			layout.disconnect();
 			motion.removeEventListener('change', setup);
 			dispose?.();
@@ -101,6 +105,7 @@ const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
 	}, [blocks]);
 	return (
 		<section ref={root} className={s.jacket} data-project-case-builder aria-label='Project case study media'>
+			{Settings && <Settings />}
 			{blocks.map(block =>
 				block.type === 'single' ? (
 					<SingleMedia key={block.id} media={block.media} />
@@ -108,7 +113,6 @@ const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
 					<DualMedia key={block.id} media={block.media} />
 				)
 			)}
-			<canvas ref={canvas} className={s.revealCanvas} tabIndex={-1} aria-hidden='true' data-media-reveal />
 		</section>
 	);
 };

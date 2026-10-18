@@ -24,7 +24,7 @@ for (const width of [440, 1440]) {
 			scroll.scrollTo({ top, behavior: 'instant' });
 		});
 		await expect(tile.locator('img')).toHaveAttribute('loading', 'eager');
-		await expect(page.locator('[data-media-reveal]')).toHaveAttribute('data-reveal-ready', 'true');
+		await expect(page.locator('[data-project-case-builder]')).toHaveAttribute('data-reveal-ready', 'true');
 		await expect
 			.poll(() =>
 				tile

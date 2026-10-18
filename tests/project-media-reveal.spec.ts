@@ -1,23 +1,13 @@
 import { expect, test } from '@playwright/test';
 
 for (const width of [440, 1440]) {
-	test(`media reveal scrubs and reverses at ${width}px`, async ({ page }) => {
-		await page.addInitScript(() => {
-			const draw = WebGLRenderingContext.prototype.drawArrays;
-			WebGLRenderingContext.prototype.drawArrays = function (mode, first, count) {
-				const surface = this.canvas as HTMLCanvasElement;
-				if (surface.hasAttribute('data-media-reveal')) {
-					surface.dataset.testDraws = String(Number(surface.dataset.testDraws || 0) + 1);
-					surface.dataset.testVertices = String(count);
-				}
-				return draw.call(this, mode, first, count);
-			};
-		});
+	test(`media reveals once on entry and stays revealed at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
-		await page.goto('/projects/pocketchange/?mediaSettings');
+		await page.goto('/projects/pocketchange/');
 		await page.getByRole('button', { name: 'Accept Necessary' }).click();
 		await expect(page.locator('[data-site-loader]')).toBeHidden({ timeout: 15000 });
-		const canvas = page.locator('[data-media-reveal]');
+		const gallery = page.locator('[data-project-case-builder]');
+		await expect(gallery.locator('canvas')).toHaveCount(0);
 		const tile = page.locator('[data-media-tile]').first();
 		const move = async (progress: number) => {
 			const scroll = await tile.evaluate((e, p) => {
@@ -39,27 +29,22 @@ for (const width of [440, 1440]) {
 				.locator('#page .lenis')
 				.first()
 				.evaluate((e, y) => e.scrollTo({ top: y, behavior: 'instant' }), scroll);
-			await expect
-				.poll(() => tile.getAttribute('data-reveal-progress').then(Number))
-				.toBeCloseTo(Math.min(1, progress), 1);
 		};
+		await move(-0.5);
+		await expect(gallery).toHaveAttribute('data-reveal-ready', 'true');
+		await expect(tile).not.toHaveAttribute('data-reveal-complete', 'true');
 		await move(0.3);
-		await expect(canvas).toHaveAttribute('data-reveal-ready', 'true');
-		await expect(tile).toHaveAttribute('data-revealing', 'true');
-		await page.screenshot({ path: `test-results/media-bend-${width}.png` });
-		await move(0.65);
-		await page.screenshot({ path: `test-results/media-bend-mid-${width}.png` });
-		await expect(canvas).toHaveAttribute('data-test-vertices', '6');
-		const idleDraws = await canvas.getAttribute('data-test-draws');
-		// Observe a stationary interval: static media must not keep drawing.
-		await page.waitForTimeout(300);
-		await expect(canvas).toHaveAttribute('data-test-draws', idleDraws ?? '');
-		await expect(page.getByRole('complementary', { name: 'Media reveal settings' })).toHaveCount(0);
-		await move(1.1);
+		// No further scroll: the timed reveal must finish on its own.
+		await expect(tile).toHaveAttribute('data-reveal-complete', 'true', { timeout: 2000 });
 		await expect(tile).not.toHaveAttribute('data-revealing', 'true');
+		await expect(tile.locator('figure')).toHaveCSS('clip-path', 'none');
+		expect(await tile.locator('figure').evaluate(element => element.getAnimations().length)).toBe(0);
+		await expect(page.getByRole('complementary', { name: 'Media reveal settings' })).toHaveCount(0);
 		await expect(tile.locator('figure')).toHaveCSS('opacity', '1');
+		await move(-1);
 		await move(0.3);
-		await expect(tile).toHaveAttribute('data-revealing', 'true');
+		await expect(tile).toHaveAttribute('data-reveal-complete', 'true');
+		await expect(tile).not.toHaveAttribute('data-revealing', 'true');
 		await page.emulateMedia({ reducedMotion: 'reduce' });
 		await expect(tile).not.toHaveAttribute('data-revealing', 'true');
 		await expect(tile.locator('figure')).toHaveCSS('opacity', '1');

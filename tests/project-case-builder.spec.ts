@@ -39,7 +39,7 @@ for (const width of [1440, 440]) {
 			)
 			.toBeGreaterThan(0);
 		await expect.poll(() => gallery.evaluate(el => Math.abs(el.getBoundingClientRect().top))).toBeLessThan(2);
-		await expect(gallery.locator('[data-media-tile]').first()).toHaveAttribute('data-reveal-progress', '1.000');
+		await expect(gallery.locator('[data-media-tile]').first()).toHaveAttribute('data-reveal-complete', 'true');
 		if (width === 1440) {
 			expect(
 				await page.locator('[data-project-panel]').evaluate(el => el.getBoundingClientRect().width)
