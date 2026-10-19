@@ -22,8 +22,6 @@ import {
 	GET_PROJECTS_PAGE,
 } from '@cms';
 import type { ToolkitItem, ToolkitLayer } from '@parts/Profile/Usps/Toolkit/interface';
-import ribbonFeatured from '@public/projects-ribbon/featured.json';
-import ribbonAll from '@public/projects-ribbon/projects.json';
 import { getYouTubeId } from '@utils/youtube';
 import { stegaClean } from 'next-sanity';
 import { fallbackProjects, type NextProject, type Project, type ProjectMedia, projectDummy } from './projects';
@@ -230,8 +228,7 @@ export const getProjectsPage = async (): Promise<ProjectsPageContent> => {
 
 	// NOTE • The ribbon runs in an iframe the overlays can't reach — send it clean data
 	const featured = stegaClean(toRibbonProjects(data?.featured));
-	if (!featured.length)
-		return { featured: ribbonFeatured as RibbonProject[], all: ribbonAll as RibbonProject[], seo: null };
+	// An unavailable or empty CMS catalogue must never publish the demo projects.
 
 	// NOTE • The grid shows every project: featured first, then the hand-ordered
 	// All projects list, then everything else newest first

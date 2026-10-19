@@ -24,8 +24,8 @@ the `routeLocation` / `routeHistory` references in `project-transition.js`.
 
 Content comes from Sanity: `app.js` loads `/api/projects-ribbon/` (the
 “Projects page” singleton's featured + all lists — see
-`docs/Sanity/ContentModel.md`) and only falls back to `featured.json` /
-`projects.json` when that fails. Images and videos load with
+`docs/Sanity/ContentModel.md`). Empty or unavailable catalogues show a message;
+the bundled demo JSON is never used by the website. Images and videos load with
 `crossOrigin='anonymous'` so Sanity CDN media can be uploaded as WebGL
 textures. Clicking a tile posts `{ type: 'projects:open', href }` to the host,
 which routes to the case study or opens the external link. Retain these three

@@ -68,6 +68,12 @@ The listing is split into the two areas the ribbon already has:
 
 Served to the ribbon runtime by `GET /api/projects-ribbon` in the shape it
 already understood (`name`, `type`, `poster`, `video`), plus `href` and `isReady`.
+Only published CMS entries are returned; missing configuration, an unavailable
+CMS, or an empty Featured list must never substitute the bundled demo catalogue.
+On each Netlify site, configure `NEXT_PUBLIC_SANITY_PROJECT_ID`,
+`NEXT_PUBLIC_SANITY_DATASET`, and `NEXT_PUBLIC_SANITY_API_VERSION` for both Builds
+and Functions, then rebuild. Verify the deployed API's featured entries and
+readiness values against Sanity before merging or publishing.
 
 ## Project — `project`
 
