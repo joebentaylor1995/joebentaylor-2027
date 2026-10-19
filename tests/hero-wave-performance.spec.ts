@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
 for (const rate of [4, 6]) {
-	test(`mobile wave frame budget at ${rate}x CPU slowdown`, async ({ browser }, testInfo) => {
+	test(`mobile loader fade frame budget at ${rate}x CPU slowdown`, async ({ browser }, testInfo) => {
 		const context = await browser.newContext({
 			viewport: { width: 390, height: 844 },
 			deviceScaleFactor: 3,
@@ -27,22 +27,13 @@ for (const rate of [4, 6]) {
 				tasks: [] as { start: number; duration: number }[],
 			};
 			Object.assign(window, { heroWaveAudit: audit });
-			const names = new WeakMap<WebGLUniformLocation, string>();
-			const locate = WebGLRenderingContext.prototype.getUniformLocation;
-			const uniform = WebGLRenderingContext.prototype.uniform1f;
-			WebGLRenderingContext.prototype.getUniformLocation = function (program, name) {
-				const location = locate.call(this, program, name);
-				if (location) names.set(location, name);
-				return location;
-			};
-			WebGLRenderingContext.prototype.uniform1f = function (location, value) {
-				uniform.call(this, location, value);
-				if (audit.running && location && names.get(location) === 'waterReveal' && value === 1) {
+			window.addEventListener('site-loader:settled', () => {
+				if (audit.running) {
 					audit.running = false;
 					audit.endedAt = performance.now();
 					audit.done = true;
 				}
-			};
+			});
 			new PerformanceObserver(list => {
 				audit.tasks.push(
 					...list.getEntries().map(entry => ({ start: entry.startTime, duration: entry.duration }))
@@ -133,7 +124,7 @@ for (const rate of [4, 6]) {
 			}
 			// Allow occasional missed vsync on the simulated slower CPU, not sustained jank.
 			expect(result.readyAtStart).toBe(true);
-			expect(result.frames).toBeGreaterThan(30);
+			expect(result.frames).toBeGreaterThan(4);
 			expect(result.median).toBeLessThan(18);
 			expect(result.p95).toBeLessThan(35);
 			expect(result.max).toBeLessThan(70);

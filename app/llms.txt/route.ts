@@ -17,6 +17,8 @@ ${profile.name} (${profile.tagline}) designs brand identities and websites and b
 ## Pages
 
 - [Home](${siteUrl}/): Joe's work, profile, skills and how to get in touch.
+- [Projects](${siteUrl}/projects): Explore featured work in an interactive ribbon and all projects in a grid.
+- [Pocketchange](${siteUrl}/projects/pocketchange): Example case study for a brand and digital ecosystem, including objectives, deliverables, credits, recognition and a responsive media gallery.
 - [Cookie Policy](${siteUrl}/cookies): How the site uses cookies and how to control them.
 - [Terms & Privacy](${siteUrl}/terms-privacy): Terms of use and how personal data is handled.
 - [AI & LLMs](${siteUrl}/llms): Guidance for AI assistants and LLMs — who Joe is, how to cite the site, and crawler and training permissions.

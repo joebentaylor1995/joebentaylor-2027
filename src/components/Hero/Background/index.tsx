@@ -2,16 +2,17 @@
 
 // Imports
 // ------------
-import { whenLoaderLanded } from '@parts/SiteLoader/events';
 import { getImageProps } from 'next/image';
-import { type ComponentType, type CSSProperties, useEffect, useRef, useState } from 'react';
+import { type ComponentType, type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HERO_DESKTOP_QUERY } from '../layout';
 import { type DepthSettings, defaultSettings, portraitUrl } from './effect-settings';
 // Styles + Interfaces
 // ------------
 import type * as I from './interface';
+import { INTRO_STORAGE_KEY, readIntroProfiles } from './intro-storage';
 import type { LiquidControlsProps } from './LiquidControls/interface';
 import { type LiquidSettings, liquidSettings as liquidDefaults } from './liquid-settings';
+import { PORTRAIT_ASPECT, portraitBottomSpan } from './portrait-layout';
 import type { DepthController } from './renderer';
 import type { SettingsProps } from './Settings/interface';
 import { type IntroSettings, introDefaults, introReplays, introSettings, mobileIntroDefaults } from './scene-intro';
@@ -53,6 +54,13 @@ const Background = ({ className }: I.BackgroundProps) => {
 	const [LiquidControls, setLiquidControls] = useState<ComponentType<LiquidControlsProps> | null>(null);
 
 	// Effects
+	useLayoutEffect(() => {
+		const profiles = readIntroProfiles();
+		const host = canvasRef.current?.closest('section');
+		if (host) introSettings.set(host, profiles[matchMedia(HERO_DESKTOP_QUERY).matches ? 'desktop' : 'mobile']);
+		setIntroProfiles(profiles);
+	}, []);
+
 	useEffect(() => {
 		const canvas = canvasRef.current,
 			photo = photoRef.current,
@@ -70,7 +78,9 @@ const Background = ({ className }: I.BackgroundProps) => {
 			controllerRef.current = null;
 			setReady(false);
 			if (!motion.matches) {
-				const { mountDepthEffect } = await import('./renderer');
+				const renderer = await import('./renderer').catch(() => null);
+				if (!renderer) return;
+				const { mountDepthEffect } = renderer;
 				if (generation !== current) return;
 				controllerRef.current = mountDepthEffect({
 					canvas,
@@ -84,17 +94,15 @@ const Background = ({ className }: I.BackgroundProps) => {
 			}
 		};
 
-		// NOTE • The WebGL setup (shader compiles, ~425KB of textures) waits until the
-		// loader's logo has landed: the photo underneath is already the LCP paint,
-		// and the loader still covers the hero, so nothing visible is lost
-		const stopWaiting = whenLoaderLanded(() => void start());
+		// Prepare alongside the logo animation so slow networks do not miss the wave.
+		// The native portrait stays visible until the first GPU frame is ready.
+		void start();
 		motion.addEventListener('change', start);
 		desktopLayout.addEventListener('change', start);
 		desktop.addEventListener('change', start);
 
 		return () => {
 			generation++;
-			stopWaiting();
 			motion.removeEventListener('change', start);
 			desktopLayout.removeEventListener('change', start);
 			desktop.removeEventListener('change', start);
@@ -151,6 +159,22 @@ const Background = ({ className }: I.BackgroundProps) => {
 	// Render
 	return (
 		<>
+			<link
+				rel='preload'
+				as='image'
+				media={HERO_DESKTOP_QUERY}
+				imageSrcSet={desktopPortrait.srcSet}
+				imageSizes={desktopPortrait.sizes}
+				fetchPriority='high'
+			/>
+			<link
+				rel='preload'
+				as='image'
+				media={`not all and ${HERO_DESKTOP_QUERY}`}
+				imageSrcSet={mobilePortrait.srcSet}
+				imageSizes={mobilePortrait.sizes}
+				fetchPriority='high'
+			/>
 			<aside
 				className={[s.jacket, className].filter(Boolean).join(' ')}
 				aria-hidden='true'
@@ -158,6 +182,12 @@ const Background = ({ className }: I.BackgroundProps) => {
 				data-testid='hero-depth'
 				style={
 					{
+						'--portrait-aspect': PORTRAIT_ASPECT,
+						'--desktop-portrait-x': `${settings.positionX}%`,
+						'--desktop-portrait-y': `${settings.positionY}%`,
+						'--desktop-portrait-scale': settings.zoom,
+						'--desktop-portrait-rotation': `${settings.rotation}deg`,
+						'--desktop-portrait-bottom-span': portraitBottomSpan(settings),
 						'--mobile-portrait-x': `${settings.mobilePositionX}%`,
 						'--mobile-portrait-y': `${settings.mobilePositionY}%`,
 						'--mobile-portrait-scale': settings.mobileZoom,
@@ -165,7 +195,7 @@ const Background = ({ className }: I.BackgroundProps) => {
 					} as CSSProperties
 				}
 			>
-				<picture>
+				<picture className={s.portrait}>
 					<source media={HERO_DESKTOP_QUERY} srcSet={desktopPortrait.srcSet} sizes={desktopPortrait.sizes} />
 					<img
 						{...mobilePortrait}
@@ -181,6 +211,14 @@ const Background = ({ className }: I.BackgroundProps) => {
 			{Controls ? (
 				<Controls
 					intro={introValues}
+					onSaveIntro={() => {
+						try {
+							localStorage.setItem(INTRO_STORAGE_KEY, JSON.stringify({ version: 2, ...introProfiles }));
+							return true;
+						} catch {
+							return false;
+						}
+					}}
 					introTarget={introTarget}
 					onIntroTargetChange={setIntroTarget}
 					onIntroChange={updateIntro}

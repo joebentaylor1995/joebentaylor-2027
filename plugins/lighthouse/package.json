@@ -1,0 +1,9 @@
+{
+	"name": "site-lighthouse",
+	"version": "1.0.0",
+	"private": true,
+	"main": "index.js",
+	"engines": {
+		"node": ">=22.19.0"
+	}
+}

@@ -8,16 +8,24 @@ import Grid, { Col } from '@waffl';
 import s from './styles.module.scss';
 import Title from './Title';
 
+// Types
+// ------------
+interface IntroductionProps {
+	eyebrow: string;
+	titleLines: string[];
+	paragraphs: string[];
+}
+
 // Component
 // ------------
-const Introduction = () => {
+const Introduction = ({ eyebrow, titleLines, paragraphs }: IntroductionProps) => {
 	// Render
 	return (
 		<section className={s.jacket}>
 			<Grid columnsDesktop={8}>
 				<Col as='hgroup' l='1/9' className={s.header}>
-					<SpecialHeading tag='h2' text='Bringing stories to life' revealOnOpen />
-					<Title />
+					<SpecialHeading tag='h2' text={eyebrow} revealOnOpen />
+					<Title lines={titleLines} />
 
 					<em data-type='bodyM'>Scroll</em>
 				</Col>
@@ -29,16 +37,11 @@ const Introduction = () => {
 				</Col>
 
 				<Col as='div' l='4/9' className={s.text}>
-					<p data-type='bodyL'>
-						For over a decade, I’ve been designing and developing for agencies and brands across the UK and
-						beyond — from global icons like Google and Global Citizen to the next generation of founders
-						rewriting the rules of business with purpose and conviction.
-					</p>
-					<p data-type='bodyL'>
-						I didn’t take the conventional route into design. No degree. No shortcuts. Just obsession,
-						curiosity, and an unshakable drive to learn, refine, and master every facet of the creative
-						process.
-					</p>
+					{paragraphs.map(paragraph => (
+						<p key={paragraph} data-type='bodyL'>
+							{paragraph}
+						</p>
+					))}
 				</Col>
 			</Grid>
 		</section>

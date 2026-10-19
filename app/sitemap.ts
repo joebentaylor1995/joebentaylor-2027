@@ -1,26 +1,21 @@
 // Imports
 // ------------
 import type { MetadataRoute } from 'next';
+import { cacheTag } from 'next/cache';
 import { siteUrl } from '@/config';
+import { getProjectSlugs } from '@/data/content';
 
 // Sitemap
 // ------------
-// NOTE • Served at /sitemap.xml. Static routes are listed by hand; with a
-// CMS wired up, fetch slugs and spread them in:
-//
-// import { fetchContent } from '@cms';
-//
-// const pages = await fetchContent<{ allPages: { slug: string }[] }>(GET_SLUGS);
-// ...(pages?.allPages ?? []).map(({ slug }) => ({
-// 	url: `${siteUrl}/${slug}/`,
-// 	lastModified: new Date(),
-// })),
+// NOTE • Served at /sitemap.xml. Static routes are listed by hand; case
+// studies come from Sanity (or the local fallback) via getProjectSlugs.
 const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
-	// NOTE • With `cacheComponents` on, uncached I/O (`new Date()` here) makes a
-	// route dynamic. `use cache` keeps /sitemap.xml prerendered, pinning
-	// lastModified to build time — swap it for a CMS timestamp when you wire
-	// slugs in above, or drop the directive to regenerate per request.
+	// Next's cache key includes the build ID: every build regenerates this
+	// sitemap and its CMS reads. Publishing also invalidates it between builds.
 	'use cache';
+	cacheTag('sanity');
+
+	const projectSlugs = await getProjectSlugs();
 
 	return [
 		{
@@ -29,6 +24,18 @@ const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
 			changeFrequency: 'monthly',
 			priority: 1,
 		},
+		{
+			url: `${siteUrl}/projects`,
+			lastModified: new Date(),
+			changeFrequency: 'monthly',
+			priority: 0.8,
+		},
+		...projectSlugs.map(slug => ({
+			url: `${siteUrl}/projects/${slug}`,
+			lastModified: new Date(),
+			changeFrequency: 'monthly' as const,
+			priority: 0.7,
+		})),
 		...['cookies', 'terms-privacy', 'llms'].map(slug => ({
 			url: `${siteUrl}/${slug}`,
 			lastModified: new Date(),

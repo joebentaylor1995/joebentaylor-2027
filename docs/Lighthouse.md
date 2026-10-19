@@ -1,45 +1,40 @@
 # Lighthouse
 
-Every push and PR runs [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci) (Lighthouse 13) on desktop against the production build. The build fails if the site drops below the floor a real, built site should hold. A barebones Tackl site scores 100 everywhere, which leaves headroom for real content, imagery and motion.
+## Netlify deployed-page audits
 
-## The thresholds
+`netlify.toml` uses the local `plugins/lighthouse` build plugin. It runs after a successful deploy against the immutable `DEPLOY_URL`, including Next.js SSR, functions and image delivery. It never audits `.next` as a static website or blocks publication on a low score.
 
-They live in [`lighthouserc.js`](../lighthouserc.js):
+Lighthouse **13.5.0** and Chrome Launcher **1.2.1** are exact dev dependencies in `bun.lock`. Lighthouse's latest version was checked against npm on 18 October 2026. Chromium comes from the Playwright installation rather than arbitrary system Chrome. Versions are reproducible, not silently upgraded every deploy.
 
-| Category | Rule |
-| --- | --- |
-| Performance | fails below **80** |
-| Best Practices | fails below **90** |
-| SEO | fails below **100** |
-| Agentic Browsing | fails unless **every applicable check passes**. Lighthouse shows this as a fraction, e.g. **3/3**. |
-| Accessibility | warns below **90**, never fails. Automated contrast checks flag designs a person would pass. |
+The official Netlify plugin's latest release, **6.0.4**, still depends on Lighthouse 9 and imports paths removed in Lighthouse 13. A dependency override alone is incompatible; this local plugin replaces it.
 
-- **Best of three runs:** CI runners are noisy, so a single slow run doesn't fail the build. A real regression fails all three.
-- **Changing a threshold:** edit its `minScore`, or switch `'error'` to `'warn'`. Do it on purpose, and say why in the PR.
+### Conditions
 
-## Agentic Browsing
+- Required route: `/`. Optional CMS-gated routes: `/projects/`, `/projects/pocketchange/`. These are explicitly reported as skipped without scores when they return 404, then audited automatically when published. All other HTTP failures remain errors, including a homepage 404.
+- Desktop: 1440×900, DPR 1, Lighthouse desktop throttling (40ms RTT, 10,240Kbps, 1× CPU).
+- Mobile: Lighthouse's mid-range Android baseline, 412×823, DPR 1.75, slow 4G (150ms RTT, 1,638.4Kbps), 4× CPU. This is not an iPhone simulation.
+- Three fresh-browser runs per route/device, sequentially, with storage reset. Select the report with the median performance score. CDN caches can still warm between runs.
+- Simulated network/CPU throttling makes comparisons repeatable; these are lab estimates, not real-device results.
+- No skipped audits, hidden loaders or relaxed scores. Deploy permalink noindex headers may legitimately lower SEO.
 
-This Lighthouse 13 category checks how usable the site is for AI agents. Three of its checks apply to a Tackl site:
+Six labelled reports return in the Netlify plugin summary, with full HTML report metadata. A local plugin may not receive the official integration's special deploy-list badges. Raw runs are written to `.lighthouseci/netlify` in the build workspace, not published publicly or guaranteed retained as downloadable artifacts.
 
-- **Accessibility tree is well-formed:** semantic HTML and labels, which the kit already gets right.
-- **Cumulative Layout Shift:** the page doesn't jump while it loads.
-- **llms.txt follows recommendations:** `app/llms.txt/route.ts` serves `/llms.txt`, a Markdown summary of the site with an H1 and links. Keep it in step with the site's pages. With a CMS, fetch the pages and list them.
+18 audits add several minutes to post-deploy reporting. Configure `paths` and `runs` in `netlify.toml`. Browser/runtime failures are reported as plugin failures, never as successful scores.
 
-The WebMCP checks apply only once a site registers agent tools or has forms, and the `ai-catalog.json` check only when that file exists. Until then they're marked not applicable.
+Lighthouse cannot certify 120fps, scrolling, Safari or sustained WebGL performance. Real-device frame-time testing and field Core Web Vitals remain necessary. Protected deploys, CMS CORS rules and network failures can affect reports.
 
-**Why there's an `overrides` entry in `package.json`:** Lighthouse CI 0.15 still bundles Lighthouse 12, which has no Agentic Browsing category. The override pins Lighthouse 13 under it. Drop the override once a Lighthouse CI release ships Lighthouse 13 itself.
+## GitHub CI
 
-## Run it locally
+The existing `lighthouserc.js` remains separate: three desktop audits of the production server. Thresholds are unchanged: Performance 80, Best Practices 90, SEO 100, Agentic Browsing 100; Accessibility warns below 90. The existing override keeps LHCI on 13.5.0.
 
 ```bash
 NEXT_PUBLIC_SITE_URL=http://localhost:3000 bun run lighthouse
 ```
 
-This builds the app, serves it, and audits `/` three times on desktop.
+This builds, serves and audits the homepage. Report links use temporary public storage and expire after seven days.
 
-- **Why set `NEXT_PUBLIC_SITE_URL`?** Without it the site is deliberately `noindex` (see `src/config.ts`), so SEO fails. That's also why deploy previews show SEO 63, and it's expected there.
-- **Report links** are printed at the end of the run. They point to temporary public storage and expire after 7 days.
+## Updates
 
-## Netlify's Lighthouse plugin
+Check npm before updating Lighthouse, its override, Chrome Launcher or Playwright; regenerate the lockfile and smoke-test both profiles. Do not force a future engine into the obsolete official plugin.
 
-Netlify's plugin still runs on every deploy and posts scores on the PR. Treat them as informational. The plugin audits the build output as static files rather than the running Next.js server, so its numbers can differ from the real site: it reported Best Practices 92 for a site that scores 100 when audited directly. The scores that count are Lighthouse CI's in GitHub Actions, and direct audits of the deployed URL.
+Sources: [Netlify plugin](https://github.com/netlify/netlify-plugin-lighthouse), [Lighthouse releases](https://github.com/GoogleChrome/lighthouse/releases), [throttling model](https://github.com/GoogleChrome/lighthouse/blob/main/docs/throttling.md).

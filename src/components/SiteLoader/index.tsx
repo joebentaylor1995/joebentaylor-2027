@@ -1,19 +1,23 @@
 'use client';
 
+import { readIntroProfiles } from '@parts/Hero/Background/intro-storage';
+import { sceneIntros } from '@parts/Hero/Background/scene-intro';
 import { HERO_DESKTOP_QUERY } from '@parts/Hero/layout';
 // Imports
 // ------------
 import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
 import { useEffect, useId, useRef, useState } from 'react';
-import { landLoader, revealScene, settleLoader } from './events';
+import { landLoader, resetLoader, revealScene, settleLoader } from './events';
+import { renderFade } from './fade-reveal';
 import { BAR_SLOTS, CUT_SLOTS, createIntro, INTRO_FPS, INTRO_FRAMES, INTRO_LAST_FRAME, type IntroIds } from './intro';
 import { BEN, JOE, LOGO, LOGO_BOX } from './logoPaths';
+import { MOBILE_SCALE_DURATION, MOBILE_SCALE_EASE } from './mobile-intro';
 import { LOADER_REPLAY, loaderControl, loaderSettings } from './settings';
-
 // Styles
 // ------------
 import s from './styles.module.scss';
+import { renderRevealWindow } from './window-reveal';
 
 // Constants
 // ------------
@@ -49,7 +53,10 @@ const SiteLoader = () => {
 			const root = ref.current;
 			if (!root) return;
 			finished.current = false;
+			loaderControl.previewTime = null;
+			if (window.location.pathname !== '/') resetLoader();
 			delete root.dataset.complete;
+			delete root.dataset.revealing;
 			// The CSS fail-open would otherwise hide a replay that starts after it fired
 			root.style.animation = 'none';
 			setReplay(count => count + 1);
@@ -64,10 +71,12 @@ const SiteLoader = () => {
 			const root = ref.current;
 			if (!root) return;
 			if (finished.current) {
+				document.documentElement.removeAttribute('data-loader-boot');
 				gsap.set(root, { autoAlpha: 0, pointerEvents: 'none' });
 				return;
 			}
 			const circle = root.querySelector('[data-circle-aperture]');
+			const revealWindow = root.querySelector('[data-window-aperture]');
 			const wash = root.querySelector('[data-logo-wash]');
 			const mark = root.querySelector('[data-loader-mark]');
 			const ring = root.querySelector('[data-loader-ring]');
@@ -78,17 +87,56 @@ const SiteLoader = () => {
 			const width = window.innerWidth;
 			const height = window.innerHeight;
 			const mobile = !window.matchMedia(HERO_DESKTOP_QUERY).matches;
+			const homepage = window.location.pathname === '/';
+			const projectsListing = /^\/projects\/?$/.test(window.location.pathname);
+			const waveSettings = readIntroProfiles()[mobile ? 'mobile' : 'desktop'];
+			const waveDuration = projectsListing ? 1 / waveSettings.speed : 1.35;
+			const page = homepage ? null : document.getElementById('page');
+			const windowReveal = !homepage && !projectsListing && loaderSettings.revealEffect === 'window';
+			const fadeReveal = !homepage && !projectsListing && loaderSettings.revealEffect === 'fade';
+			const entrancePath = window.location.pathname;
+			// The slow zoom can outlive the loader. Never apply it to a project
+			// reached through a subsequent, already-framed ribbon transition.
+			const zoomHero = () =>
+				window.location.pathname === entrancePath
+					? document.querySelector<HTMLElement>('[data-project-hero]')
+					: null;
+			const projectHero =
+				!homepage && !windowReveal ? document.querySelector<HTMLElement>('[data-project-hero]') : null;
+			const setProjectWave = (progress: number) => {
+				if (projectsListing) {
+					document
+						.querySelector<HTMLIFrameElement>('iframe[title="Interactive projects"]')
+						?.contentWindow?.postMessage(
+							{ type: 'projects:loader-wave', progress, settings: waveSettings },
+							window.location.origin
+						);
+				}
+				const entrance = projectHero && sceneIntros.get(projectHero);
+				if (entrance) entrance.waterReveal = fadeReveal ? 1 : progress;
+			};
+			root.dataset.outro = fadeReveal ? 'fade' : windowReveal ? 'window' : 'wave';
+			root.dataset.revealOrigin = loaderSettings.revealOrigin;
 			delete root.dataset.webglReveal;
+			delete root.dataset.revealing;
 			gsap.set(root, { autoAlpha: 1, pointerEvents: 'auto' });
+			gsap.set(root, { '--loader-window-mask': `url("#${id}-scene")` });
 			gsap.set(circle, { attr: { cx: width / 2, cy: height / 2, r: 0 } });
 			gsap.set(wash, { attr: { r: 0 } });
 			gsap.set(ring, { scale: 0, opacity: 0 });
+			gsap.set(intro, { visibility: 'visible' });
+			gsap.set(final, { visibility: 'hidden' });
+			gsap.set(mark, { opacity: 1 });
+			renderRevealWindow(revealWindow, width, height, loaderSettings.revealOrigin, 0);
 			const { revealGap, speed } = loaderSettings;
+			if (fadeReveal && !reduced) renderFade(root, mark, zoomHero(), 0);
 			let stopWaitingForScene = () => {};
 			const tl = gsap.timeline({
 				paused: true,
 				onComplete: () => {
+					if (finished.current) return;
 					finished.current = true;
+					if (projectsListing) setProjectWave(1);
 					root.dataset.complete = 'true';
 					settleLoader();
 				},
@@ -100,6 +148,43 @@ const SiteLoader = () => {
 				// The glitch intro: one discrete state per source frame.
 				const render = createIntro(svg, ids);
 				render({});
+				const cutAt = Math.max(INTRO_LAST_FRAME / INTRO_FPS, loaderSettings.pageRevealAt);
+				const { revealDuration, revealOrigin } = loaderSettings;
+				loaderControl.preview = time => {
+					tl.pause();
+					loaderControl.previewTime = time;
+					delete root.dataset.complete;
+					root.style.animation = 'none';
+					gsap.set(root, { autoAlpha: 1, pointerEvents: 'auto' });
+					gsap.set(circle, { attr: { r: 0 } });
+					gsap.set(wash, { attr: { r: 0 } });
+					gsap.set(ring, { opacity: 0 });
+					const progress = Math.max(0, Math.min(1, (time - cutAt) / (windowReveal ? revealDuration : 1.35)));
+					root.dataset.revealing = String(progress > 0);
+					if (fadeReveal) {
+						renderFade(root, mark, zoomHero(), time - cutAt);
+					} else if (windowReveal) {
+						renderRevealWindow(revealWindow, width, height, revealOrigin, progress, page);
+						gsap.set(mark, { opacity: 1 });
+					} else {
+						setProjectWave(gsap.parseEase('power2.inOut')(progress));
+						const radius =
+							Math.hypot(width, height) * (mobile ? 0.53 : 1) * gsap.parseEase('power2.inOut')(progress);
+						circle?.setAttribute('r', String(radius));
+						wash?.setAttribute('r', String(radius / (logoWidth / LOGO_BOX.width)));
+						gsap.set(ring, {
+							scale: radius / 100,
+							opacity: progress > 0 ? 0.45 * Math.min(1, (1 - progress) * 3) : 0,
+						});
+						gsap.set(mark, { opacity: 1 });
+					}
+					const landed = time >= INTRO_LAST_FRAME / INTRO_FPS;
+					gsap.set(intro, { visibility: landed ? 'hidden' : 'visible' });
+					gsap.set(final, { visibility: landed ? 'visible' : 'hidden' });
+					for (const [frame, state] of Object.entries(INTRO_FRAMES)) {
+						if (Number(frame) / INTRO_FPS <= time) render(state);
+					}
+				};
 				for (const [frame, state] of Object.entries(INTRO_FRAMES)) {
 					tl.call(render, [state], Number(frame) / INTRO_FPS);
 				}
@@ -111,63 +196,126 @@ const SiteLoader = () => {
 					.call(landLoader, [], landedAt);
 
 				// One wavefront removes the stationary logo and opens the scene.
-				const revealAt = landedAt + revealGap;
+				const revealAt = fadeReveal ? cutAt : homepage ? landedAt + (mobile ? 0 : revealGap) : cutAt;
 				const wave = { radius: 0 };
 				// quickSetter does not expand the CSSPlugin's multi-property "scale" alias.
 				const setRingScaleX = gsap.quickSetter(ring, 'scaleX');
 				const setRingScaleY = gsap.quickSetter(ring, 'scaleY');
-				// Shader compilation and logo decoding can outlast the logo's hold.
-				// Keep both reveals paused until the GPU has actually drawn a frame.
-				tl.addPause(revealAt, () => {
-					const hero = document.querySelector('[data-scene-cover]')?.parentElement;
-					const resume = () => {
-						stopWaitingForScene();
-						if (mobile && hero?.dataset.liquidReady === 'true') root.dataset.webglReveal = 'true';
-						// Let the first GPU frame and overlay change paint before starting either clock.
-						let frames = 0;
-						const release = () => {
-							if (++frames < 2) return;
-							gsap.ticker.remove(release);
-							revealScene();
-							tl.resume();
+				// Wave reveals need the first GPU frame. A project fade can reveal
+				// the existing hero image immediately while its water shader warms up.
+				if (homepage || projectsListing || (projectHero && !fadeReveal))
+					tl.addPause(revealAt, () => {
+						const hero = projectsListing
+							? document.querySelector<HTMLIFrameElement>('iframe[title="Interactive projects"]')
+							: (projectHero ?? document.querySelector('[data-scene-cover]')?.parentElement);
+						const readyAttribute = projectsListing ? 'data-ribbon-ready' : 'data-liquid-ready';
+						const sceneReady = () => hero?.getAttribute(readyAttribute) === 'true';
+						const resume = () => {
+							stopWaitingForScene();
+							setProjectWave(0);
+							// Let the first GPU frame and overlay change paint before starting either clock.
+							let frames = 0;
+							const release = () => {
+								if (++frames < 2) return;
+								gsap.ticker.remove(release);
+								if (!fadeReveal && (!homepage || !mobile) && sceneReady()) {
+									root.dataset.webglReveal = 'true';
+								}
+								if (!fadeReveal) revealScene();
+								tl.resume();
+							};
+							gsap.ticker.add(release);
+							stopWaitingForScene = () => gsap.ticker.remove(release);
 						};
-						gsap.ticker.add(release);
-						stopWaitingForScene = () => gsap.ticker.remove(release);
-					};
-					if (!hero || hero.dataset.liquidReady === 'true') {
-						resume();
-						return;
-					}
-					const observer = new MutationObserver(() => {
-						if (hero.dataset.liquidReady === 'true') resume();
+						if (!hero || sceneReady()) {
+							resume();
+							return;
+						}
+						const observer = new MutationObserver(() => {
+							if (sceneReady()) resume();
+						});
+						observer.observe(hero, { attributes: true, attributeFilter: [readyAttribute] });
+						// Network-bound hero textures can arrive well after the logo lands.
+						// Keep a deadline so unavailable WebGL still falls back to native content.
+						const timeout = window.setTimeout(resume, homepage ? 15000 : 2000);
+						stopWaitingForScene = () => {
+							observer.disconnect();
+							window.clearTimeout(timeout);
+						};
 					});
-					observer.observe(hero, { attributes: true, attributeFilter: ['data-liquid-ready'] });
-					const timeout = window.setTimeout(resume, 2000);
-					stopWaitingForScene = () => {
-						observer.disconnect();
-						window.clearTimeout(timeout);
-					};
-				});
-				tl.set(ring, { opacity: 0.45 }, revealAt)
-					.to(
-						wave,
-						{
-							radius: Math.hypot(width, height) * (mobile ? 0.53 : 1),
-							duration: 1.35,
-							ease: 'power2.inOut',
-							onUpdate: () => {
-								setRingScaleX(wave.radius / 100);
-								setRingScaleY(wave.radius / 100);
-								if (mobile && ring instanceof HTMLElement)
-									ring.style.setProperty('--ring-width', `${1 / Math.max(1, wave.radius / 100)}px`);
-								circle?.setAttribute('r', String(wave.radius));
-								wash?.setAttribute('r', String(wave.radius / (logoWidth / LOGO_BOX.width)));
+				tl.set(root, { attr: { 'data-revealing': 'true' } }, revealAt);
+				if (!homepage && !fadeReveal) tl.call(revealScene, [], revealAt);
+				if (fadeReveal) {
+					const fade = { elapsed: 0 };
+					tl.call(revealScene, [], revealAt)
+						.to(
+							fade,
+							{
+								elapsed: Math.max(revealDuration, loaderSettings.heroZoomDuration),
+								duration: Math.max(revealDuration, loaderSettings.heroZoomDuration),
+								ease: 'none',
+								onUpdate: () => renderFade(root, mark, zoomHero(), fade.elapsed),
 							},
+							revealAt
+						)
+						.call(
+							() => {
+								finished.current = true;
+								root.dataset.complete = 'true';
+								settleLoader();
+							},
+							[],
+							revealAt + revealDuration
+						);
+				} else if (windowReveal) {
+					const opening = { progress: 0 };
+					tl.to(
+						opening,
+						{
+							progress: 1,
+							duration: revealDuration,
+							ease: 'none',
+							onUpdate: () =>
+								renderRevealWindow(revealWindow, width, height, revealOrigin, opening.progress, page),
 						},
 						revealAt
-					)
-					.to(ring, { opacity: 0, duration: 0.45 }, revealAt + 0.9)
-					.set(root, { autoAlpha: 0, pointerEvents: 'none' }, revealAt + 1.35);
+					).set(root, { autoAlpha: 0, pointerEvents: 'none' }, revealAt + revealDuration);
+				} else if (homepage && mobile) {
+					tl.to(
+						root,
+						{
+							autoAlpha: 0,
+							pointerEvents: 'none',
+							duration: MOBILE_SCALE_DURATION,
+							ease: MOBILE_SCALE_EASE,
+						},
+						revealAt
+					);
+				} else
+					tl.set(ring, { opacity: 0.45 }, revealAt)
+						.to(
+							wave,
+							{
+								radius: Math.hypot(width, height) * (mobile ? 0.53 : 1),
+								duration: waveDuration,
+								ease: projectsListing ? waveSettings.ease : 'power2.inOut',
+								onUpdate: () => {
+									setProjectWave(wave.radius / (Math.hypot(width, height) * (mobile ? 0.53 : 1)));
+									setRingScaleX(wave.radius / 100);
+									setRingScaleY(wave.radius / 100);
+									if (mobile && ring instanceof HTMLElement)
+										ring.style.setProperty(
+											'--ring-width',
+											`${1 / Math.max(1, wave.radius / 100)}px`
+										);
+									circle?.setAttribute('r', String(wave.radius));
+									wash?.setAttribute('r', String(wave.radius / (logoWidth / LOGO_BOX.width)));
+								},
+							},
+							revealAt
+						)
+						.to(ring, { opacity: 0, duration: 0.45 }, revealAt + 0.9)
+						.set(root, { autoAlpha: 0, pointerEvents: 'none' }, revealAt + waveDuration);
 			}
 			// Wait for first-view assets, with a deadline for slow or failed requests.
 			let active = true;
@@ -175,6 +323,8 @@ const SiteLoader = () => {
 			const start = () => {
 				if (!active || started) return;
 				started = true;
+				// The loader is mounted, styled and opaque before releasing the document cover.
+				document.documentElement.removeAttribute('data-loader-boot');
 				window.clearTimeout(deadline);
 				tl.play();
 			};
@@ -190,7 +340,10 @@ const SiteLoader = () => {
 			]).then(start, start);
 			return () => {
 				active = false;
+				setProjectWave(1);
+				renderRevealWindow(null, width, height, loaderSettings.revealOrigin, 1, page);
 				stopWaitingForScene();
+				loaderControl.preview = null;
 				window.clearTimeout(deadline);
 			};
 		},
@@ -212,6 +365,7 @@ const SiteLoader = () => {
 					<mask id={`${id}-scene`} maskUnits='userSpaceOnUse'>
 						<rect width='100%' height='100%' fill='white' />
 						<circle data-circle-aperture cx='0' cy='0' r='0' fill='black' />
+						<rect data-window-aperture x='0' y='0' width='0' height='0' rx='0' fill='black' />
 					</mask>
 				</defs>
 				<rect width='100%' height='100%' className={s.dark} mask={`url(#${id}-scene)`} />

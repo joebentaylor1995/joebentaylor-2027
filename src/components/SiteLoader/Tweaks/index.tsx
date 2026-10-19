@@ -3,7 +3,7 @@
 // Imports
 // ------------
 import { useEffect, useState } from 'react';
-import { INTRO_FPS } from '../intro';
+import { INTRO_FPS, INTRO_LAST_FRAME } from '../intro';
 import {
 	DEFAULT_LOADER_SETTINGS,
 	LOADER_REPLAY,
@@ -18,7 +18,7 @@ import s from './styles.module.scss';
 
 // Constants
 // ------------
-type NumericKey = keyof LoaderSettings;
+type NumericKey = { [K in keyof LoaderSettings]: LoaderSettings[K] extends number ? K : never }[keyof LoaderSettings];
 
 type Slider = {
 	key: NumericKey;
@@ -37,6 +37,7 @@ const SLIDERS: Slider[] = [
 	{ key: 'bandWidth', label: 'Screen width', min: 0.5, max: 2.5, step: 0.01 },
 	{ key: 'speed', label: 'Speed', min: 0.1, max: 2, step: 0.05 },
 	{ key: 'revealGap', label: 'Hold before wipe (s)', min: 0, max: 3, step: 0.05, rebuild: true },
+	{ key: 'heroZoomDuration', label: 'Hero zoom duration (s)', min: 1, max: 8, step: 0.1, rebuild: true },
 ];
 
 const ASPECTS = [
@@ -54,6 +55,10 @@ const loaderRoot = () => document.querySelector<HTMLElement>('[data-site-loader]
 // NOTE • Seeking from 0 replays every frame callback up to `time`, so the
 // held state is exact; it also reopens a loader that already finished.
 const seek = (time: number) => {
+	if (window.location.pathname !== '/' && loaderControl.preview) {
+		loaderControl.preview(time);
+		return;
+	}
 	const tl = loaderControl.timeline;
 	const root = loaderRoot();
 	if (!tl || !root) return;
@@ -79,16 +84,22 @@ const LoaderTweaks = () => {
 	const [duration, setDuration] = useState(0);
 	const [playing, setPlaying] = useState(false);
 	const [copied, setCopied] = useState(false);
+	const [pageMode, setPageMode] = useState(false);
 
 	// Effects
 	// NOTE • Mirrors the live timeline's playhead into the scrubber
 	useEffect(() => {
+		setPageMode(window.location.pathname !== '/');
 		let frame = 0;
 		const tick = () => {
 			const tl = loaderControl.timeline;
 			if (tl) {
-				setTime(tl.time());
-				setDuration(tl.duration());
+				setTime(loaderControl.previewTime ?? tl.time());
+				setDuration(
+					window.location.pathname === '/'
+						? tl.duration()
+						: Math.max(tl.duration(), loaderSettings.pageRevealAt + loaderSettings.revealDuration)
+				);
 				setPlaying(!tl.paused() && tl.progress() < 1);
 			}
 			frame = requestAnimationFrame(tick);
@@ -107,18 +118,24 @@ const LoaderTweaks = () => {
 		setSettings({ ...loaderSettings });
 		if (slider.key === 'speed') loaderControl.timeline?.timeScale(value);
 		if (slider.rebuild) replay();
-		else if (loaderControl.timeline?.paused()) seek(loaderControl.timeline.time());
+		else if (loaderControl.timeline?.paused()) seek(loaderControl.previewTime ?? loaderControl.timeline.time());
 	};
 
 	const togglePlay = () => {
 		const tl = loaderControl.timeline;
 		if (!tl) return;
-		if (playing) tl.pause();
+		if (loaderControl.previewTime !== null) replay();
+		else if (playing) tl.pause();
 		else if (tl.progress() >= 1) replay();
 		else {
 			seek(tl.time());
 			tl.play();
 		}
+	};
+
+	const setRevealPoint = (value: number) => {
+		loaderSettings.pageRevealAt = Math.max(INTRO_LAST_FRAME, Math.round(value * INTRO_FPS)) / INTRO_FPS;
+		setSettings({ ...loaderSettings });
 	};
 
 	const reset = () => {
@@ -142,7 +159,7 @@ const LoaderTweaks = () => {
 
 				<div className={s.transport}>
 					<button type='button' onClick={togglePlay}>
-						{playing ? 'Pause' : 'Play'}
+						{playing ? 'Pause' : loaderControl.previewTime !== null ? 'Play from start' : 'Play'}
 					</button>
 					<button type='button' onClick={replay}>
 						Replay
@@ -160,11 +177,125 @@ const LoaderTweaks = () => {
 						max={duration}
 						step={1 / INTRO_FPS}
 						value={time}
-						onChange={event => seek(Number(event.target.value))}
+						onChange={event => {
+							const value = Number(event.target.value);
+							setTime(value);
+							seek(value);
+						}}
 					/>
 				</label>
+				{pageMode && (
+					<>
+						<label className={s.control}>
+							<span>Reveal effect</span>
+							<select
+								aria-label='Reveal effect'
+								value={settings.revealEffect}
+								onChange={event => {
+									loaderSettings.revealEffect = event.target.value as LoaderSettings['revealEffect'];
+									setSettings({ ...loaderSettings });
+									replay();
+								}}
+							>
+								<option value='fade'>Cinematic fade</option>
+								<option value='window'>Masked window</option>
+								<option value='wave'>Original wave</option>
+							</select>
+						</label>
+						<label className={s.control}>
+							<span>Reveal origin</span>
+							<select
+								aria-label='Reveal origin'
+								disabled={settings.revealEffect !== 'window'}
+								value={settings.revealOrigin}
+								onChange={event => {
+									loaderSettings.revealOrigin = event.target.value as LoaderSettings['revealOrigin'];
+									setSettings({ ...loaderSettings });
+									replay();
+								}}
+							>
+								<option value='lower'>Lower centre — like the video</option>
+								<option value='logo'>Centred logo</option>
+							</select>
+						</label>
+						<label className={s.control}>
+							<span>
+								Reveal duration{' '}
+								<output>
+									{(settings.revealEffect === 'wave' ? 1.35 : settings.revealDuration).toFixed(2)}s
+								</output>
+							</span>
+							<input
+								aria-label='Reveal duration'
+								disabled={settings.revealEffect === 'wave'}
+								type='range'
+								min='0.4'
+								max='2'
+								step='0.05'
+								value={settings.revealDuration}
+								onChange={event => {
+									loaderSettings.revealDuration = Number(event.target.value);
+									setSettings({ ...loaderSettings });
+								}}
+							/>
+						</label>
+						<label className={s.control}>
+							<span>
+								Hero starting scale <output>{Math.round(settings.heroStartScale * 100)}%</output>
+							</span>
+							<input
+								aria-label='Hero starting scale'
+								disabled={settings.revealEffect === 'wave'}
+								type='range'
+								min='0.01'
+								max='1.5'
+								step='0.01'
+								value={settings.heroStartScale}
+								onChange={event => {
+									loaderSettings.heroStartScale = Number(event.target.value);
+									setSettings({ ...loaderSettings });
+									if (loaderControl.timeline?.paused())
+										seek(loaderControl.previewTime ?? loaderControl.timeline.time());
+								}}
+							/>
+						</label>
+						<div className={s.transport}>
+							<button type='button' onClick={() => seek(Math.max(0, time - 1 / INTRO_FPS))}>
+								Previous frame
+							</button>
+							<button type='button' onClick={() => seek(Math.min(duration, time + 1 / INTRO_FPS))}>
+								Next frame
+							</button>
+						</div>
+						<label className={s.control}>
+							<span>
+								Reveal page at{' '}
+								<output>
+									{settings.pageRevealAt.toFixed(2)}s · frame{' '}
+									{Math.round(settings.pageRevealAt * INTRO_FPS)}
+								</output>
+							</span>
+							<input
+								aria-label='Reveal page at'
+								type='range'
+								min={INTRO_LAST_FRAME / INTRO_FPS}
+								max={INTRO_LAST_FRAME / INTRO_FPS + 1}
+								step={1 / INTRO_FPS}
+								value={settings.pageRevealAt}
+								onChange={event => setRevealPoint(Number(event.target.value))}
+							/>
+						</label>
+						<button type='button' onClick={() => setRevealPoint(time)}>
+							Reveal at this frame
+						</button>
+						<p>
+							The cinematic fade runs after the logo finishes. Adjust the hero starting scale and zoom
+							duration, then Replay. Scrub to inspect the fade and zoom together.
+						</p>
+					</>
+				)}
 
-				{SLIDERS.map(slider => (
+				{SLIDERS.filter(slider => !pageMode || slider.key !== 'revealGap').map(slider => (
 					<label key={slider.key} className={s.control}>
 						<span>
 							{slider.label} <output>{format(settings[slider.key])}</output>

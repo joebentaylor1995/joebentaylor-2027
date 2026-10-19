@@ -16,11 +16,11 @@ const FILL_DURATION = 1.1;
 const LINE_STAGGER = 0.25;
 const FILL_START = -16;
 const FILL_END = 111;
-const WORDS = ['Designer', 'Developer', 'Storyteller'];
 
 // Component
 // ------------
-const Title = () => {
+// NOTE • One fill-wave line per entry — from the Profile panel's “Title” field
+const Title = ({ lines }: { lines: string[] }) => {
 	// Context
 	const present = use(ProfilePresenceContext);
 
@@ -48,7 +48,7 @@ const Title = () => {
 				timeline.to(word, { '--tfw-fill': FILL_END, duration: FILL_DURATION, ease: 'expo.out' }, start);
 			});
 		},
-		{ scope: ref, dependencies: [present], revertOnUpdate: true },
+		{ scope: ref, dependencies: [present, lines], revertOnUpdate: true },
 		{ reduced: '(prefers-reduced-motion: reduce)' }
 	);
 
@@ -62,9 +62,10 @@ const Title = () => {
 			data-anm-text-fill-wave
 			data-anm-tfw-headline
 		>
-			{WORDS.map(word => (
-				<span key={word} className={s.line} data-title-text>
-					{word}
+			{lines.map((line, index) => (
+				// biome-ignore lint/suspicious/noArrayIndexKey: lines can repeat; order is the identity
+				<span key={index} className={s.line} data-title-text>
+					{line}
 				</span>
 			))}
 		</p>

@@ -2,6 +2,12 @@
 // ------------
 
 .jacket {
+    --portrait-aspect: 1;
+    --desktop-portrait-x: 0%;
+    --desktop-portrait-y: 0%;
+    --desktop-portrait-scale: 1;
+    --desktop-portrait-rotation: 0deg;
+    --desktop-portrait-bottom-span: 1;
     --mobile-portrait-x: 0%;
     --mobile-portrait-y: 0%;
     --mobile-portrait-scale: 1;
@@ -12,6 +18,21 @@
     overflow: clip;
     z-index: 0;
     pointer-events: none;
+    container-type: size;
+
+    .portrait {
+        position: absolute;
+        inset: 0;
+
+        @include heroDesktop {
+            inset: auto;
+            left: calc(50% + var(--desktop-portrait-x));
+            top: calc(50% + var(--desktop-portrait-y) + max(0px, (100cqh - 100cqw * var(--desktop-portrait-bottom-span)) / 2));
+            width: calc(100% * var(--desktop-portrait-scale));
+            aspect-ratio: var(--portrait-aspect);
+            transform: translate(-50%, -50%) rotate(var(--desktop-portrait-rotation));
+        }
+    }
 
     .fallback {
         object-fit: cover;

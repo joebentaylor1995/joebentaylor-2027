@@ -1,21 +1,29 @@
 // Imports
 // ------------
 import Grid, { Col } from '@waffl';
+// Styles
+// ------------
+import type { ProfilePanelContent } from '@/data/site';
 import CssDesignAwards from './CssDesignAwards';
 import FeaturedOn from './FeaturedOn';
 import Keycap from './Keycap';
 import GlobeMap from './Map';
 import SingleUSP from './SingleUSP';
-
-// Styles
-// ------------
 import s from './styles.module.scss';
 import Toolkit from './Toolkit';
-import { designTools, developmentTools } from './toolkits';
+
+// Types
+// ------------
+type UspsProps = Pick<
+	ProfilePanelContent,
+	'designToolkit' | 'developmentToolkit' | 'keyboards' | 'featuredOn' | 'cssda'
+>;
 
 // Component
 // ------------
-const Usps = () => {
+// NOTE • Tile content comes from the Profile panel's “Highlights” in Sanity;
+// the location tile (globe) is fixed artwork
+const Usps = ({ designToolkit, developmentToolkit, keyboards, featuredOn, cssda }: UspsProps) => {
 	// Render
 	return (
 		<section className={s.usps}>
@@ -23,34 +31,33 @@ const Usps = () => {
 				<Col as='div' l='1/6'>
 					<SingleUSP>
 						<h3 data-type='bodyL' data-placement='top'>
-							Design Toolkit
+							{designToolkit.title}
 						</h3>
 
-						<Toolkit items={designTools} label='Design toolkit' />
+						<Toolkit items={designToolkit.tools} label={designToolkit.title} />
 					</SingleUSP>
 				</Col>
 
 				<Col as='div' l='6/9'>
 					<SingleUSP>
 						<h3 data-type='bodyL' data-placement='top'>
-							Keyboard Collector
-							<span>10 Boards</span>
+							{keyboards.title}
+							<span>
+								{keyboards.count} {keyboards.count === 1 ? 'Board' : 'Boards'}
+							</span>
 						</h3>
 						<Keycap />
 					</SingleUSP>
 				</Col>
 
 				<Col as='div' l='1/5'>
-					<SingleUSP
-						linkLabel='Featured on Codrops'
-						href='https://tympanus.net/codrops/2026/05/28/the-never-ending-story-building-a-seamless-infinite-scroll-experience-with-gsap-lenis/'
-					>
+					<SingleUSP linkLabel={featuredOn.linkLabel} href={featuredOn.url ?? undefined}>
 						<h3 data-type='bodyL' data-placement='bottom'>
-							Featured on
-							<span>Codrops</span>
+							{featuredOn.eyebrow}
+							<span>{featuredOn.title}</span>
 						</h3>
 
-						<FeaturedOn />
+						{featuredOn.video && <FeaturedOn video={featuredOn.video} />}
 					</SingleUSP>
 				</Col>
 
@@ -65,20 +72,20 @@ const Usps = () => {
 				</Col>
 
 				<Col as='div' l='1/4'>
-					<SingleUSP linkLabel='CSSDA Judge' href='https://www.cssdesignawards.com/judges/joe-taylor/1893/'>
+					<SingleUSP linkLabel={cssda.linkLabel} href={cssda.url ?? undefined}>
 						<h3 data-type='bodyL' data-placement='bottom'>
-							CSSDA Judge
+							{cssda.title}
 						</h3>
-						<CssDesignAwards />
+						<CssDesignAwards image={cssda.image} alt={cssda.alt} />
 					</SingleUSP>
 				</Col>
 
 				<Col as='div' l='4/9'>
 					<SingleUSP>
 						<h3 data-type='bodyL' data-placement='top'>
-							Development Toolkit
+							{developmentToolkit.title}
 						</h3>
-						<Toolkit items={developmentTools} label='Development toolkit' />
+						<Toolkit items={developmentToolkit.tools} label={developmentToolkit.title} />
 					</SingleUSP>
 				</Col>
 			</Grid>

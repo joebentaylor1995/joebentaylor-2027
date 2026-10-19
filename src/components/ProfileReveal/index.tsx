@@ -5,10 +5,11 @@
 import { GlobalContext } from '@parts/Contexts';
 import { PerformanceContext } from '@parts/Contexts/Performance';
 import { DESKTOP_HOVER_QUERY } from '@utils/desktopHover';
+import { preloadNearbyMedia } from '@utils/preloadNearbyMedia';
 import { gsap } from 'gsap';
 import Lenis from 'lenis';
 import Image from 'next/image';
-import { type ComponentType, use, useEffect, useRef, useState } from 'react';
+import { type ComponentType, use, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ProfilePresenceContext } from './context';
 
 // Styles + Interfaces
@@ -46,6 +47,10 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 
 	// Effects
 	useEffect(() => {
+		if (profileOpen && panelRef.current) return preloadNearbyMedia(panelRef.current);
+	}, [profileOpen]);
+
+	useEffect(() => {
 		if (!new URLSearchParams(window.location.search).has('modalSettings')) return;
 		let disposed = false;
 		void import('./Settings').then(module => {
@@ -59,7 +64,8 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 	useEffect(() => {
 		const cursor = cursorRef.current;
 		const jacket = jacketRef.current;
-		if (!profileOpen || !cursor || !jacket) return;
+		if (!cursor || !jacket) return;
+		let lastPointer: PointerEvent | null = null;
 		const mouse = window.matchMedia(DESKTOP_HOVER_QUERY);
 		const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 		const position = { x: 0, y: 0 };
@@ -93,25 +99,22 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			resetShape();
 		};
 		const move = (event: PointerEvent) => {
-			if (event.target instanceof Element && event.target.closest('[data-modal-settings], dialog[open]')) {
+			lastPointer = event;
+			const target = document.elementFromPoint(event.clientX, event.clientY);
+			const projectPanel = target?.closest('[data-project-panel][data-open="true"]');
+			if ((!profileOpen && !projectPanel) || target?.closest('[data-modal-settings], dialog[open]')) {
 				hide();
 				return;
 			}
-			if (
-				!mouse.matches ||
-				event.pointerType !== 'mouse' ||
-				!(event.target instanceof Node) ||
-				!jacket.contains(event.target)
-			) {
+			if (!mouse.matches || event.pointerType !== 'mouse' || !target || !jacket.contains(target)) {
 				hide();
 				return;
 			}
-			const stickyTarget =
-				event.target instanceof Element ? event.target.closest<HTMLElement>('[data-cursor-sticky]') : null;
+			const stickyTarget = target.closest<HTMLElement>('[data-cursor-sticky]');
 			// Independent positioning keeps the glyph off the circle's eased animation path.
 			gsap.set(closeCursorRef.current, { x: event.clientX, y: event.clientY });
 			const wasSticky = jacket.dataset.cursor === 'sticky';
-			const inside = panelRef.current?.contains(event.target);
+			const inside = projectPanel || panelRef.current?.contains(target);
 			let x = event.clientX;
 			let y = event.clientY;
 			if (stickyTarget) {
@@ -120,10 +123,20 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 				).getBoundingClientRect();
 				x = bounds.left + bounds.width / 2;
 				y = bounds.top + bounds.height / 2;
+				if (stickyTarget.hasAttribute('data-cursor-fit')) {
+					cursor.style.setProperty('--cursor-fit-width', `${bounds.width}px`);
+					cursor.style.setProperty('--cursor-fit-height', `${bounds.height}px`);
+					cursor.style.setProperty('--cursor-fit-radius', getComputedStyle(stickyTarget).borderRadius);
+				}
 			}
-			const overLink = event.target instanceof Element && event.target.closest('[data-cursor-link]');
-			const overSoft = event.target instanceof Element && event.target.closest('[data-cursor-soft]');
-			const overCta = event.target instanceof Element && event.target.closest('[data-cursor-cta]');
+			if (!stickyTarget?.hasAttribute('data-cursor-fit')) {
+				cursor.style.removeProperty('--cursor-fit-width');
+				cursor.style.removeProperty('--cursor-fit-height');
+				cursor.style.removeProperty('--cursor-fit-radius');
+			}
+			const overLink = target.closest('[data-cursor-link]');
+			const overSoft = target.closest('[data-cursor-soft]');
+			const overCta = target.closest('[data-cursor-cta]');
 			if (overCta && !reduced.matches) {
 				const bounds = overCta.getBoundingClientRect();
 				x += Math.max(-18, Math.min(18, (bounds.left + bounds.width / 2 - x) * 0.12));
@@ -160,11 +173,18 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			deform();
 		};
 		window.addEventListener('pointermove', move);
+		const refresh = () => {
+			if (lastPointer) move(lastPointer);
+		};
+		window.addEventListener('project-panel:change', refresh);
+		window.addEventListener('scroll', refresh, true);
 		window.addEventListener('blur', hide);
 		document.addEventListener('pointerleave', hide);
 		mouse.addEventListener('change', hide);
 		return () => {
 			window.removeEventListener('pointermove', move);
+			window.removeEventListener('project-panel:change', refresh);
+			window.removeEventListener('scroll', refresh, true);
 			window.removeEventListener('blur', hide);
 			document.removeEventListener('pointerleave', hide);
 			mouse.removeEventListener('change', hide);
@@ -175,7 +195,6 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 	useEffect(() => {
 		if (profileOpen) {
 			setPresented(true);
-			panelRef.current?.scrollTo(0, 0);
 			return;
 		}
 		let cancelled = false;
@@ -196,12 +215,17 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 		};
 	}, [profileOpen]);
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		const wrapper = panelRef.current;
 		const content = panelContentRef.current;
-		if (!profileOpen || isReducedMotion || !wrapper || !content) return;
+		if (!profileOpen || !wrapper || !content) return;
+
+		// Reset before the opening frame, including native/reduced-motion scrolling.
+		wrapper.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+		if (isReducedMotion) return;
 
 		const modalLenis = new Lenis({ wrapper, content, autoRaf: false, syncTouch: false });
+		modalLenis.scrollTo(0, { immediate: true, force: true });
 		const update = (time: number) => modalLenis.raf(time * 1000);
 		gsap.ticker.add(update);
 
@@ -244,6 +268,11 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 		const overflow = page?.style.overflow;
 		const lenis = lenisRef.current?.lenis;
 		const wasStopped = lenis?.isStopped;
+		const scrollRoot = lenis?.rootElement;
+		const scrollOverflow = scrollRoot?.style.overflow ?? '';
+		// Lenis' stopped class uses overflow: clip, which resets the pinned page's scroll.
+		// Preserve its scroll container while the profile has its own scrolling instance.
+		if (scrollRoot) scrollRoot.style.overflow = 'hidden';
 		lenis?.stop();
 		if (page) page.style.overflow = 'hidden';
 		closeRef.current?.focus({ preventScroll: true });
@@ -277,6 +306,7 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			window.removeEventListener('keydown', onKeyDown);
 			if (page) page.style.overflow = overflow ?? '';
 			if (lenis && !wasStopped) lenis.start();
+			if (scrollRoot) scrollRoot.style.overflow = scrollOverflow;
 			if (previousFocus instanceof HTMLElement) previousFocus.focus({ preventScroll: true });
 		};
 	}, [active, lenisRef, setProfileOpen]);

@@ -1,9 +1,7 @@
 export const posterVertexShader = `
 varying vec2 vUv;
-varying float paperLight;
 void main(){
   vUv=uv;
-  paperLight=.55+.45*abs(normal.z);
   gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);
 }
 `;
@@ -14,8 +12,6 @@ uniform float depth;
 uniform float fade;
 uniform float glareAmount;
 uniform vec2 lightPosition;
-uniform float paperBend;
-varying float paperLight;
 varying vec2 vUv;
 void main(){
   vec2 q=abs((vUv-.5)*vec2(1.,1.416667))-vec2(.475,.683333);
@@ -24,7 +20,6 @@ void main(){
   if(edge<.01)discard;
   vec2 uv=gl_FrontFacing?vUv:vec2(1.-vUv.x,vUv.y);
   vec3 c=texture2D(poster,uv).rgb*mix(.09,1.,pow(depth,1.8));
-  c*=mix(1.,paperLight,clamp(paperBend,0.,1.));
   float rim=1.-smoothstep(.001,.008,abs(sd+.004));
   vec2 lightUv=vec2(.5)+lightPosition*.3;
   vec2 delta=(vUv-lightUv)*vec2(1.,1.42);

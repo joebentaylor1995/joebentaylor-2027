@@ -1,0 +1,136 @@
+.jacket {
+	position: relative;
+	isolation: isolate;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	min-height: 100svh;
+	padding: 0 var(--gap-l);
+	overflow: clip;
+	color: var(--global-white);
+	background: var(--brand-c4);
+
+	@include bp(l) { padding: 0 var(--gap-xl); }
+
+	&::before, &::after {
+		content: '';
+		position: absolute;
+		inset: var(--outro-gradient-top, 55%) 0 0;
+		pointer-events: none;
+		transform: translateY(calc((1 - var(--project-outro-progress, 0)) * 100%));
+
+		@media (prefers-reduced-motion: reduce) { transform: none; }
+	}
+
+	&::before {
+		background-color: var(--brand-c1);
+
+		@include bp(l) { background-color: var(--brand-c3); }
+		mask-image: radial-gradient(ellipse 220% 100% at 50% 100%, black 0%, rgb(0 0 0 / 70%) 25%, rgb(0 0 0 / 40%) 45%, rgb(0 0 0 / 20%) 62%, rgb(0 0 0 / 8%) 78%, rgb(0 0 0 / 2%) 90%, transparent 100%);
+		transition: background-color 0.6s ease;
+	}
+
+	// Static fine grain breaks up colour quantisation without another render loop.
+	&::after {
+		background-image: url('/images/gradient-dither.svg');
+		background-size: 128px 128px;
+		mix-blend-mode: soft-light;
+		opacity: 0.15;
+		mask-image: linear-gradient(transparent, black 30%);
+	}
+
+	@include bp(l) {
+		@media (hover: hover) {
+			&:has([data-next-project]:hover)::before { background-color: var(--brand-c1); }
+		}
+		&:has([data-next-project]:focus-visible)::before { background-color: var(--brand-c1); }
+	}
+}
+
+.review {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--gap-sm);
+	width: 100%;
+	margin: 0;
+	padding: var(--gap-xl) var(--gap-l);
+	text-align: center;
+
+	@include bp(l) {
+		gap: var(--gap-m);
+		padding-inline: 0;
+	}
+}
+
+.portraitSlot {
+	flex: none;
+	width: 6.4rem;
+	height: 6.4rem;
+}
+
+.portrait {
+	position: relative;
+	flex: none;
+	width: 6.4rem;
+	height: 6.4rem;
+	overflow: hidden;
+	border-radius: var(--br-round);
+}
+
+.portraitImage { object-fit: cover; }
+
+.quote {
+	width: min(100%, 43rem);
+	margin: 0;
+}
+
+.role { opacity: 0.4; }
+
+.nextArea {
+	position: relative;
+	isolation: isolate;
+	flex: none;
+	width: calc(100% + var(--gap-l) * 2);
+	padding: var(--gap-xl) var(--gap-l) var(--gap-uber);
+	text-align: center;
+
+	@include bp(l) {
+		width: calc(100% + var(--gap-xl) * 2);
+		padding: var(--gap-xl) var(--gap-xl) var(--gap-uber);
+	}
+}
+
+.next {
+	--hover-fill: -16;
+	position: relative;
+	z-index: 1;
+	display: block;
+	flex: none;
+	text-align: center;
+	text-decoration: none;
+	white-space: nowrap;
+	font-size: clamp(4rem, 13.636vw, 6rem);
+
+	@include bp(l) { font-size: clamp(4rem, 8.333vw, 12rem); }
+
+	&:focus-visible {
+		outline: 2px solid var(--global-white);
+		outline-offset: 8px;
+	}
+
+}
+
+.wave {
+	--tfw-fill: calc(-16 + 127 * var(--project-outro-progress, 0));
+	background-image: linear-gradient(97deg, var(--global-white) calc((var(--tfw-fill) - 8) * 1%), alpha(--global-white, 40) calc((var(--tfw-fill) + 8) * 1%));
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	mask-image: linear-gradient(97deg, rgb(0 0 0 / 40%) calc((var(--hover-fill, -16) - 8) * 1%), black calc((var(--hover-fill, -16) + 8) * 1%));
+
+	@media (prefers-reduced-motion: reduce) { --tfw-fill: 111; }
+}

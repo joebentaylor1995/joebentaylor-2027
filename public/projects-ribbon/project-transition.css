@@ -1,0 +1,16 @@
+#project-page{position:fixed;inset:0;overflow:auto;background:transparent;z-index:7;pointer-events:none}
+#project-page[hidden]{display:none}
+#project-return-fade{position:fixed;inset:0;z-index:10000;background:#121212;opacity:0;pointer-events:auto}
+#project-return-fade[hidden]{display:none}
+.project-hero{position:relative;height:100dvh;width:100%;overflow:hidden}
+.project-hero>img{width:100%;height:100%;display:block;object-fit:cover;opacity:0}
+#project-back{position:absolute;top:112px;left:32px;z-index:2;padding:13px 20px;background:rgba(18,18,18,.78);color:white;border-radius:30px;backdrop-filter:blur(12px)}
+.project-hero>h1{position:absolute;bottom:40px;left:40px;font-size:clamp(28px,5vw,72px);max-width:85%;text-shadow:0 2px 20px #000;opacity:var(--project-content,0);transform:translateY(calc((1 - var(--project-content,0))*16px))}
+body.project-open #stage{z-index:6;pointer-events:none}
+body.project-open>footer,body.project-open>.view-switch,body.project-open>#settings,body.project-open>#toggle,body.project-open>#hover-title,body.project-open>main{visibility:hidden}
+body.project-open #project-back{opacity:var(--project-content,0);pointer-events:none}
+body.project-arrived #stage{visibility:hidden}
+body.project-arrived #project-page{pointer-events:auto;background:#121212}
+body.project-arrived .project-hero>img{opacity:1}
+body.project-arrived #project-back,body.project-arrived .project-hero>h1{opacity:1;pointer-events:auto}
+@media(width < 768px){#project-back{top:100px;left:20px}.project-hero>h1{left:24px;bottom:32px}}

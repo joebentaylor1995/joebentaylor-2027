@@ -3,10 +3,11 @@
 // Imports
 // ------------
 import '@parts/AnimationPlugins';
-import Contexts from '@parts/Contexts';
+import Contexts, { ContactContext } from '@parts/Contexts';
 import CookieBar from '@parts/CookieBar';
 import dynamic from 'next/dynamic';
 import { type ComponentType, useEffect, useState } from 'react';
+import type { ContactDetails } from '@/data/site';
 
 // Dev Tools
 // ------------
@@ -19,7 +20,7 @@ const GridExposer = process.env.NODE_ENV === 'development' ? dynamic(() => impor
 // NOTE • Client-side providers only — the document shell (html/body) and all
 // site chrome live in app/(site)/layout.tsx, so page content stays
 // server-rendered. Styles need no provider: they're static CSS.
-const Providers = ({ children }: { children: React.ReactNode }) => {
+const Providers = ({ children, contact }: { children: React.ReactNode; contact: ContactDetails }) => {
 	const [Settings, setSettings] = useState<ComponentType | null>(null);
 	const [LoaderTweaks, setLoaderTweaks] = useState<ComponentType | null>(null);
 	useEffect(() => {
@@ -47,7 +48,9 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 
 			<CookieBar />
 
-			<Contexts>{children}</Contexts>
+			<ContactContext value={contact}>
+				<Contexts>{children}</Contexts>
+			</ContactContext>
 		</>
 	);
 };

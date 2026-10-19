@@ -1,15 +1,17 @@
 .jacket {
 	position: relative;
 	width: 100%;
-	min-height: 73rem;
+	min-height: 0;
 	color-scheme: dark;
 
 	@include bp(l) { min-height: 57rem }
 
 	&[data-state='loading'] {
-		height: min(57rem, calc(100dvh - 16rem));
+		height: 100dvh;
 		min-height: 0;
 		overflow: clip;
+
+		@include bp(l) { height: min(57rem, calc(100dvh - 16rem)) }
 
 		.embed {
 			visibility: hidden;

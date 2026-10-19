@@ -15,7 +15,7 @@ export const grid = {
 	},
 	breakpoints: {
 		s: '320px',
-		sm: '390px',
+		sm: '400px',
 		m: '700px',
 		l: '1024px',
 		xl: '1200px',

@@ -5,6 +5,12 @@
 
 // Exports
 // ------------
-export { client, fetchContent } from './client';
-export { GET_GLOBAL } from './queries/getGlobal';
-export { GET_HOME } from './queries/getHome';
+export { client, fetchContent, isDraftMode, SANITY_CACHE_TAG, STUDIO_URL } from './client';
+export {
+	GET_GLOBAL,
+	GET_HOME,
+	GET_PROFILE_PANEL,
+	GET_PROJECT,
+	GET_PROJECT_SLUGS,
+	GET_PROJECTS_PAGE,
+} from './queries';

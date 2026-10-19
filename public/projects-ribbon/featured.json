@@ -1,0 +1,104 @@
+[
+  {
+    "index": 0,
+    "name": "Jillian Phyllis",
+    "type": "video",
+    "source": "https://cdn.dribbble.com/userupload/46394847/file/94a4fbd8d30b41bc602748dfc0baf30e.mp4",
+    "file": "featured-01.mp4",
+    "video": "assets/featured/01.mp4",
+    "poster": "assets/featured/01.jpg"
+  },
+  {
+    "index": 1,
+    "name": "Featured 02",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/43487569/file/original-94998be74f0a1a58005a3ba5ad5ad5e6.png?resize=1200x896&vertical=center",
+    "file": "featured-02.png",
+    "poster": "assets/featured/02.jpg"
+  },
+  {
+    "index": 2,
+    "name": "Featured 03",
+    "type": "video",
+    "source": "https://assets.awwwards.com/awards/element/2026/09/6a9dd49c30465448347785.mp4",
+    "file": "featured-03.mp4",
+    "video": "assets/featured/03.mp4",
+    "poster": "assets/featured/03.jpg"
+  },
+  {
+    "index": 3,
+    "name": "Featured 04",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/47857792/file/35a0fbc08f541b6ac938db528a533748.jpg?resize=1504x1128&vertical=center",
+    "file": "featured-04.jpg",
+    "poster": "assets/featured/04.jpg"
+  },
+  {
+    "index": 4,
+    "name": "Featured 05",
+    "type": "video",
+    "source": "https://assets.awwwards.com/awards/element/2026/02/698d4e7f3ac1f042199814.mp4",
+    "file": "featured-05.mp4",
+    "video": "assets/featured/05.mp4",
+    "poster": "assets/featured/05.jpg"
+  },
+  {
+    "index": 5,
+    "name": "Featured 06",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/15261949/file/original-82b19ff0addefbf448730b8b00f92e58.jpg?resize=2048x2048&vertical=center",
+    "file": "featured-06.jpg",
+    "poster": "assets/featured/06.jpg"
+  },
+  {
+    "index": 6,
+    "name": "Featured 07",
+    "type": "video",
+    "source": "https://cdn.dribbble.com/userupload/16787073/file/original-98457e9a277c88379b08c439769ba837.mp4",
+    "file": "featured-07.mp4",
+    "video": "assets/featured/07.mp4",
+    "poster": "assets/featured/07.jpg"
+  },
+  {
+    "index": 7,
+    "name": "Featured 08",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/6426625/file/original-c2b355905af48c64c3aa3452b38727ff.jpg?resize=1504x1128&vertical=center",
+    "file": "featured-08.jpg",
+    "poster": "assets/featured/08.jpg"
+  },
+  {
+    "index": 8,
+    "name": "Featured 09",
+    "type": "video",
+    "source": "https://cdn.dribbble.com/userupload/48915840/file/79e2865ad340a8ed169a0d9d13f6c6c0.mp4",
+    "file": "featured-09.mp4",
+    "video": "assets/featured/09.mp4",
+    "poster": "assets/featured/09.jpg"
+  },
+  {
+    "index": 9,
+    "name": "Featured 10",
+    "type": "image",
+    "source": "https://cdn.dribbble.com/userupload/6329551/file/original-bf7ba53d6f51dc7b59504c665705b724.jpg?resize=1504x1128&vertical=center",
+    "file": "featured-10.jpg",
+    "poster": "assets/featured/10.jpg"
+  },
+  {
+    "index": 10,
+    "name": "Featured 11",
+    "type": "video",
+    "source": "https://cdn.dribbble.com/userupload/36679303/file/original-0d1d1f3bd5adb7113d196c917c5818e2.mp4",
+    "file": "featured-11.mp4",
+    "video": "assets/featured/11.mp4",
+    "poster": "assets/featured/11.jpg"
+  },
+  {
+    "index": 11,
+    "name": "Spireworks",
+    "type": "image",
+    "source": "https://www.levinriegner.com/_next/image/?url=https%3A%2F%2Fweb-cdn-prod.levinriegner.com%2Fdesktop%2FSpireworks2.0_D10.1_1by1.jpg&w=2048&q=75",
+    "file": "featured-12.jpg",
+    "poster": "assets/featured/12.jpg"
+  }
+]

@@ -26,6 +26,12 @@ const googleAnalytics = {
 	],
 };
 
+// NOTE • The embedded Studio at /studio talks to Sanity's API (HTTPS + live
+// listeners over WebSockets). Site pages fetch Sanity on the server only.
+const sanity = {
+	connect: ['https://*.sanity.io', 'wss://*.sanity.io'],
+};
+
 const contentSecurityPolicy = {
 	'default-src': ["'self'"],
 	// NOTE • React needs eval in development only, for its debugging stacks
@@ -41,11 +47,13 @@ const contentSecurityPolicy = {
 	'img-src': ["'self'", 'blob:', 'data:', 'https:'],
 	'media-src': ["'self'", 'blob:', 'https:'],
 	'font-src': ["'self'"],
-	'connect-src': ["'self'", ...(hasGoogleAnalytics ? googleAnalytics.connect : [])],
+	'connect-src': ["'self'", ...sanity.connect, ...(hasGoogleAnalytics ? googleAnalytics.connect : [])],
 	'frame-src': [
 		"'self'",
 		'https://cal.com',
 		'https://app.cal.com',
+		// Case-study YouTube media (marketing-consent gated) and its Studio preview
+		'https://www.youtube-nocookie.com',
 		...(isNetlifyPreview ? ['https://app.netlify.com'] : []),
 	],
 	'object-src': ["'none'"],
@@ -54,7 +62,8 @@ const contentSecurityPolicy = {
 	// NOTE • 'self' rather than 'none' so the site can preview inside its own
 	// embedded Studio (Sanity's Presentation tool)
 	'frame-ancestors': ["'self'"],
-	'upgrade-insecure-requests': [],
+	// Safari upgrades localhost assets too; the development server only speaks HTTP.
+	...(!isDev ? { 'upgrade-insecure-requests': [] } : {}),
 };
 
 const securityHeaders = [
@@ -66,7 +75,7 @@ const securityHeaders = [
 	},
 	// NOTE • Two years, this host only — add includeSubDomains once every
 	// subdomain is HTTPS
-	{ key: 'Strict-Transport-Security', value: 'max-age=63072000' },
+	...(!isDev ? [{ key: 'Strict-Transport-Security', value: 'max-age=63072000' }] : []),
 	{ key: 'X-Content-Type-Options', value: 'nosniff' },
 	{ key: 'X-Frame-Options', value: 'SAMEORIGIN' },
 	{ key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
@@ -107,6 +116,21 @@ const nextConfig = {
 			{
 				protocol: 'https',
 				hostname: 'picsum.photos',
+			},
+			// Sanity image + file CDN
+			{
+				protocol: 'https',
+				hostname: 'cdn.sanity.io',
+			},
+			// Stand-in for missing project imagery (PLACEHOLDER_IMAGE in src/data/site.ts)
+			{
+				protocol: 'https',
+				hostname: 'via.placeholder.com',
+			},
+			// YouTube thumbnails, the still behind case-study YouTube media
+			{
+				protocol: 'https',
+				hostname: 'i.ytimg.com',
 			},
 		],
 	},
@@ -233,6 +257,16 @@ const nextConfig = {
 	// loads its own scripts and APIs and manages its own policy
 	async headers() {
 		return [{ source: '/((?!studio).*)', headers: securityHeaders }];
+	},
+
+	// The profile panel is an overlay, not a page — /profile/ is the address
+	// Sanity's Presentation tool uses for it (src/utils/profileRoute.ts). Loading
+	// it directly lands on the homepage with the panel open.
+	async rewrites() {
+		return [
+			{ source: '/profile', destination: '/' },
+			{ source: '/contact', destination: '/' },
+		];
 	},
 
 	// Compiler settings

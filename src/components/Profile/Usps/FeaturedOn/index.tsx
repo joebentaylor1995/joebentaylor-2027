@@ -15,7 +15,8 @@ const LOOP_LEAD_SECONDS = 1;
 
 // Component
 // ------------
-const FeaturedOn = () => {
+// NOTE • video is the loop from the Profile panel's “Featured on” tile
+const FeaturedOn = ({ video: source }: { video: string }) => {
 	// Context
 	const profilePresent = use(ProfilePresenceContext);
 
@@ -27,7 +28,7 @@ const FeaturedOn = () => {
 		const container = containerRef.current;
 		if (!container || !profilePresent) return;
 		const videos = Array.from(container.querySelectorAll('video'));
-		for (const video of videos) video.src = '/videos/codrops.mp4';
+		for (const video of videos) video.src = source;
 		let active = 0;
 		let incoming: number | null = null;
 		let fade: gsap.core.Tween | undefined;
@@ -109,7 +110,7 @@ const FeaturedOn = () => {
 				gsap.set(video, { clearProps: 'opacity,zIndex' });
 			}
 		};
-	}, [profilePresent]);
+	}, [profilePresent, source]);
 
 	// Render
 	return (

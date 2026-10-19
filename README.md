@@ -24,7 +24,7 @@ The CLI keeps your existing `.git`/remote, prunes the CMS you didn't pick (code,
 
 Open [http://localhost:3000](http://localhost:3000). Set your design tokens in `src/theme` (colours, spacing, motion, fonts) and your type styles in `src/css/tackl/_type.scss` — straight from the Figma file.
 
-The placeholder screen you see is `src/components/DeleteMe` — delete it (and its usage in `app/(site)/(home)/page.tsx`) and start building.
+This site replaces the starter demo with the portfolio homepage and project templates. The unused `DeleteMe` demo has been removed.
 
 Copy `.env.example` to `.env` and fill in your values (the DatoCMS token, etc.). `.env` is gitignored; `.env.example` is the documented template.
 

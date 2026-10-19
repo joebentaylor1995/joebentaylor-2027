@@ -10,22 +10,20 @@ import Grid, { Col } from '@waffl';
 import gsap from 'gsap';
 import Image from 'next/image';
 import { type CSSProperties, use, useRef, useSyncExternalStore } from 'react';
+import type { AboutImage } from '@/data/site';
 
 // Styles
 // ------------
 import s from './styles.module.scss';
 
-const images = [
-	{ id: 'opening', name: 'portrait' },
-	{ id: 'son', name: 'son' },
-	{ id: 'dog', name: 'dog' },
-	{ id: 'car', name: 'car' },
-	{ id: 'closing', name: 'portrait' },
-];
-
 // Component
 // ------------
-const About = () => {
+// NOTE • Covers the viewport at any ratio — the 115svh floor suits the tallest
+// art-directed crop, so no frame is ever upscaled
+const FRAME_SIZES =
+	'(min-width: 1600px) max(75.9vw, 115svh), (min-width: 971px) max(1214px, 115svh), max(125vw, 115svh)';
+
+const About = ({ paragraphs, images }: { paragraphs: string[]; images: AboutImage[] }) => {
 	// Context + Refs
 	const present = use(ProfilePresenceContext);
 	const {
@@ -94,7 +92,7 @@ const About = () => {
 				timeline.set(frames[index - 1], { visibility: 'hidden' });
 			}
 			gsap.fromTo(
-				frames[4],
+				frames.at(-1) as HTMLElement,
 				{ opacity: 1 },
 				{
 					opacity: aboutFinalOpacity / 100,
@@ -110,7 +108,7 @@ const About = () => {
 				}
 			);
 			gsap.fromTo(
-				frames[4].querySelector('img'),
+				frames.at(-1)?.querySelector('img') ?? null,
 				{ yPercent: 0 },
 				{
 					yPercent: aboutExitParallax,
@@ -157,19 +155,16 @@ const About = () => {
 			}
 		>
 			<div className={s.stage} aria-hidden='true'>
-				{images.map(({ id, name }) => (
-					<div key={id} className={s.frame} data-about-frame data-image={name}>
+				{images.map(({ src, focus }, index) => (
+					<div
+						// biome-ignore lint/suspicious/noArrayIndexKey: the sequence repeats its portrait; position is the identity
+						key={index}
+						className={s.frame}
+						data-about-frame
+						style={{ '--about-focus': focus } as CSSProperties}
+					>
 						<div className={s.zoom} data-about-zoom>
-							{present && (
-								<Image
-									src={`/images/about/${name === 'car' ? 'car-2x' : `${name}-master`}.webp`}
-									quality={90}
-									alt=''
-									fill
-									loading='eager'
-									sizes={`(min-width: 1600px) max(75.9vw, ${name === 'car' ? 115 : 98}svh), (min-width: 971px) max(1214px, ${name === 'car' ? 115 : 98}svh), max(125vw, ${name === 'car' ? 115 : 98}svh)`}
-								/>
-							)}
+							{present && <Image src={src} quality={90} alt='' fill loading='lazy' sizes={FRAME_SIZES} />}
 						</div>
 					</div>
 				))}
@@ -181,19 +176,11 @@ const About = () => {
 						<SpecialHeading text='About' revealOnView />
 					</Col>
 					<Col l='4/9' className={s.text} data-about-text>
-						<p data-type='bodyL'>
-							I’m a dad first, a drummer at heart, and someone who finds rhythm in almost everything.
-							Whether it’s sound, light, or motion, I’m drawn to the details that make things feel alive.
-						</p>
-						<p data-type='bodyL'>
-							I live by precision but chase creativity in its purest form; from late nights gaming and
-							tinkering with code to quiet mornings with my son and our whacky, sock-thief, golden
-							retriever.
-						</p>
-						<p data-type='bodyL'>
-							I’m calm under pressure, curious by nature, and always trying to build balance between logic
-							and emotion — in life, not just in work.
-						</p>
+						{paragraphs.map(paragraph => (
+							<p key={paragraph} data-type='bodyL'>
+								{paragraph}
+							</p>
+						))}
 					</Col>
 				</Grid>
 			</div>

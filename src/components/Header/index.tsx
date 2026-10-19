@@ -6,29 +6,45 @@ import { GlobalContext } from '@parts/Contexts';
 // ------------
 import Logo from '@parts/Logo';
 import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
+import { prepareNavigationScene } from '@utils/navigationScene';
 import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { use, useRef, useState } from 'react';
+import { use, useEffect, useRef, ViewTransition } from 'react';
 
-// Styles + Interfaces
+// Styles
 // ------------
-import type * as I from './interface';
 import s from './styles.module.scss';
 
 // Component
 // ------------
-const Header = (_props: I.HeaderProps) => {
+const Header = () => {
 	// Context
-	const { profileOpen, setProfileOpen } = use(GlobalContext);
-	const pathname = usePathname();
-	const isLegalPage = /^\/(cookies|terms-privacy|llms)\/?$/.test(pathname);
+	const { profileOpen, setProfileOpen, contactOpen, setContactOpen, pagePath: pathname } = use(GlobalContext);
+	const isDarkPage = /^\/(cookies|terms-privacy|llms)\/?$/.test(pathname) || /^\/projects(?:\/|$)/.test(pathname);
 	// State
-	const [contactOpen, setContactOpen] = useState(false);
 	// Refs
 	const ref = useRef<HTMLElement>(null);
 	const entered = useRef(false);
+
+	// Effects
+	// biome-ignore lint/correctness/useExhaustiveDependencies: resync when navigation replaces the page scroller.
+	useEffect(() => {
+		const header = ref.current;
+		if (!header) return;
+		const update = (event?: Event) => {
+			const target = event?.target;
+			if (target instanceof Element && !target.closest('#page')) return;
+			const scroller = document.querySelector('#page .lenis');
+			const scroll = scroller ? scroller.scrollTop : window.scrollY;
+			const progress = Math.max(0, Math.min(1, scroll / 96));
+			header.style.setProperty('--header-blur-opacity', String(progress * progress * (3 - 2 * progress)));
+		};
+		update();
+		// Capture native scroll from the nested Lenis wrapper as well as reduced-motion window scrolling.
+		document.addEventListener('scroll', update, { capture: true, passive: true });
+		return () => document.removeEventListener('scroll', update, true);
+	}, [pathname]);
 
 	// Animations
 	useAnimation(
@@ -78,61 +94,69 @@ const Header = (_props: I.HeaderProps) => {
 	// Render
 	return (
 		<>
-			<header
-				ref={ref}
-				className={s.jacket}
-				data-profile={profileOpen ? 'open' : 'closed'}
-				data-tone={isLegalPage ? 'light' : 'dark'}
+			<ViewTransition
+				name='site-header'
+				update={{ 'project-mesh': 'none', 'next-project': 'headerStill', default: 'none' }}
+				default='none'
 			>
-				<nav className={s.left} aria-label='Homepage navigation'>
-					<Link href='/' aria-label='Go to home page'>
-						<Logo className={s.logo} />
-					</Link>
-
-					<div>
-						<em data-type='captionS'>Available for hire</em>
-						<span data-type='captionS'>Based in Doncaster, UK</span>
+				<header
+					ref={ref}
+					className={s.jacket}
+					data-profile={profileOpen ? 'open' : 'closed'}
+					data-tone={isDarkPage ? 'light' : 'dark'}
+				>
+					<div className={s.blur} aria-hidden='true' data-header-blur>
+						<span />
+						<span />
+						<span />
+						<span />
+						<span />
+						<span />
 					</div>
-				</nav>
+					<nav className={s.left} aria-label='Homepage navigation'>
+						<Link href='/' aria-label='Go to home page' onNavigate={() => prepareNavigationScene('/')}>
+							<Logo className={s.logo} />
+						</Link>
 
-				<nav className={s.right} aria-label='Page navigation'>
-					<button
-						type='button'
-						aria-label='Open Profile'
-						aria-haspopup='dialog'
-						aria-expanded={profileOpen}
-						aria-controls='profile-panel'
-						onClick={() => setProfileOpen(true)}
-						data-type='bodyS'
-					>
-						Profile
-					</button>
-					{/* NOTE • Points at Dribbble until the projects page exists */}
-					<a
-						href='https://www.dribbble.com/joebentaylor'
-						target='_blank'
-						rel='noopener noreferrer'
-						aria-label='Projects on Dribbble — projects page coming soon (opens in a new tab)'
-						className={s.projects}
-						data-type='bodyS'
-					>
-						Projects
-						<span className={s.soon} data-type='captionS' aria-hidden='true'>
-							Coming soon
-						</span>
-					</a>
-					<button
-						type='button'
-						aria-label='Open Booking Form'
-						aria-haspopup='dialog'
-						aria-expanded={contactOpen}
-						onClick={() => setContactOpen(true)}
-						data-type='bodyS'
-					>
-						Let's Talk
-					</button>
-				</nav>
-			</header>
+						<div>
+							<em data-type='captionS'>Available for hire</em>
+							<span data-type='captionS'>Based in Doncaster, UK</span>
+						</div>
+					</nav>
+
+					<nav className={s.right} aria-label='Page navigation'>
+						<button
+							type='button'
+							aria-label='Open Profile'
+							aria-haspopup='dialog'
+							aria-expanded={profileOpen}
+							aria-controls='profile-panel'
+							onClick={() => setProfileOpen(true)}
+							data-type='bodyS'
+						>
+							Profile
+						</button>
+						<Link
+							href='/projects'
+							onNavigate={() => prepareNavigationScene('/projects')}
+							aria-current={/^\/projects\/?$/.test(pathname) ? 'page' : undefined}
+							data-type='bodyS'
+						>
+							Projects
+						</Link>
+						<button
+							type='button'
+							aria-label='Open Booking Form'
+							aria-haspopup='dialog'
+							aria-expanded={contactOpen}
+							onClick={() => setContactOpen(true)}
+							data-type='bodyS'
+						>
+							Let's Talk
+						</button>
+					</nav>
+				</header>
+			</ViewTransition>
 			{contactOpen && <ContactModal onClose={() => setContactOpen(false)} />}
 		</>
 	);

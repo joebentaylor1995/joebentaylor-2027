@@ -1,5 +1,7 @@
 // Imports + Styles
 // ------------
+
+import PageTitleReveal from '@parts/PageTitleReveal';
 import SpecialHeading from '@parts/SpecialHeading';
 import Block from './Block';
 import Contents from './Contents';
@@ -28,7 +30,11 @@ const LegalPage = ({ document }: I.LegalPageProps) => {
 			<article className={s.main}>
 				<header className={s.header}>
 					<h1 className={s.title} data-type='displayL'>
-						<span className={s.titleMuted}>{title[0]}</span> <span>{title[1]}</span>
+						<PageTitleReveal key={slug}>
+							{title[0]}
+							<br />
+							{title[1]}
+						</PageTitleReveal>
 					</h1>
 				</header>
 

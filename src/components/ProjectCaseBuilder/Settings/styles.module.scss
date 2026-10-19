@@ -1,0 +1,54 @@
+.jacket {
+	position: fixed;
+	z-index: 11;
+	right: var(--gap-s);
+	bottom: var(--gap-s);
+	width: min(34rem, calc(100vw - 2 * var(--gap-s)));
+	max-height: 75dvh;
+	padding: var(--gap-s);
+	overflow: auto;
+	overscroll-behavior: contain;
+	border: 1px solid alpha(--global-white, 25);
+	border-radius: var(--br-s);
+	background: var(--brand-c3);
+	color: var(--global-white);
+	cursor: auto;
+
+	label {
+		display: grid;
+		gap: var(--gap-xs);
+		margin-top: var(--gap-s);
+	}
+
+	label span {
+		display: flex;
+		justify-content: space-between;
+	}
+
+	input {
+		width: 100%;
+		accent-color: var(--brand-c1);
+	}
+
+	p {
+		margin-block: var(--gap-s);
+		opacity: 0.7;
+	}
+
+	summary, button { cursor: pointer; }
+
+	select, button {
+		padding: var(--gap-xs);
+		border: 1px solid alpha(--global-white, 25);
+		border-radius: var(--br-s);
+		color: inherit;
+		background: var(--brand-c4);
+	}
+
+	button + button { margin-left: var(--gap-xs); }
+
+	:focus-visible {
+		outline: 2px solid var(--brand-c2);
+		outline-offset: 2px;
+	}
+}

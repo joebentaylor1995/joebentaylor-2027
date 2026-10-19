@@ -28,8 +28,8 @@ export default function IntroTimings({
 		<details className={s.group}>
 			<summary>Heading & paragraph timing</summary>
 			<p>
-				All values are seconds. Start times share the intro timeline; the ripple starts at 0.10s. Replay to
-				preview changes.
+				All values are seconds. Start times share the intro timeline; the desktop ripple starts at{' '}
+				{intro.start.toFixed(2)}s. Replay to preview changes.
 			</p>
 			<p>Copyright starts with the heading at {intro.headingStart.toFixed(2)}s.</p>
 			{ranges.map(([key, label, min, max, step]) => (

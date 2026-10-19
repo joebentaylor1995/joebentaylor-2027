@@ -56,8 +56,8 @@ const NECESSARY_COOKIES: string[] = [];
 
 // Helpers
 // ------------
-// The banner offers analytics; the calendar requests its own consent when opened.
-const allConsent = (): I.Consent => ({ ...(getConsent() ?? noConsent()), analytics: true });
+const allConsent = (): I.Consent =>
+	Object.fromEntries(OPTIONAL_CATEGORIES.map(category => [category, true])) as I.Consent;
 
 const isWithdrawn = (previous: I.Consent | null, next: I.Consent): boolean =>
 	OPTIONAL_CATEGORIES.some(category => previous?.[category] && !next[category]);
@@ -81,7 +81,7 @@ const expireCookies = (): void => {
 // ------------
 const CookieBar = ({
 	title = 'Cookies',
-	message = 'I use essential cookies to run this website and optional cookies to understand how you use it.',
+	message = 'I use essential cookies to run this website and optional cookies for analytics and the booking calendar.',
 	privacyHref = '/cookies',
 	className,
 }: I.CookieBarProps) => {
@@ -242,23 +242,21 @@ const CookieBar = ({
 						</span>
 					</label>
 
-					{OPTIONAL_CATEGORIES.filter(category => category === 'analytics' || getConsent()?.[category]).map(
-						category => (
-							<label key={category} className={s.choice}>
-								<input
-									type='checkbox'
-									checked={choices[category]}
-									onChange={() => toggleChoice(category)}
-								/>
-								<span data-type='captionS' className={s.label}>
-									{CATEGORIES[category].label}
-								</span>
-								<span data-type='captionS' className={s.description}>
-									{CATEGORIES[category].description}
-								</span>
-							</label>
-						)
-					)}
+					{OPTIONAL_CATEGORIES.map(category => (
+						<label key={category} className={s.choice}>
+							<input
+								type='checkbox'
+								checked={choices[category]}
+								onChange={() => toggleChoice(category)}
+							/>
+							<span data-type='captionS' className={s.label}>
+								{CATEGORIES[category].label}
+							</span>
+							<span data-type='captionS' className={s.description}>
+								{CATEGORIES[category].description}
+							</span>
+						</label>
+					))}
 				</fieldset>
 			)}
 

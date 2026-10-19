@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('booking modal covers the viewport, traps focus and restores it on close', async ({ page }) => {
 	await page.goto('/');
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true');
 	const trigger = page.getByRole('button', { name: 'Open Booking Form' });
 	await trigger.click();
 	const dialog = page.getByRole('dialog', { name: 'Book a call with Joe Ben Taylor' });
@@ -11,6 +12,10 @@ test('booking modal covers the viewport, traps focus and restores it on close', 
 	expect(bounds?.height).toBe(page.viewportSize()?.height);
 	await expect(page.getByRole('button', { name: 'Close booking form' })).toBeFocused();
 	await expect(dialog.locator('iframe')).toHaveCount(0);
+	await expect(dialog.getByRole('button', { name: 'Allow cookies and load calendar' })).toHaveCSS(
+		'color',
+		'rgb(0, 0, 0)'
+	);
 	expect(await dialog.evaluate(element => element.matches(':modal'))).toBe(true);
 	await page.keyboard.press('Tab');
 	await expect(dialog.getByRole('button', { name: 'Allow cookies and load calendar' })).toBeFocused();
@@ -47,6 +52,7 @@ test('booking modal covers the viewport, traps focus and restores it on close', 
 test('reduced motion closes the modal without a fade', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true');
 	const trigger = page.getByRole('button', { name: 'Open Booking Form' });
 	await trigger.click();
 	const dialog = page.getByRole('dialog');
@@ -93,8 +99,10 @@ test('Cal.com loads only after consent and preserves the booking URL', async ({ 
 
 test('booking modal fits a narrow viewport', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
-	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Booking Form' }).click();
+	await page.goto('/', { waitUntil: 'domcontentloaded' });
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true');
+	// The development-only Next badge overlaps the right side at this width.
+	await page.getByRole('button', { name: 'Open Booking Form' }).click({ position: { x: 3, y: 8 } });
 	const dialog = page.getByRole('dialog');
 	await expect(dialog).toBeVisible();
 	expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);

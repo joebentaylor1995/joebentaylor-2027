@@ -383,10 +383,9 @@ test('desktop liquid survives cursor input and returns to the HTML marquee on mo
 	).toBe(0);
 	await page.setViewportSize({ width: 390, height: 844 });
 	await expect(hero).not.toHaveAttribute('data-liquid-ready', 'true');
-	// The remount's not-ready state is brief; check it before the marquee's fade-in.
+	await expect(marquee).toHaveCSS('opacity', '1');
 	await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'false');
 	await expect(page.getByTestId('hero-depth').locator('img')).toBeVisible();
-	await expect(marquee).toHaveCSS('opacity', '1');
 	await page.setViewportSize({ width: 1283, height: 720 });
 	await expect(hero).toHaveAttribute('data-liquid-ready', 'true', { timeout: 30_000 });
 });

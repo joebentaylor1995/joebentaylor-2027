@@ -4,7 +4,8 @@ export function drawHeroContent(
 	canvas: HTMLCanvasElement,
 	host: HTMLElement,
 	maxTexture: number,
-	raster = document.createElement('canvas')
+	raster = document.createElement('canvas'),
+	content = host.querySelector<HTMLElement>('[data-hero-content]')
 ) {
 	const bounds = canvas.getBoundingClientRect();
 	const ratio = Math.min(window.devicePixelRatio || 1, 2, maxTexture / Math.max(bounds.width, bounds.height));
@@ -17,7 +18,6 @@ export function drawHeroContent(
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
 	ctx.clearRect(0, 0, width, height);
 	ctx.setTransform(width / bounds.width, 0, 0, height / bounds.height, 0, 0);
-	const content = host.querySelector<HTMLElement>('[data-hero-content]');
 	if (!content) return raster;
 	const opacity = (element: Element) => {
 		let alpha = 1;
@@ -29,6 +29,12 @@ export function drawHeroContent(
 	let node = walker.nextNode();
 	while (node) {
 		const parent = node.parentElement;
+		// Keep the title in the DOM during its reveal; hand it to WebGL once settled.
+		const titleReveal = parent?.closest<HTMLElement>('[data-page-title-reveal]');
+		if (titleReveal && titleReveal.dataset.waveState !== 'complete') {
+			node = walker.nextNode();
+			continue;
+		}
 		if (parent && !parent.closest('svg') && node.textContent?.trim()) {
 			const css = getComputedStyle(parent);
 			const alpha = opacity(parent);
