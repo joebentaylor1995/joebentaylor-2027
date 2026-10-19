@@ -182,29 +182,3 @@
 		mask-image: linear-gradient(black 8%, rgb(0 0 0 / 55%) 15%, rgb(0 0 0 / 12%) 26%, rgb(0 0 0 / 1%) 38%, transparent 54%);
 	}
 }
-
-// NOTE • Temporary: the label sits under the link, out of the layout, and
-// shows on hover or keyboard focus
-.projects {
-	&:hover .soon,
-	&:focus-visible .soon {
-		opacity: 1;
-		transform: translate(-50%, 0);
-	}
-}
-
-.soon {
-	pointer-events: none;
-	position: absolute;
-	top: 100%;
-	left: 50%;
-	transform: translate(-50%, -0.4rem);
-
-	white-space: nowrap;
-	color: alpha(var(--header-foreground), 60);
-
-	opacity: 0;
-	transition:
-		opacity var(--time-m) var(--easing-bezzy),
-		transform var(--time-m) var(--easing-bezzy);
-}

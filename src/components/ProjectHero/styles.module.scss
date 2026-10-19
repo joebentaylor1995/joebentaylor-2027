@@ -7,6 +7,16 @@
 	color: var(--global-white);
 	background: var(--brand-c4);
 
+	&::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		pointer-events: none;
+		background: linear-gradient(to bottom, transparent, var(--global-black) 100svh);
+		opacity: 0.6;
+	}
+
 	@include bp(l) {
 		--col-width: calc((100vw - var(--gap-xl) * 11 - var(--gap-xl)) / 12);
 		--hero-copy-gap: calc(var(--col-width) * 2 - var(--gap-xl));

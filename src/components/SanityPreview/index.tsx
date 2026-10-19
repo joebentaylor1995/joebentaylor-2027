@@ -1,7 +1,7 @@
 // Imports
 // ------------
 import { draftMode } from 'next/headers';
-import Overlays from './Overlays';
+import LazyOverlays from './LazyOverlays';
 
 // Component
 // ------------
@@ -13,7 +13,7 @@ const SanityPreview = async () => {
 	const { isEnabled } = await draftMode();
 
 	// Render
-	return isEnabled ? <Overlays /> : null;
+	return isEnabled ? <LazyOverlays /> : null;
 };
 
 // Exports

@@ -52,6 +52,7 @@ export const RIBBON_PROJECT = /* groq */ `{
 	"id": _id,
 	"name": title,
 	"tags": coalesce(tags[]->title, []),
+	"isReady": isReady == true,
 	// NOTE • Thumbnail type picks the tile: an image, or a video loop whose
 	// optional poster frame is the still (grid view, and while it loads)
 	"type": select(thumbnailType == "video" && defined(previewVideo.asset) => "video", "image"),

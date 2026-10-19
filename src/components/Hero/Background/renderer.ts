@@ -1,11 +1,13 @@
 // Imports
 // ------------
 import { canHover } from '@utils/desktopHover';
+import { waitForNavigationScene } from '@utils/navigationScene';
 import { gsap } from 'gsap';
 import { HERO_DESKTOP_QUERY } from '../layout';
 import { type DepthSettings, depthUrl, scrollKeys } from './effect-settings';
 import type { LiquidLayer } from './liquid';
 import type { LiquidSettings } from './liquid-settings';
+import { portraitBottomSpan } from './portrait-layout';
 import { introDefaults, introSettings, sceneIntros } from './scene-intro';
 import { ScrollMotion } from './scroll-motion';
 import { fragment, vertex } from './shaders';
@@ -184,6 +186,7 @@ export function mountDepthEffect({
 			);
 			const { createLiquidLayer } = await import('./liquid');
 			await document.fonts.ready;
+			await waitForNavigationScene(events.signal);
 			if (disposed || lost || current !== generation) return;
 			stopLiquid();
 			const layer = await createLiquidLayer(
@@ -281,9 +284,20 @@ export function mountDepthEffect({
 	}
 	const desktopLayout = window.matchMedia(HERO_DESKTOP_QUERY);
 	const profileScene = host.closest<HTMLElement>('[data-profile-scene]');
+	let hasPresented = false;
+	const navigationPaused = () =>
+		hasPresented && document.documentElement.matches('[data-navigation-pending], [data-navigation-wave]');
 	function syncTicker() {
 		gsap.ticker.remove(draw);
-		if (loaded && !disposed && !lost && visible && !document.hidden && profileScene?.dataset.scenePaused !== 'true')
+		if (
+			loaded &&
+			!disposed &&
+			!lost &&
+			visible &&
+			!document.hidden &&
+			!navigationPaused() &&
+			profileScene?.dataset.scenePaused !== 'true'
+		)
 			gsap.ticker.add(draw);
 	}
 	const pauseObserver = new MutationObserver(() => {
@@ -291,8 +305,20 @@ export function mountDepthEffect({
 		syncTicker();
 	});
 	if (profileScene) pauseObserver.observe(profileScene, { attributes: true, attributeFilter: ['data-scene-paused'] });
+	pauseObserver.observe(document.documentElement, {
+		attributes: true,
+		attributeFilter: ['data-navigation-pending', 'data-navigation-wave'],
+	});
 	function draw(_time: number, deltaMs: number) {
-		if (!loaded || disposed || lost || !visible || document.hidden || profileScene?.dataset.scenePaused === 'true')
+		if (
+			!loaded ||
+			disposed ||
+			lost ||
+			!visible ||
+			document.hidden ||
+			navigationPaused() ||
+			profileScene?.dataset.scenePaused === 'true'
+		)
 			return;
 		try {
 			const now = performance.now(),
@@ -396,10 +422,7 @@ export function mountDepthEffect({
 				const portraitAspect = photo.naturalWidth / photo.naturalHeight;
 				const coverWidth = Math.max(cssWidth, cssHeight * portraitAspect);
 				const widthScale = cssWidth / coverWidth;
-				const settledWidth = cssWidth * s.zoom;
-				const rotation = Math.abs((s.rotation * Math.PI) / 180);
-				const bottomSpan =
-					(settledWidth / portraitAspect) * Math.cos(rotation) - settledWidth * Math.sin(rotation);
+				const bottomSpan = cssWidth * portraitBottomSpan(s, portraitAspect);
 				const bottomOffset = Math.max(0, (cssHeight - bottomSpan) / 2);
 				gl.uniform2f(u.positionShift, s.positionX / 100, s.positionY / 100 + bottomOffset / cssHeight);
 				gl.uniform1f(
@@ -423,6 +446,7 @@ export function mountDepthEffect({
 			gl.uniform1f(u.colourMix, colourImage ? scroll.colour + (1 - scroll.colour) * introTint : 0);
 			lastIntroTint = introTint;
 			gl.drawArrays(gl.TRIANGLES, 0, 6);
+			hasPresented = true;
 			if (liquid) {
 				try {
 					liquid.draw(dt, scroll.velocity, scroll.gesture);
@@ -598,6 +622,8 @@ export function mountDepthEffect({
 		const current = ++generation;
 		loaded = false;
 		try {
+			await waitForNavigationScene(events.signal);
+			if (disposed || lost || current !== generation) return;
 			const compiled = await makeProgram(vertex, fragment, [
 				'photo',
 				'colourPhoto',

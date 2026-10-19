@@ -10,6 +10,7 @@ import { splitStega } from '@utils/stega';
 import { useAnimation } from '@utils/useAnimation';
 import Grid from '@waffl';
 import { gsap } from 'gsap';
+import { useRouter } from 'next/navigation';
 import { Fragment, useLayoutEffect, useRef } from 'react';
 import { introDefaults, introReplays, introSettings, sceneIntros } from '../Background/scene-intro';
 import { HERO_DESKTOP_QUERY } from '../layout';
@@ -22,8 +23,10 @@ import s from './styles.module.scss';
 // Component
 // ------------
 const Content = ({ heading, description }: I.ContentProps) => {
+	const router = useRouter();
 	const ref = useRef<HTMLElement>(null);
 	const entered = useRef(false);
+	const projectsPrefetched = useRef(false);
 	// Cached routes retain refs, but their entrance must replay when reactivated.
 	useLayoutEffect(
 		() => () => {
@@ -72,12 +75,19 @@ const Content = ({ heading, description }: I.ContentProps) => {
 					for (let digit = 0; digit < 4; digit++) gsap.set(copyright, { [`--${side}-${digit}`]: '110%' });
 				}
 			};
+			const prefetchProjects = () => {
+				if (projectsPrefetched.current) return;
+				projectsPrefetched.current = true;
+				// Give the homepage entrance priority before warming the next route.
+				router.prefetch('/projects');
+			};
 			if (reduced) {
 				entered.current = true;
 				gsap.set(cover, { opacity: 0 });
 				if (cover) cover.dataset.complete = 'true';
 				root.dataset.entrance = 'complete';
 				tick();
+				prefetchProjects();
 				return;
 			}
 			root.dataset.entrance = 'running';
@@ -99,6 +109,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 					entered.current = true;
 					root.dataset.entrance = 'complete';
 					tick();
+					prefetchProjects();
 				},
 			});
 			const buildTimeline = () => {
@@ -202,7 +213,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				window.removeEventListener(LOADER_REVEAL, revealLoader);
 			};
 		},
-		{ scope: ref, dependencies: [heading, description], revertOnUpdate: true },
+		{ scope: ref, dependencies: [heading, description, router], revertOnUpdate: true },
 		{ reduced: '(prefers-reduced-motion: reduce)', heroDesktop: HERO_DESKTOP_QUERY }
 	);
 	const descriptionParts = splitStega(description || '');

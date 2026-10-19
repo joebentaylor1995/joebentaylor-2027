@@ -94,6 +94,7 @@ lighthouse-report.json
 lhr-*.json
 # Ignore any custom output folders
 lh-output/
+/output/lighthouse*/
 # Ignore any temp files
 *.lhci-*
 storybook-static

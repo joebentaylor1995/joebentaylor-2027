@@ -208,6 +208,8 @@ const SiteLoader = () => {
 						const hero = projectsListing
 							? document.querySelector<HTMLIFrameElement>('iframe[title="Interactive projects"]')
 							: (projectHero ?? document.querySelector('[data-scene-cover]')?.parentElement);
+						const readyAttribute = projectsListing ? 'data-ribbon-ready' : 'data-liquid-ready';
+						const sceneReady = () => hero?.getAttribute(readyAttribute) === 'true';
 						const resume = () => {
 							stopWaitingForScene();
 							setProjectWave(0);
@@ -216,7 +218,7 @@ const SiteLoader = () => {
 							const release = () => {
 								if (++frames < 2) return;
 								gsap.ticker.remove(release);
-								if (!fadeReveal && (!homepage || !mobile) && hero?.dataset.liquidReady === 'true') {
+								if (!fadeReveal && (!homepage || !mobile) && sceneReady()) {
 									root.dataset.webglReveal = 'true';
 								}
 								if (!fadeReveal) revealScene();
@@ -225,15 +227,17 @@ const SiteLoader = () => {
 							gsap.ticker.add(release);
 							stopWaitingForScene = () => gsap.ticker.remove(release);
 						};
-						if (!hero || hero.dataset.liquidReady === 'true') {
+						if (!hero || sceneReady()) {
 							resume();
 							return;
 						}
 						const observer = new MutationObserver(() => {
-							if (hero.dataset.liquidReady === 'true') resume();
+							if (sceneReady()) resume();
 						});
-						observer.observe(hero, { attributes: true, attributeFilter: ['data-liquid-ready'] });
-						const timeout = window.setTimeout(resume, 2000);
+						observer.observe(hero, { attributes: true, attributeFilter: [readyAttribute] });
+						// Network-bound hero textures can arrive well after the logo lands.
+						// Keep a deadline so unavailable WebGL still falls back to native content.
+						const timeout = window.setTimeout(resume, homepage ? 15000 : 2000);
 						stopWaitingForScene = () => {
 							observer.disconnect();
 							window.clearTimeout(timeout);

@@ -12,7 +12,6 @@ import { MEDIA, REVIEW, RIBBON_PROJECT, SEO, TOOLKIT } from './fragments';
 // ------------
 export const GET_GLOBAL = defineQuery(`
 	*[_id == "settings"][0]{
-		"projectsLive": projectsLive == true,
 		name,
 		shortName,
 		tagline,

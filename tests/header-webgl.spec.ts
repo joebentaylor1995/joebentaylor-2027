@@ -17,6 +17,7 @@ test('header gaps pass through to the hero and navigation remains clickable', as
 
 test('header movement reaches the projects canvas including over links', async ({ page }) => {
 	await page.goto('/projects/');
+	await expect(page.locator('[data-site-loader]')).toBeHidden({ timeout: 15000 });
 	const frame = page.locator('iframe[title="Interactive projects"]');
 	await expect(frame).toHaveAttribute('data-ready', 'true', { timeout: 15000 });
 	expect(await page.evaluate(() => document.elementFromPoint(innerWidth / 2, 50)?.tagName)).toBe('IFRAME');

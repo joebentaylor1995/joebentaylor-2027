@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readyProjects } from './helpers/ready-projects';
 
 // These bindings live in the ribbon iframe. Function predicates avoid string
 // eval, which the production Content Security Policy deliberately blocks.
@@ -9,6 +10,7 @@ declare const projectTransition: { active: boolean; progress: number; settled: b
 
 for (const mode of ['featured', 'grid', 'mobile']) {
 	test(`${mode} finishes expanding into the real hero before navigating`, async ({ page }) => {
+		await readyProjects(page);
 		if (mode === 'mobile') await page.setViewportSize({ width: 440, height: 780 });
 		const errors: string[] = [];
 		page.on('pageerror', error => errors.push(error.message));

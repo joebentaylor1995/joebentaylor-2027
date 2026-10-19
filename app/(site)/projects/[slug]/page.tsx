@@ -9,7 +9,7 @@ import ProjectOverview from '@parts/ProjectOverview';
 import { toMetadata } from '@utils/metadata';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { areProjectsVisible, getNextProject, getProject, getProjectSlugs } from '@/data/content';
+import { getNextProject, getProject, getProjectSlugs } from '@/data/content';
 import { projectDummy } from '@/data/projects';
 
 // Types
@@ -45,8 +45,6 @@ export const generateMetadata = async ({ params }: Params): Promise<Metadata> =>
 // Component
 // ------------
 const CaseStudy = async ({ params }: Params) => {
-	// NOTE • A 404 until “Projects live” is on in Sanity (draft preview always sees it)
-	if (!(await areProjectsVisible())) notFound();
 	const { slug } = await params;
 	const [project, nextProject] = await Promise.all([getProject(slug), getNextProject(slug)]);
 	if (!project) notFound();

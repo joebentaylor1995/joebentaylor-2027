@@ -1,12 +1,9 @@
 // Imports
 // ------------
 import PageTransition from '@parts/PageTransition';
-import ProjectsRibbon from '@parts/ProjectsRibbon';
 import { toMetadata } from '@utils/metadata';
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
-import { Suspense } from 'react';
-import { areProjectsVisible, getProjectsPage } from '@/data/content';
+import { getProjectsPage } from '@/data/content';
 
 // SEO
 // ------------
@@ -24,18 +21,11 @@ export const generateMetadata = async (): Promise<Metadata> => {
 
 // Component
 // ------------
-// NOTE • A 404 until “Projects live” is on in Sanity (draft preview always sees it)
-const Page = async () => {
-	if (!(await areProjectsVisible())) notFound();
-
-	return (
-		<PageTransition>
-			<Suspense fallback={null}>
-				<ProjectsRibbon />
-			</Suspense>
-		</PageTransition>
-	);
-};
+const Page = () => (
+	<PageTransition>
+		<div data-projects-page />
+	</PageTransition>
+);
 
 // Exports
 // ------------

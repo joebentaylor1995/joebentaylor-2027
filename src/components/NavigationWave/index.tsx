@@ -1,11 +1,14 @@
 'use client';
 
 import { GlobalContext } from '@parts/Contexts';
-import { readIntroProfiles } from '@parts/Hero/Background/intro-storage';
+import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { lockProjectScroll } from '@utils/lockProjectScroll';
+import { releaseNavigationScene } from '@utils/navigationScene';
 import { gsap } from 'gsap';
 import { type ReactNode, use, useEffect, useMemo, useRef, ViewTransition } from 'react';
+import { readWaveSettings, WAVE_SETTINGS_CHANGED } from './settings';
 import s from './styles.module.scss';
+import { waveTexture } from './texture';
 
 // Native snapshots retain canvases, video and font rendering without DOM rasterisation.
 export default function NavigationWave({ children }: { children: ReactNode }) {
@@ -16,11 +19,20 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 	const navigation = useMemo(() => ({ pathname, played: false }), [pathname]);
 	useEffect(() => {
 		previous.current = pathname;
+		releaseNavigationScene();
 	}, [pathname]);
 	const map = useRef<SVGFEImageElement>(null);
 	const displacement = useRef<SVGFEDisplacementMapElement>(null);
-	const texture = useRef('');
-	const textureKey = useRef('');
+	useEffect(() => {
+		const prepare = () => map.current?.setAttribute('href', waveTexture(readWaveSettings()));
+		if (isLoaderSettled()) prepare();
+		else window.addEventListener(LOADER_SETTLED, prepare, { once: true });
+		window.addEventListener(WAVE_SETTINGS_CHANGED, prepare);
+		return () => {
+			window.removeEventListener(LOADER_SETTLED, prepare);
+			window.removeEventListener(WAVE_SETTINGS_CHANGED, prepare);
+		};
+	}, []);
 	return (
 		<>
 			<svg className={s.jacket} aria-hidden='true' width='0' height='0'>
@@ -59,57 +71,24 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 					if (navigation.played) return;
 					navigation.played = true;
 					if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-					const settings = readIntroProfiles().desktop;
+					const settings = readWaveSettings();
 					const width = innerWidth,
 						height = innerHeight;
 					const x = (width * settings.originX) / 100,
 						y = height * (1 - settings.originY / 100);
 					const feather = Math.max(1, height * 0.16 * settings.width * settings.softness);
-					const end = Math.hypot(Math.max(x, width - x), Math.max(y, height - y)) + feather * 2;
-					const duration = Math.min(2000, Math.max(450, 1000 / settings.speed));
+					const end = Math.hypot(Math.max(x, width - x), Math.max(y, height - y)) + feather;
+					const duration = settings.duration;
 					const ease = gsap.parseEase(settings.ease);
 					const root = document.documentElement;
 					root.dataset.navigationWave = 'running';
+					root.dataset.navigationWaveLens = String(settings.bend > 0 && settings.strength > 0);
 					root.dataset.navigationWaveProgress = '0';
 					const releaseScroll = lockProjectScroll();
-					// The reusable map is a broad radial shoulder, neutral beyond the lens.
-					const key = `${settings.lensWidth}:${settings.lensFalloff}`;
-					if (!texture.current || textureKey.current !== key) {
-						const canvas = document.createElement('canvas');
-						canvas.width = canvas.height = 256;
-						const context = canvas.getContext('2d');
-						if (context) {
-							const pixels = context.createImageData(256, 256);
-							for (let j = 0; j < 256; j++)
-								for (let i = 0; i < 256; i++) {
-									const dx = (i - 127.5) / 127.5,
-										dy = (j - 127.5) / 127.5,
-										d = Math.hypot(dx, dy);
-									const shoulder = Math.exp(
-										-(
-											Math.abs((d - 0.65) / (0.18 * Math.max(0.1, settings.lensWidth))) **
-											Math.max(1, settings.lensFalloff * 2)
-										)
-									);
-									const p = (j * 256 + i) * 4;
-									pixels.data[p] = 128 + (dx / Math.max(d, 0.001)) * shoulder * 110;
-									pixels.data[p + 1] = 128 + (dy / Math.max(d, 0.001)) * shoulder * 110;
-									pixels.data[p + 2] = 128;
-									pixels.data[p + 3] = 255;
-								}
-							context.putImageData(pixels, 0, 0);
-							texture.current = canvas.toDataURL();
-							textureKey.current = key;
-						}
-					}
-					map.current?.setAttribute('href', texture.current);
-					const frames = Array.from({ length: 61 }, (_, i) => {
-						const radius = -feather * 2 + (end + feather * 2) * ease(i / 60);
-						return {
-							maskImage: `radial-gradient(circle at ${x}px ${y}px, #000 ${Math.max(0, radius - feather)}px, transparent ${Math.max(0.01, radius + feather)}px)`,
-						};
-					});
-					const animation = root.animate(frames, {
+					map.current?.setAttribute('href', waveTexture(settings));
+					// Gradients interpolate discretely in mask-image keyframes. Keep the
+					// native animation as the clock, and move mask and lens together below.
+					const animation = root.animate([{ opacity: 1 }, { opacity: 1 }], {
 						duration,
 						fill: 'both',
 						pseudoElement: `::view-transition-new(${instance.name})`,
@@ -122,8 +101,15 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 					const tick = () => {
 						const progress = Math.min(1, Number(animation.currentTime || 0) / duration);
 						root.dataset.navigationWaveProgress = String(progress);
-						const radius = Math.max(1, -feather * 2 + (end + feather * 2) * ease(progress));
-						const size = radius / 0.65;
+						// Grow from zero immediately; a negative radius hides the first part
+						// of the animation and feels like a delay after the click.
+						const radius = end * ease(progress);
+						const edge = Math.min(feather, radius);
+						root.style.setProperty(
+							'--navigation-wave-mask',
+							`radial-gradient(circle at ${x}px ${y}px, #000 ${Math.max(0, radius - edge)}px, transparent ${Math.max(0.01, radius + edge)}px)`
+						);
+						const size = Math.max(1, radius) / 0.65;
 						map.current?.setAttribute('x', String(x - size));
 						map.current?.setAttribute('y', String(y - size));
 						map.current?.setAttribute('width', String(size * 2));
@@ -144,6 +130,8 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 						displacement.current?.setAttribute('scale', '0');
 						delete root.dataset.navigationWave;
 						delete root.dataset.navigationWaveProgress;
+						delete root.dataset.navigationWaveLens;
+						root.style.removeProperty('--navigation-wave-mask');
 					};
 					void animation.finished.then(cleanup, cleanup);
 					return () => {

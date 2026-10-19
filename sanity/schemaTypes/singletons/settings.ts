@@ -27,24 +27,12 @@ export const settings = defineType({
 	type: 'document',
 	icon: CogIcon,
 	groups: [
-		{ name: 'launch', title: 'Launch', default: true },
-		{ name: 'identity', title: 'Identity' },
+		{ name: 'identity', title: 'Identity', default: true },
 		{ name: 'seo', title: 'SEO' },
 		{ name: 'contact', title: 'Contact' },
 		{ name: 'business', title: 'Business' },
 	],
 	fields: [
-		// Launch
-		defineField({
-			name: 'projectsLive',
-			title: 'Projects live',
-			type: 'boolean',
-			group: 'launch',
-			initialValue: false,
-			description:
-				'Off: visitors can’t see /projects or any case study — the header’s Projects link goes to Dribbble with a “Coming soon” label. On: everything goes live on publish. Previewing in Presentation always shows the projects, so you can build them before launch.',
-		}),
-
 		// Identity
 		defineField({ name: 'name', title: 'Name', type: 'string', group: 'identity' }),
 		defineField({ name: 'shortName', title: 'Short name', type: 'string', group: 'identity' }),

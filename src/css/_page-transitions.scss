@@ -9,13 +9,20 @@
 // class names inside ::view-transition-*(), so they live here instead.
 
 @layer base {
+	:root { --navigation-wave-mask: none; }
+
 	::view-transition-group(navigation-surface) { animation: none; }
 
 	::view-transition-old(.pageWave), ::view-transition-new(.pageWave) {
 		animation: none;
 		mix-blend-mode: normal;
 	}
-	:root[data-navigation-wave='running']::view-transition-new(.pageWave) { filter: url('#navigation-wave-lens'); }
+
+	:root[data-navigation-wave]::view-transition-new(.pageWave) {
+		mask-image: var(--navigation-wave-mask);
+	}
+
+	:root[data-navigation-wave-lens='true']::view-transition-new(.pageWave) { filter: url('#navigation-wave-lens'); }
 	html[data-next-project-transition] header { view-transition-name: site-header; }
 
 	::view-transition-old(root),

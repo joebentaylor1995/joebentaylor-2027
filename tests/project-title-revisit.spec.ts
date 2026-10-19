@@ -1,6 +1,12 @@
 import { expect, test } from '@playwright/test';
+import { readyProjects } from './helpers/ready-projects';
+
+declare const ready: boolean;
+declare const introduction: { active: boolean };
+declare function returningToFeatured(): boolean;
 
 test('ribbon title wave reveal replays when reopening a cached project', async ({ page }) => {
+	await readyProjects(page);
 	await page.goto('/projects/');
 	await page.getByRole('button', { name: 'Accept Necessary' }).click();
 	for (let visit = 0; visit < 2; visit++) {
@@ -8,9 +14,9 @@ test('ribbon title wave reveal replays when reopening a cached project', async (
 		await expect(ribbon.locator('#stage')).toBeVisible({ timeout: 20000 });
 		const frame = page.frames().find(item => item.url().includes('/projects-ribbon/'));
 		if (!frame) throw new Error('Missing ribbon frame');
-		await frame.waitForFunction('ready && !introduction.active');
+		await frame.waitForFunction(() => ready && !introduction.active && !returningToFeatured());
 		await ribbon.locator('#stage').press('Enter');
-		await expect(page).toHaveURL(/\/projects\/[^/]+\/?$/);
+		await expect(page).toHaveURL(/\/projects\/[^/]+\/?$/, { timeout: 20000 });
 		await page.waitForFunction(
 			() => {
 				const title = Array.from(

@@ -26,8 +26,6 @@ export interface Social {
 }
 
 export interface SiteSettings {
-	/** Launch switch — off hides /projects and case studies from visitors */
-	projectsLive: boolean;
 	name: string;
 	shortName: string;
 	tagline: string;
@@ -50,13 +48,6 @@ export interface ContactDetails {
 	bookingLink: string;
 	socials: Social[];
 	resumeUrl: string | null;
-}
-
-// NOTE • The header's Projects link — see areProjectsVisible in ./content
-export interface ProjectsLink {
-	isLive: boolean;
-	/** Until projects are live, the link goes here (Dribbble) with “Coming soon” */
-	comingSoonUrl: string;
 }
 
 export interface HomeContent {
@@ -124,6 +115,8 @@ export interface ProfilePanelContent {
 export interface RibbonProject {
 	id?: string;
 	name: string;
+	/** Case-study tiles only open when explicitly enabled in Sanity. */
+	isReady?: boolean;
 	tags?: string[];
 	type: 'image' | 'video';
 	poster: string;
@@ -148,7 +141,6 @@ export const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/1440x1440';
 const platformOf = (url: string) => new URL(url).hostname.replace('www.', '').split('.')[0];
 
 export const fallbackSettings: SiteSettings = {
-	projectsLive: false,
 	name: profile.name,
 	shortName: profile.shortName,
 	tagline: profile.tagline,

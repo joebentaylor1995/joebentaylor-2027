@@ -50,6 +50,17 @@ export const project = defineType({
 		}),
 
 		defineField({
+			name: 'isReady',
+			title: 'Is ready',
+			type: 'boolean',
+			group: ['listing', 'caseStudy'],
+			initialValue: false,
+			hidden: isListingOnly,
+			description:
+				'On: visitors can open this case study from Featured and All projects. Off: the tile stays visible with a “Coming soon” tooltip. Publish to apply changes; direct case-study links remain accessible.',
+		}),
+
+		defineField({
 			name: 'externalUrl',
 			title: 'External link',
 			type: 'url',

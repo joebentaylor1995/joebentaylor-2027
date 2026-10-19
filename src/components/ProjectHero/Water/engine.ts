@@ -39,6 +39,9 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 	let previousSaturation = 1;
 	let imageBox: WebGLUniformLocation | null = null;
 	let introImage: WebGLUniformLocation | null = null;
+	let shade: WebGLUniformLocation | null = null;
+	let shadeScale = 1;
+	let shadeOpacity = 0;
 	let previousImageScale = 1;
 	let previousMediaTop = Number.NaN;
 	const profileScene = host.closest<HTMLElement>('[data-profile-scene]');
@@ -90,6 +93,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			gl.uniform1f(textOpacity, textAlpha);
 			gl.uniform1f(textOffset, copyOffset / bounds.height);
 			gl.uniform1f(saturation, imageSaturation);
+			gl.uniform2f(shade, shadeScale, shadeOpacity);
 			gl.drawArrays(gl.TRIANGLES, 0, 6);
 			previousMediaTop = mediaTop;
 			previousImageScale = imageScale;
@@ -128,6 +132,11 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		if (disposed || gl.isContextLost() || !canvas.clientWidth || !canvas.clientHeight) return;
 		const width = Math.max(1, canvas.clientWidth),
 			height = Math.max(1, canvas.clientHeight);
+		// The title's minimum height resolves 100svh, including mobile browser chrome.
+		const title = host.querySelector<HTMLElement>('[data-project-hero-copy]');
+		const viewportHeight = title ? Number.parseFloat(getComputedStyle(title).minHeight) : height;
+		shadeScale = height / (viewportHeight || height);
+		shadeOpacity = Number.parseFloat(getComputedStyle(host, '::after').opacity);
 		const max = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
 		const ratio = Math.min(
 			devicePixelRatio,
@@ -173,7 +182,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			[gl.VERTEX_SHADER, liquidVertex],
 			[
 				gl.FRAGMENT_SHADER,
-				`precision highp float; varying vec2 uv; uniform sampler2D source,textSource; uniform vec2 cover,imageBox,introImage; uniform float textOpacity,textOffset,saturation;
+				`precision highp float; varying vec2 uv; uniform sampler2D source,textSource; uniform vec2 cover,imageBox,introImage,shade; uniform float textOpacity,textOffset,saturation;
 				void main(){
 				vec2 imageUV=vec2(uv.x,1.-((1.-uv.y)-imageBox.x)/imageBox.y);
 				vec2 anchor=vec2(.5,introImage.y);
@@ -181,6 +190,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 				vec4 photo=texture2D(source,(imageUV-.5)*cover+.5);
 				float grey=dot(photo.rgb,vec3(.2126,.7152,.0722));
 				photo.rgb=mix(vec3(grey),photo.rgb,saturation);
+				photo.rgb*=1.-clamp((1.-uv.y)*shade.x,0.,1.)*shade.y;
 				vec2 textUV=uv+vec2(0.,textOffset);
 				vec4 text=texture2D(textSource,textUV);
 				text.a*=step(0.,textUV.y)*step(textUV.y,1.);
@@ -206,6 +216,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		saturation = gl.getUniformLocation(program, 'saturation');
 		imageBox = gl.getUniformLocation(program, 'imageBox');
 		introImage = gl.getUniformLocation(program, 'introImage');
+		shade = gl.getUniformLocation(program, 'shade');
 		buffer = gl.createBuffer();
 		texture = gl.createTexture();
 		if (!buffer || !texture) throw new Error('Project water resources unavailable');

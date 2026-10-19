@@ -3,7 +3,7 @@
 import type { MetadataRoute } from 'next';
 import { cacheTag } from 'next/cache';
 import { siteUrl } from '@/config';
-import { getProjectSlugs, getSettings } from '@/data/content';
+import { getProjectSlugs } from '@/data/content';
 
 // Sitemap
 // ------------
@@ -15,9 +15,7 @@ const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
 	'use cache';
 	cacheTag('sanity');
 
-	// NOTE • Projects stay out of the sitemap until “Projects live” is on
-	const { projectsLive } = await getSettings();
-	const projectSlugs = projectsLive ? await getProjectSlugs() : [];
+	const projectSlugs = await getProjectSlugs();
 
 	return [
 		{
@@ -26,16 +24,12 @@ const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
 			changeFrequency: 'monthly',
 			priority: 1,
 		},
-		...(projectsLive
-			? [
-					{
-						url: `${siteUrl}/projects`,
-						lastModified: new Date(),
-						changeFrequency: 'monthly' as const,
-						priority: 0.8,
-					},
-				]
-			: []),
+		{
+			url: `${siteUrl}/projects`,
+			lastModified: new Date(),
+			changeFrequency: 'monthly',
+			priority: 0.8,
+		},
 		...projectSlugs.map(slug => ({
 			url: `${siteUrl}/projects/${slug}`,
 			lastModified: new Date(),

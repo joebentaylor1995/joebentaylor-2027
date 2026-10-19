@@ -62,7 +62,8 @@ const contentSecurityPolicy = {
 	// NOTE • 'self' rather than 'none' so the site can preview inside its own
 	// embedded Studio (Sanity's Presentation tool)
 	'frame-ancestors': ["'self'"],
-	'upgrade-insecure-requests': [],
+	// Safari upgrades localhost assets too; the development server only speaks HTTP.
+	...(!isDev ? { 'upgrade-insecure-requests': [] } : {}),
 };
 
 const securityHeaders = [
@@ -74,7 +75,7 @@ const securityHeaders = [
 	},
 	// NOTE • Two years, this host only — add includeSubDomains once every
 	// subdomain is HTTPS
-	{ key: 'Strict-Transport-Security', value: 'max-age=63072000' },
+	...(!isDev ? [{ key: 'Strict-Transport-Security', value: 'max-age=63072000' }] : []),
 	{ key: 'X-Content-Type-Options', value: 'nosniff' },
 	{ key: 'X-Frame-Options', value: 'SAMEORIGIN' },
 	{ key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },

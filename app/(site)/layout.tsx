@@ -9,6 +9,7 @@ import LinkPreloader from '@parts/LinkPreloader';
 import NavigationWave from '@parts/NavigationWave';
 import Profile from '@parts/Profile';
 import ProfileReveal from '@parts/ProfileReveal';
+import ProjectsRibbon from '@parts/ProjectsRibbon';
 import SanityDevSync from '@parts/SanityDevSync';
 import SanityPreview from '@parts/SanityPreview';
 import SiteLoader from '@parts/SiteLoader';
@@ -18,7 +19,7 @@ import { ppNeueMontreal, sequel } from '@theme/fonts';
 import type { Metadata, Viewport } from 'next';
 import { Suspense, ViewTransition } from 'react';
 import { isSiteUrlConfigured, profile, siteUrl } from '@/config';
-import { getProjectsLink, getSettings } from '@/data/content';
+import { getSettings } from '@/data/content';
 import { toContact } from '@/data/site';
 import Providers from './Providers';
 
@@ -95,7 +96,7 @@ export const viewport: Viewport = {
 // ------------
 const RootLayout = async ({ children }: { children: React.ReactNode }) => {
 	// NOTE • Cached Sanity read (see src/cms/sanity/client.ts) — the shell still prerenders
-	const [settings, projectsLink] = await Promise.all([getSettings(), getProjectsLink()]);
+	const settings = await getSettings();
 
 	return (
 		<html
@@ -123,10 +124,13 @@ const RootLayout = async ({ children }: { children: React.ReactNode }) => {
 					<LinkPreloader />
 					<NavigationWave>
 						<ProfileReveal profile={<Profile />}>
-							<Header projects={projectsLink} />
+							<Header />
 							<ViewTransition name='page-viewport' update='none' default='none'>
 								<main id='page'>
 									<SmoothScroll>{children}</SmoothScroll>
+									<Suspense fallback={null}>
+										<ProjectsRibbon />
+									</Suspense>
 								</main>
 							</ViewTransition>
 						</ProfileReveal>

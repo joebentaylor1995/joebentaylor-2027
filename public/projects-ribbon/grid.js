@@ -1,10 +1,37 @@
 'use strict';
 // The grid holds metadata for the entire catalogue, but renders only viewport cells.
 // Its bounded texture cache therefore stays the same size for 25 or 1,000 projects.
-// Host integration: a project with no link (Sanity sends href: null — a listing-only project without an
-// external link) can't be opened: no pointer cursor, no click, and a locked "Coming soon" tooltip.
-// Bundled fallback items have no href key at all and keep their original behaviour.
-function isProjectClickable(project){return Boolean(project)&&project.href!==null}
+// Case studies require an explicit Is ready toggle. External listings keep their own links.
+// Missing links/readiness fail closed, including the bundled placeholder catalogue.
+function isProjectClickable(project){
+ if(!project||typeof project.href!=='string'||!project.href.trim())return false;
+ if(/^\/projects\/[^/]+\/?$/.test(project.href))return project.isReady===true;
+ return /^https?:\/\//.test(project.href);
+}
+let tooltipInput=null,tooltipPoint=null,tooltipDismissed=false,tooltipKey=null;
+function projectKind(project){return !isProjectClickable(project)?'Coming soon':project.href.startsWith('/')?'View':'View Offsite'}
+function clearProjectTooltip(){
+ const label=document.querySelector('#hover-title'),stage=document.querySelector('#stage');
+ label.hidden=true;tooltipKey=null;stage.removeAttribute('aria-describedby');stage.removeAttribute('aria-disabled');
+}
+function projectLockIcon(){
+ const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
+ svg.setAttribute('viewBox','0 0 10 12');svg.setAttribute('width','9');svg.setAttribute('height','11');svg.setAttribute('aria-hidden','true');svg.setAttribute('class','lock');
+ const shackle=document.createElementNS(ns,'path');shackle.setAttribute('d','M2.75 5.25V3.5a2.25 2.25 0 0 1 4.5 0v1.75');shackle.setAttribute('fill','none');shackle.setAttribute('stroke','currentColor');shackle.setAttribute('stroke-width','1.3');
+ const body=document.createElementNS(ns,'rect');body.setAttribute('x','1');body.setAttribute('y','5');body.setAttribute('width','8');body.setAttribute('height','6.25');body.setAttribute('rx','1.4');body.setAttribute('fill','currentColor');
+ svg.append(shackle,body);return svg;
+}
+function showProjectTooltip(project,point){
+ if(!project||!point||tooltipDismissed){clearProjectTooltip();return;}
+ const label=document.querySelector('#hover-title'),stage=document.querySelector('#stage'),kind=projectKind(project),key=project.name+'\n'+kind;
+ if(tooltipKey!==key){
+  if(kind==='Coming soon')label.replaceChildren(projectLockIcon(),document.createTextNode(kind));else label.textContent=kind;
+  label.classList.toggle('is-case-study',kind==='View');tooltipKey=key;
+  stage.setAttribute('aria-label',`${project.name} — ${kind==='View'?'case study. Press Enter to open.':kind==='View Offsite'?'external project. Opens in a new tab.':'coming soon'}`);
+ }
+ label.hidden=false;stage.setAttribute('aria-describedby','hover-title');stage.setAttribute('aria-disabled',String(!isProjectClickable(project)));
+ label.style.left=Math.max(12,Math.min(point.x+18,innerWidth-label.offsetWidth-20))+'px';label.style.top=Math.max(12,Math.min(point.y+20,innerHeight-70))+'px';
+}
 // Host integration: the All projects grid layout — a shuffled block (rebuilt each time the grid opens)
 // wrapped across the infinite grid, so no project repeats within a screen-sized window.
 // - The window is one screen's worth of tiles, measured from the viewport (partly visible tiles included),
@@ -240,37 +267,20 @@ class ProjectGrid {
  isActive(){return this.target===1}
  ribbonHandoff(){const t=Math.max(0,Math.min(1,this.mix/.18));return 1-t*t*(3-2*t)}
  wheel(e){const unit=e.deltaMode===1?16:e.deltaMode===2?innerHeight:1;this.goal.y-=Math.max(-600,Math.min(600,e.deltaY*unit));this.goal.x-=Math.max(-600,Math.min(600,e.deltaX*unit));this.requestFrame()}
- pointerDown(e){this.drag={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};this.goal={...this.pan};this.clearHover()}
+ pointerDown(e){this.pointer={x:e.clientX,y:e.clientY};this.drag={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};this.goal={...this.pan};this.clearHover()}
  pointerMove(e){this.pointer={x:e.clientX,y:e.clientY};if(this.drag){const dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.goal.x+=dx;this.goal.y+=dy;this.drag.x=e.clientX;this.drag.y=e.clientY;this.drag.moved ||= Math.hypot(e.clientX-this.drag.startX,e.clientY-this.drag.startY)>5;}this.requestFrame()}
  pointerUp(){const clicked=!!this.drag&&!this.drag.moved;this.drag=null;this.requestFrame();return clicked}
- clearHover(){this.hover=null;this.hoverLabelName=null;const label=document.querySelector('#hover-title');if(!label.hidden)label.hidden=true;}
+ clearHover(){this.hover=null;clearProjectTooltip();}
  inversePoint(x,y){const sx=(x-innerWidth/2)*2/innerWidth,sy=-(y-innerHeight/2)*2/innerHeight;let factor=1;for(let i=0;i<12;i++){const q=(sx*sx+.4*sy*sy)/(factor*factor);factor=(factor+1+this.bend*q)*.5}return{x:sx/factor*innerWidth/2,y:-sy/factor*innerHeight/2}}
  hitTest(x,y){if(this.mapPointer){const point=this.mapPointer(x,y);x=point.x;y=point.y;}if(this.mix<.96||!this.target||!this.projects.length)return null;const p=this.inversePoint(x,y),d=this.dimensions(),row=Math.round((p.y-this.pan.y)/d.pitchY),col=Math.round((p.x-this.pan.x)/d.pitchX-this.rowShift(row));if(Math.abs(p.x-this.pan.x-(col+this.rowShift(row))*d.pitchX)>d.width/2||Math.abs(p.y-this.pan.y-row*d.pitchY)>d.height/2)return null;const index=this.indexFor(col,row);return {index,project:this.projects[index],col,row}}
- // Host integration: the tooltip only says where a project opens — the name and services already show
- // bottom-left. "View" is a case study on this site (styled as a borderless pill, see .is-case-study);
- // "View Offsite" is hosted elsewhere (Dribbble, an agency site); "Coming soon" (with a lock) has no link yet.
- projectKind(project){
-  const href=project.href;if(href===null)return'Coming soon';if(typeof href!=='string')return null;
-  return href.startsWith('/')?'View':/^https?:\/\//.test(href)?'View Offsite':null;
- }
- // A small padlock, built from DOM nodes (never HTML strings); it takes the tooltip's text colour.
- lockIcon(){
-  const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
-  svg.setAttribute('viewBox','0 0 10 12');svg.setAttribute('width','9');svg.setAttribute('height','11');svg.setAttribute('aria-hidden','true');svg.setAttribute('class','lock');
-  const shackle=document.createElementNS(ns,'path');shackle.setAttribute('d','M2.75 5.25V3.5a2.25 2.25 0 0 1 4.5 0v1.75');shackle.setAttribute('fill','none');shackle.setAttribute('stroke','currentColor');shackle.setAttribute('stroke-width','1.3');
-  const body=document.createElementNS(ns,'rect');body.setAttribute('x','1');body.setAttribute('y','5');body.setAttribute('width','8');body.setAttribute('height','6.25');body.setAttribute('rx','1.4');body.setAttribute('fill','currentColor');
-  svg.append(shackle,body);return svg;
- }
  refreshHover(){
-  if(!this.target){this.clearHover();document.querySelector('#stage').setAttribute('aria-label','Featured projects. Scroll or drag to explore the curved ribbon.');return;}
-  const hit=this.pointer&&!this.drag?this.hitTest(this.pointer.x,this.pointer.y):null;this.hover=hit;
-  const title=document.querySelector('#hover-title'),canvas=document.querySelector('#stage');
+  if(!this.target){this.clearHover();return;}
+  const point=tooltipInput==='keyboard'?{x:innerWidth/2,y:innerHeight/2}:this.pointer;
+  const hit=point&&!this.drag?this.hitTest(point.x,point.y):null;this.hover=hit;
+  const canvas=document.querySelector('#stage');
   canvas.style.cursor=this.drag?'grabbing':isProjectClickable(hit?.project)?'pointer':'grab';
-  if(hit){
-   const labelKey=`${hit.project.name}\n${hit.project.href??''}`;
-   if(this.hoverLabelName!==labelKey){const kind=this.projectKind(hit.project);if(kind==='Coming soon')title.replaceChildren(this.lockIcon(),document.createTextNode(kind));else title.textContent=kind??'';title.classList.toggle('is-case-study',kind==='View');title.hidden=!kind;this.hoverLabelWidth=title.offsetWidth;this.hoverLabelName=labelKey;canvas.setAttribute('aria-label',isProjectClickable(hit.project)?`${hit.project.name}${kind?` — ${kind==='View'?'case study':'external, opens in a new tab'}`:''}. Click to open.`:`${hit.project.name} — coming soon`)}
-   title.style.left=Math.min(this.pointer.x+18,innerWidth-this.hoverLabelWidth-20)+'px';title.style.top=Math.min(this.pointer.y+20,innerHeight-70)+'px';
-  }else if(!title.hidden||this.hoverLabelName!==null){title.hidden=true;this.hoverLabelName=null;canvas.setAttribute('aria-label','All projects. Drag in any direction or scroll vertically to explore the infinite grid.')}
+  showProjectTooltip(hit?.project,point);
+  if(!hit)canvas.setAttribute('aria-label','All projects. Drag in any direction or scroll vertically to explore the infinite grid.');
  }
  requestTexture(index){
   // Host integration: Video loop tiles key by their video so the poster and the loop share one entry.

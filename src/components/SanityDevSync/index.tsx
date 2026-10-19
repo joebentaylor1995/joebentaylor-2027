@@ -19,7 +19,7 @@ const SETTLE_MS = 400;
 // webhook can't reach localhost, so without this a publish never clears the
 // local cache. This listens for published changes and does the webhook's job:
 // clears the Sanity cache tag via /api/revalidate/ (dev-only GET) and refreshes
-// the page — so flipping “Projects live” or editing copy shows up straight away.
+// the page — so edits to page copy show up straight away.
 const SanityDevSync = () => {
 	// Context
 	const router = useRouter();

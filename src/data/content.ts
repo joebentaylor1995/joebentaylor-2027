@@ -20,7 +20,6 @@ import {
 	GET_PROJECT,
 	GET_PROJECT_SLUGS,
 	GET_PROJECTS_PAGE,
-	isDraftMode,
 } from '@cms';
 import type { ToolkitItem, ToolkitLayer } from '@parts/Profile/Usps/Toolkit/interface';
 import ribbonFeatured from '@public/projects-ribbon/featured.json';
@@ -37,7 +36,6 @@ import {
 	PLACEHOLDER_IMAGE,
 	type ProfileImage,
 	type ProfilePanelContent,
-	type ProjectsLink,
 	type ProjectsPageContent,
 	type Review,
 	type RibbonProject,
@@ -164,6 +162,7 @@ const toRibbonProjects = (items: (Nullable<RibbonProject> | null)[] | null | und
 					{
 						id: item.id ?? undefined,
 						name: item.name,
+						isReady: item.isReady === true,
 						tags: (item.tags ?? []).filter(
 							(tag): tag is string => typeof tag === 'string' && tag.trim().length > 0
 						),
@@ -181,26 +180,6 @@ const toRibbonProjects = (items: (Nullable<RibbonProject> | null)[] | null | und
 // NOTE • Settings only feed metadata, structured data and links — always clean
 export const getSettings = async (): Promise<SiteSettings> =>
 	stegaClean(withFallback(await fetchContent<Nullable<SiteSettings>>(GET_GLOBAL), fallbackSettings));
-
-// SECTION • Projects launch switch
-// NOTE • Where the header's Projects link points while projects aren't live
-const COMING_SOON_FALLBACK_URL = 'https://dribbble.com/joebentaylor';
-
-/**
- * Visitors only see /projects and the case studies once “Projects live” is on
- * in Global settings. Draft mode (Sanity Presentation) always sees them, so
- * they can be built and previewed on production before launch.
- */
-export const areProjectsVisible = async (): Promise<boolean> =>
-	(await getSettings()).projectsLive || (await isDraftMode());
-
-export const getProjectsLink = async (): Promise<ProjectsLink> => {
-	const { socials } = await getSettings();
-	return {
-		isLive: await areProjectsVisible(),
-		comingSoonUrl: socials.find(({ platform }) => platform === 'dribbble')?.url ?? COMING_SOON_FALLBACK_URL,
-	};
-};
 
 export const getHome = async (): Promise<HomeContent> =>
 	withFallback(await fetchContent<Nullable<HomeContent>>(GET_HOME), fallbackHome);

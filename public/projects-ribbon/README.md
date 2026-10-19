@@ -35,14 +35,17 @@ Missing or failing posters fall back to the `placeholder` URL the API sends
 (`PLACEHOLDER_IMAGE` in `src/data/site.ts`) — in `imageLoad` (app.js) and the
 grid's texture loader (grid.js) — so one bad image can't stop the ribbon.
 
-The All projects grid's hover tooltip shows only where a project opens, from
-its `href`: “View” for a case study on this site (borderless, brand-c3 fill), or “View Offsite” for one
+The ribbon and grid's tooltip shows where a project opens, from
+its `href`: “View” for a ready case study on this site (borderless, brand-c3 fill), or “View Offsite” for one
 hosted elsewhere (Dribbble, an agency site) — the name and services already
-show bottom-left. See `projectKind` in `grid.js`.
+show bottom-left. See `projectKind` in `grid.js`. Keyboard focus selects the
+centre tile; Enter/Space opens it, and Escape dismisses its tooltip. Tapping a
+locked tile also shows the tooltip without navigating.
 
-A project with no link (Sanity sends `href: null` — listing-only with no
-external link) can't be opened: grab cursor, no click, and a locked “Coming soon” tooltip (`isProjectClickable`
-in `grid.js`, used by the grid's hover and `projectClick` in `app.js`).
+Case studies only open when Sanity sends `isReady: true`. False or missing
+readiness, and projects with no link, show a grab cursor and locked “Coming soon”
+tooltip (`isProjectClickable` in `grid.js`, shared by both views and
+`projectClick` in `app.js`). Explicit external listing links remain clickable.
 
 Video loop projects also play in the All projects grid (`attachVideo` /
 `updateVideoTexture` in `grid.js`): the poster shows until the loop has a frame,

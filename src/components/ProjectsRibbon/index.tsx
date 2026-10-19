@@ -6,7 +6,7 @@ import { heroFrame } from '@parts/ProjectHero/framing';
 import type { ProjectHeroProps } from '@parts/ProjectHero/interface';
 // Imports
 // ------------
-import { isLoaderSettled } from '@parts/SiteLoader/events';
+import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { mq } from '@tackl';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useRef, useState } from 'react';
@@ -23,7 +23,8 @@ const FALLBACK_CASE_STUDY = '/projects/pocketchange';
 // Component
 // ------------
 const ProjectsRibbon = () => {
-	const { lenisRef } = use(GlobalContext);
+	const { lenisRef, pagePath } = use(GlobalContext);
+	const active = /^\/projects\/?$/.test(pagePath);
 	// Refs
 	const frame = useRef<HTMLIFrameElement>(null);
 	const measure = useRef<HTMLDivElement>(null);
@@ -36,8 +37,8 @@ const ProjectsRibbon = () => {
 	// Handlers
 	const syncRoute = () => {
 		if (frame.current?.contentWindow?.location.pathname !== '/projects-ribbon/index.html') return;
-		frame.current.dataset.ready = 'true';
-		frame.current?.contentWindow?.postMessage({ type: 'projects:route' }, window.location.origin);
+		frame.current?.contentWindow?.postMessage({ type: 'projects:active', active }, window.location.origin);
+		if (active) frame.current?.contentWindow?.postMessage({ type: 'projects:route' }, window.location.origin);
 	};
 
 	// Effects
@@ -84,6 +85,7 @@ const ProjectsRibbon = () => {
 	useEffect(() => {
 		// Header links stay interactive while their pointer motion reaches the canvas below.
 		const forward = (event: PointerEvent) => {
+			if (!active) return;
 			if (!(event.target instanceof Element) || !event.target.closest('header')) return;
 			const element = frame.current;
 			const canvas = element?.contentDocument?.querySelector('canvas');
@@ -102,14 +104,18 @@ const ProjectsRibbon = () => {
 		};
 		window.addEventListener('pointermove', forward, { passive: true });
 		return () => window.removeEventListener('pointermove', forward);
-	}, []);
+	}, [active]);
 
 	useEffect(() => {
 		const openProject = async (event: MessageEvent) => {
 			if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow) return;
+			if (event.data?.type === 'projects:error') {
+				frame.current?.setAttribute('data-ready', 'true');
+				return;
+			}
 			if (event.data?.type === 'projects:wave-ready') {
 				frame.current?.setAttribute('data-ready', 'true');
-				frame.current?.setAttribute('data-liquid-ready', 'true');
+				frame.current?.setAttribute('data-ribbon-ready', 'true');
 				return;
 			}
 			if (
@@ -152,7 +158,7 @@ const ProjectsRibbon = () => {
 					// Navigation still works if the browser cannot decode the cover.
 				}
 				router.push(href, { transitionTypes: ['project-mesh'] });
-			} else if (href.startsWith('https:')) window.open(href, '_blank', 'noopener,noreferrer');
+			} else if (/^https?:\/\//.test(href)) window.open(href, '_blank', 'noopener,noreferrer');
 		};
 		window.addEventListener('message', openProject);
 		return () => window.removeEventListener('message', openProject);
@@ -162,20 +168,22 @@ const ProjectsRibbon = () => {
 		const element = frame.current;
 		if (!element) return;
 		// Prepare the canvas behind the first-visit loader so its wave can refract it.
-		const playIntroduction = !isLoaderSettled();
 		let started = false;
 		const start = () => {
 			if (started) return;
 			started = true;
+			const playIntroduction = /^\/projects\/?$/.test(location.pathname) && !isLoaderSettled();
 			// Replace avoids adding iframe-only entries to the browser's Back stack.
 			element.contentWindow?.location.replace(
 				`/projects-ribbon/index.html${playIntroduction ? '?loaderWave=1' : '?entrance=cascade'}`
 			);
 		};
-		start();
+		if (/^\/projects\/?$/.test(location.pathname) || isLoaderSettled()) start();
+		else window.addEventListener(LOADER_SETTLED, start, { once: true });
 		return () => {
-			delete element.dataset.liquidReady;
-			// Next's Activity cache retains hidden DOM: unload its GPU/video resources.
+			window.removeEventListener(LOADER_SETTLED, start);
+			delete element.dataset.ribbonReady;
+			// The layout owns this frame; only a document teardown unloads it.
 			delete element.dataset.ready;
 			element.contentWindow?.location.replace('about:blank');
 		};
@@ -183,12 +191,21 @@ const ProjectsRibbon = () => {
 
 	useEffect(() => {
 		// Also handles Next.js navigation back to /projects from its header link.
-		frame.current?.contentWindow?.postMessage({ type: 'projects:route', project }, window.location.origin);
-	}, [project]);
+		frame.current?.contentWindow?.postMessage({ type: 'projects:active', active }, window.location.origin);
+		if (active)
+			frame.current?.contentWindow?.postMessage({ type: 'projects:route', project }, window.location.origin);
+	}, [project, active]);
 
 	// Render
 	return (
-		<section className={s.jacket} aria-label='Projects' data-lenis-prevent>
+		<section
+			className={s.jacket}
+			aria-label='Projects'
+			data-state={active ? 'active' : 'cached'}
+			aria-hidden={!active}
+			inert={!active}
+			data-lenis-prevent
+		>
 			<iframe ref={frame} title='Interactive projects' onLoad={syncRoute} />
 			{preview && (
 				<div ref={measure} className={s.measure} aria-hidden='true' inert>

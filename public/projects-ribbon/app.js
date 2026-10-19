@@ -4,6 +4,15 @@ const canvas=document.querySelector('#stage');
 try{for(const token of ['--brand-c1','--brand-c4','--brand-c5']){const colour=getComputedStyle(window.parent.document.documentElement).getPropertyValue(token).trim();if(colour)document.documentElement.style.setProperty(token,colour)}}catch{}
 const mobileViewport=matchMedia('(width < 768px)');
 let mobile=mobileViewport.matches;
+let hostActive=window.parent===window||/^\/projects\/?$/.test(window.parent.location.pathname),hostPrepared=false;
+const hostTransition=()=>window.parent!==window&&window.parent.document.documentElement.matches('[data-navigation-pending], [data-navigation-wave]');
+window.addEventListener('message',event=>{
+ if(event.source!==window.parent||event.origin!==location.origin||event.data?.type!=='projects:active')return;
+ hostActive=event.data.active===true;
+ idleMotion.reset(false);clearTimeout(snapTimer);target=position;scrollVelocity=0;
+ if(!hostActive){for(const item of videoSlides)item.video.pause();}else{lastTime=0;requestRender();}
+});
+if(window.parent!==window)new MutationObserver(()=>{idleMotion.reset(false);if(hostTransition()){for(const item of videoSlides)item.video.pause();}else if(hostActive){lastTime=0;requestRender()}}).observe(window.parent.document.documentElement,{attributes:true,attributeFilter:['data-navigation-pending','data-navigation-wave']});
 let settingsKey=mobile?'ribbon-settings-mobile':'ribbon-settings';
 const gl=canvas.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:false});
 let loaderWave=new URL(location.href).searchParams.has('loaderWave')&&gl?new RibbonLoaderWave(gl):null;
@@ -114,6 +123,7 @@ function syncTwist(){syncMouseTilt();twistToggle.checked=!!state.twist;for(const
 twistToggle.onchange=()=>{state.twist=twistToggle.checked?1:0;syncTwist();saveSettings();requestRender()};syncTwist();
 const mod=(v,n)=>(v%n+n)%n;
 function updateUI(){
+ if(!gridView?.target)refreshFeaturedTooltip();
  const key=gridView?.target?'grid:'+ (gridView.hover?.index??'none')+':'+gridView.projects.length:'featured:'+mod(Math.round(position),count);
  if(key===uiKey)return;uiKey=key;
  const currentProject=gridView?.target?gridView.hover?.project:featured[mod(Math.round(position),count)];
@@ -127,17 +137,26 @@ function buildDots(){uiKey='';document.querySelector('#dots').replaceChildren();
 function returningToFeatured(){return projectTransition.active||projectTransition.loading||projectTransition.returning||gridView?.returning&&!gridView.target&&gridView.mix>0}
 function move(direction){if(returningToFeatured())return;clearTimeout(snapTimer);target=Math.round(target)+direction;requestRender()}
 document.querySelector('#prev').onclick=()=>move(-1);document.querySelector('#next').onclick=()=>move(1);
-window.addEventListener('keydown',e=>{if(returningToFeatured())return;if(/INPUT|BUTTON|SELECT/.test(e.target.tagName))return;if(e.target===canvas&&(e.key==='Enter'||e.key===' ')){e.preventDefault();projectKeyboardClick();return;}if(gridView?.isActive()){const step=150;if(e.key==='ArrowLeft')gridView.goal.x+=step;else if(e.key==='ArrowRight')gridView.goal.x-=step;else if(e.key==='ArrowUp')gridView.goal.y+=step;else if(e.key==='ArrowDown')gridView.goal.y-=step;else return;e.preventDefault();requestRender();return;}if(e.key==='ArrowRight'||e.key==='ArrowLeft'||(state.vertical&&(e.key==='ArrowDown'||e.key==='ArrowUp'))){e.preventDefault();move(e.key==='ArrowRight'||e.key==='ArrowDown'?1:-1)}});
+window.addEventListener('keydown',e=>{if(returningToFeatured())return;if(/INPUT|BUTTON|SELECT/.test(e.target.tagName))return;if(e.key==='Escape'){tooltipDismissed=true;clearProjectTooltip();return;}if(e.target===canvas){tooltipInput='keyboard';tooltipDismissed=false;requestRender();if(e.key==='Enter'||e.key===' '){e.preventDefault();projectKeyboardClick();return;}}if(gridView?.isActive()){const step=150;if(e.key==='ArrowLeft')gridView.goal.x+=step;else if(e.key==='ArrowRight')gridView.goal.x-=step;else if(e.key==='ArrowUp')gridView.goal.y+=step;else if(e.key==='ArrowDown')gridView.goal.y-=step;else return;e.preventDefault();requestRender();return;}if(e.key==='ArrowRight'||e.key==='ArrowLeft'||(state.vertical&&(e.key==='ArrowDown'||e.key==='ArrowUp'))){e.preventDefault();move(e.key==='ArrowRight'||e.key==='ArrowDown'?1:-1)}});
 function scheduleSnap(){clearTimeout(snapTimer);if(projectTransition.loading||projectTransition.active)return;if(document.querySelector('#snap').checked)snapTimer=setTimeout(()=>{target=Math.round(target);requestRender()},160)}
 canvas.addEventListener('wheel',e=>{e.preventDefault();if(returningToFeatured())return;if(gridView?.isActive()){gridView.wheel(e);return;}const delta=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;target+=Math.max(-250,Math.min(250,delta*(e.deltaMode===1?16:e.deltaMode===2?innerHeight:1)))*.0025*state.speed/100;scheduleSnap();requestRender()},{passive:false});
 let drag=null;
-canvas.addEventListener('pointerdown',e=>{if(returningToFeatured())return;clearTimeout(snapTimer);canvas.setPointerCapture(e.pointerId);if(gridView?.isActive()){gridView.pointerDown(e);return;}drag={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};canvas.style.cursor='grabbing'});
-canvas.addEventListener('pointermove',e=>{if(returningToFeatured())return;if(gridView?.isActive()){gridView.pointerMove(e);return;}if(!drag){canvas.style.cursor=pickFeatured(e.clientX,e.clientY)?'pointer':'grab';return;}target+=(state.vertical?(e.clientY-drag.y)/Math.max(220,innerHeight*.3):(drag.x-e.clientX)/Math.max(220,innerWidth*.3))*state.speed/100;drag.x=e.clientX;drag.y=e.clientY;drag.moved ||= Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>5;requestRender()});
-function projectClick(project,hit){if(!isProjectClickable(project))return;if(window.parent!==window&&project.href?.startsWith('https:')){window.parent.postMessage({type:'projects:open',href:project.href},location.origin);return;}projectTransition.open(project,hit||project.ribbonHit);canvas.dispatchEvent(new CustomEvent('project:select',{detail:{project},bubbles:true}));}
-function projectKeyboardClick(){if(gridView?.isActive()){const hit=gridView.hover||gridView.hitTest(innerWidth/2,innerHeight/2);if(hit)projectClick(hit.project,{...hit,grid:true})}else projectClick(pickFeatured(innerWidth/2,innerHeight/2));}
-canvas.addEventListener('pointerup',e=>{if(returningToFeatured())return;if(gridView?.isActive()){if(gridView.pointerUp()){const hit=gridView.hitTest(e.clientX,e.clientY);if(hit)projectClick(hit.project,{...hit,grid:true})}}else{if(drag&&!drag.moved)projectClick(pickFeatured(e.clientX,e.clientY));drag=null;scheduleSnap()}canvas.style.cursor='grab'});
+canvas.addEventListener('pointerdown',e=>{if(returningToFeatured())return;tooltipInput=e.pointerType==='touch'?'touch':'pointer';tooltipPoint={x:e.clientX,y:e.clientY};tooltipDismissed=false;clearProjectTooltip();clearTimeout(snapTimer);canvas.setPointerCapture(e.pointerId);if(gridView?.isActive()){gridView.pointerDown(e);return;}drag={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};canvas.style.cursor='grabbing'});
+canvas.addEventListener('pointermove',e=>{if(returningToFeatured())return;tooltipInput=e.pointerType==='touch'?'touch':'pointer';tooltipPoint={x:e.clientX,y:e.clientY};tooltipDismissed=false;if(gridView?.isActive()){gridView.pointerMove(e);return;}if(!drag){refreshFeaturedTooltip();return;}clearProjectTooltip();target+=(state.vertical?(e.clientY-drag.y)/Math.max(220,innerHeight*.3):(drag.x-e.clientX)/Math.max(220,innerWidth*.3))*state.speed/100;drag.x=e.clientX;drag.y=e.clientY;drag.moved ||= Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>5;requestRender()});
+function projectClick(project,hit){if(!isProjectClickable(project)){showProjectTooltip(project,tooltipInput==='keyboard'?{x:innerWidth/2,y:innerHeight/2}:tooltipPoint);return;}clearProjectTooltip();if(/^https?:\/\//.test(project.href)){if(window.parent!==window)window.parent.postMessage({type:'projects:open',href:project.href},location.origin);else window.open(project.href,'_blank','noopener,noreferrer');return;}projectTransition.open(project,hit||project.ribbonHit);canvas.dispatchEvent(new CustomEvent('project:select',{detail:{project},bubbles:true}));}
+function projectKeyboardClick(){if(gridView?.isActive()){const hit=gridView.hitTest(innerWidth/2,innerHeight/2);if(hit)projectClick(hit.project,{...hit,grid:true})}else projectClick(pickFeatured(innerWidth/2,innerHeight/2));}
+canvas.addEventListener('pointerup',e=>{if(returningToFeatured())return;tooltipInput=e.pointerType==='touch'?'touch':'pointer';tooltipPoint={x:e.clientX,y:e.clientY};if(gridView?.isActive()){if(gridView.pointerUp()){const hit=gridView.hitTest(e.clientX,e.clientY);if(hit)projectClick(hit.project,{...hit,grid:true})}}else{if(drag&&!drag.moved)projectClick(pickFeatured(e.clientX,e.clientY));drag=null;scheduleSnap()}requestRender();});
 canvas.addEventListener('pointercancel',()=>{drag=null;if(gridView)gridView.drag=null});
-canvas.addEventListener('pointerleave',()=>{if(gridView){gridView.pointer=null;gridView.clearHover();requestRender()}});
+canvas.addEventListener('pointerleave',e=>{if(e.pointerType==='touch')return;tooltipPoint=null;if(tooltipInput==='pointer')tooltipInput=null;clearProjectTooltip();if(gridView){gridView.pointer=null;gridView.clearHover();requestRender()}});
+canvas.addEventListener('focus',()=>{tooltipInput='keyboard';tooltipDismissed=false;requestRender()});
+canvas.addEventListener('blur',()=>{tooltipInput=null;tooltipPoint=null;clearProjectTooltip();if(gridView)gridView.pointer=null;requestRender()});
+function refreshFeaturedTooltip(){
+ const point=tooltipInput==='keyboard'?{x:innerWidth/2,y:innerHeight/2}:tooltipPoint;
+ const project=ready&&point&&!drag&&!returningToFeatured()?pickFeatured(point.x,point.y):null;
+ canvas.style.cursor=drag?'grabbing':isProjectClickable(project)?'pointer':'grab';
+ showProjectTooltip(project,point);
+ if(!project)canvas.setAttribute('aria-label','Featured projects. Scroll, drag, or use the arrow keys to explore.');
+}
 function pickFeatured(clientX,clientY){
  const shaped=featuredView();
  const x=(clientX/innerWidth*2-1)*innerWidth/innerHeight*.77/shaped.scale*100,y=(1-clientY/innerHeight*2)*.77/shaped.scale*100,a=shaped.rotation*Math.PI/180;
@@ -156,6 +175,7 @@ function pickFeatured(clientX,clientY){
 function setProjectView(all){
  if(mobile)all=false;
  if(!gridView)return;idleMotion.reset();introduction.finish();clearTimeout(snapTimer);drag=null;scrollVelocity=0;target=position;const selected=gridView.setView(all,position,!!state.vertical);if(selected!==null)position=target=selected;
+ tooltipInput=null;tooltipPoint=null;clearProjectTooltip();
  canvas.setAttribute('aria-label',all?'All projects. Drag in any direction or scroll vertically to explore the infinite grid.':'Featured projects. Scroll or drag to explore the curved ribbon.');document.body.classList.toggle('all-projects',all);document.querySelector('#view-featured').setAttribute('aria-pressed',String(!all));document.querySelector('#view-all').setAttribute('aria-pressed',String(all));
  document.querySelector('#featured-controls').hidden=all;document.querySelector('#grid-controls').hidden=!all;
  document.querySelector('.panel-copy').textContent=all?'A quieter grid. Curvature follows motion.':'Inside the ribbon. Find your perspective.';
@@ -343,7 +363,7 @@ function drawFeaturedRibbons(){
   gl.depthMask(true);gl.disable(gl.BLEND);
  }
 }
-function requestRender(){if(ready&&!raf)raf=requestAnimationFrame(render)}
+function requestRender(){if(ready&&!raf&&(hostActive||!hostPrepared))raf=requestAnimationFrame(render)}
 function updateStackedDeparture(dt){
  const destination=gridView&&(gridView.target||gridView.mix>.12)?1:0;
  stackedDeparture+=(destination-stackedDeparture)*(reduced?1:1-Math.exp(-dt*(destination?16:10)));
@@ -351,6 +371,7 @@ function updateStackedDeparture(dt){
  if(state.stacked&&stackedDeparture!==destination)requestRender();
 }
 function render(time){
+ if(hostPrepared&&(!hostActive||hostTransition())){raf=0;return;}
  const dpr=exportPixelRatio||Math.min(devicePixelRatio||1,mobile?1.5:2);
  const w=Math.round(innerWidth*dpr),h=Math.round(innerHeight*dpr);
  if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}
@@ -416,7 +437,7 @@ function updateVideoTextures(){
  for(const item of videoSlides){
   const video=item.video;
   {
-   if(!videoIsVisible(item.index)||document.hidden){if(!video.paused)video.pause();continue;}
+   if(!hostActive||hostTransition()||!videoIsVisible(item.index)||document.hidden){if(!video.paused)video.pause();continue;}
    if(video.paused&&!item.playPending&&!item.playBlocked&&!document.hidden){item.playPending=true;video.play().catch(()=>{item.playBlocked=true}).finally(()=>{item.playPending=false})}
   }
   if(!videoIsVisible(item.index)||video.readyState<2||(!item.dirty&&video.requestVideoFrameCallback))continue;
@@ -440,10 +461,10 @@ function startFeaturedVideos(){
   video.addEventListener('playing',()=>{requestRender();if(videoSlides.every(item=>!item.video.error&&!item.video.paused))document.querySelector('#upload-note').textContent='Each image or video appears on both sides.'});
   video.addEventListener('error',()=>{document.querySelector('#upload-note').textContent='A video could not load. Its poster is shown instead.'});
   if(video.requestVideoFrameCallback)item.callback=video.requestVideoFrameCallback(frame);
-  if(videoIsVisible(index))video.play().catch(()=>{item.playBlocked=true;document.querySelector('#upload-note').textContent='Click or scroll the ribbon to start the muted videos.'});
+  if(hostActive&&!hostTransition()&&videoIsVisible(index))video.play().catch(()=>{item.playBlocked=true;document.querySelector('#upload-note').textContent='Click or scroll the ribbon to start the muted videos.'});
  }
 }
-function resumeVideos(){if(document.hidden||projectTransition.active)return;for(const item of videoSlides){item.playBlocked=false;if(item.video.paused&&videoIsVisible(item.index))item.video.play().catch(()=>{item.playBlocked=true})}}
+function resumeVideos(){if(!hostActive||hostTransition()||document.hidden||projectTransition.active)return;for(const item of videoSlides){item.playBlocked=false;if(item.video.paused&&videoIsVisible(item.index))item.video.play().catch(()=>{item.playBlocked=true})}}
 canvas.addEventListener('pointerdown',resumeVideos);canvas.addEventListener('wheel',resumeVideos,{passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){for(const item of videoSlides)item.video.pause()}else{resumeVideos();requestRender()}});
 document.querySelector('#upload').onclick=()=>document.querySelector('#files').click();document.querySelector('#files').onchange=async e=>{const files=[...e.target.files].filter(f=>f.type.startsWith('image/')).slice(0,12);if(!files.length)return;const urls=files.map(f=>URL.createObjectURL(f));try{const images=await Promise.all(urls.map(imageLoad));names=files.map(f=>f.name.replace(/\.[^.]+$/,''));count=names.length;position=target=0;makeAtlas(images,true);featured=names.map((name,index)=>({name,index,poster:urls[index]}));gridView.setProjects(featured,featured);document.querySelector('#all-count').textContent=featured.length;setProjectView(false);buildDots();document.querySelector('#upload-note').textContent=`${count} image${count===1?'':'s'} loaded. Stored only in this tab.`}catch{document.querySelector('#upload-note').textContent='Could not read those images. Try JPG, PNG, or WebP.'}finally{urls.forEach(URL.revokeObjectURL);e.target.value=''}};
@@ -475,7 +496,9 @@ async function applyRibbonCatalog(){
   setup();gridView=new ProjectGrid(gl,requestRender);syncDirection();
   // Host integration: the CMS catalog (Sanity via /api/projects-ribbon), falling back to the bundled JSON.
   const loadJson=url=>fetch(url).then(response=>{if(!response.ok)throw Error('Project items could not load. Please reload.');return response.json()});
-  [featuredProjects,allProjects]=await loadJson('/api/projects-ribbon/').then(data=>{window.ribbonPlaceholder=data.placeholder;return[data.featured,data.all]}).catch(()=>Promise.all([loadJson('featured.json'),loadJson('projects.json')]));
+  const preloaded=window.parent.getPreloadedProjects?.();
+  const catalog=preloaded?preloaded.catch(()=>loadJson('/api/projects-ribbon/')):loadJson('/api/projects-ribbon/');
+  [featuredProjects,allProjects]=await catalog.then(data=>{window.ribbonPlaceholder=data.placeholder;return[data.featured,data.all]}).catch(()=>Promise.all([loadJson('featured.json'),loadJson('projects.json')]));
   allProjects=allProjects.map((project,index)=>({...project,index}));
   await applyRibbonCatalog();
   // Internal navigation already has its page wave: only cascade the slides afterwards.
@@ -485,12 +508,13 @@ async function applyRibbonCatalog(){
   if(loaderWave){
    introduction.finish();
    if(window.parent.document.querySelector('[data-site-loader]')?.dataset.complete==='true'){loaderWave.dispose();loaderWave=null;}
-   window.parent.postMessage({type:'projects:wave-ready'},location.origin);
   // Host integration: no card entrance — the ribbon appears in its resting state (the page transition
   // still plays). The cascade stays available from the tuning panel's Replay button.
   }else introduction.finish();
+  // Let atlas uploads and the first canvas paint finish before the host reveals us.
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{hostPrepared=true;window.parent.postMessage({type:'projects:wave-ready'},location.origin)}));
   const projectSlug=new URL(routeLocation.href).searchParams.get('project');if(projectSlug)projectTransition.openRoute(projectSlug);
- }catch(error){showCatalogError(error)}
+ }catch(error){showCatalogError(error);window.parent.postMessage({type:'projects:error'},location.origin)}
 })();
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();ready=false;document.querySelector('#error').hidden=false;document.querySelector('#error').textContent='The graphics connection was interrupted. Reload to restore the ribbon.'});
 

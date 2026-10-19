@@ -21,7 +21,6 @@ Reusable objects: `seo`, `mediaItem`, `caseSingle`, `caseDual`, `link`.
 
 | Group | Field | Renders |
 | --- | --- | --- |
-| Launch | `projectsLive` (off by default) | **Off:** `/projects/`, every case study and `/api/projects-ribbon/` return 404, they're left out of the sitemap, and the header's Projects link goes to Dribbble (the Dribbble social link) with a “Coming soon” label. **On:** everything goes live on publish. Draft preview / Presentation always sees the projects. See `areProjectsVisible` in `src/data/content.ts`. |
 | Identity | `name`, `shortName`, `tagline`, `jobTitle`, `description`, `knowsAbout[]` | Default `<title>` template, meta description, JSON-LD Person/WebSite, keywords |
 | SEO | `seo` (title, description, share image) | Site-wide metadata defaults + default OG card (each page may override) |
 | Contact | `email`, `bookingLink` (Cal.com path, e.g. `joebentaylor/30min`), `location` (locality, region, country) | Contact modal booking calendar, profile CTA email link, JSON-LD |
@@ -30,7 +29,8 @@ Reusable objects: `seo`, `mediaItem`, `caseSingle`, `caseDual`, `link`.
 
 `src/config.ts` → `profile` remains the **fallback**: any field left empty in
 Sanity (or Sanity being unreachable) falls back to the coded value, so the site
-never renders blank.
+never renders blank. The header always links to `/projects`; project readiness
+is controlled on each case study instead of in Global settings.
 
 ## Homepage — `homePage`
 
@@ -67,7 +67,7 @@ The listing is split into the two areas the ribbon already has:
 | `seo` | `/projects` metadata |
 
 Served to the ribbon runtime by `GET /api/projects-ribbon` in the shape it
-already understood (`name`, `type`, `poster`, `video`), plus an `href`.
+already understood (`name`, `type`, `poster`, `video`), plus `href` and `isReady`.
 
 ## Project — `project`
 
@@ -78,6 +78,7 @@ One document per piece of work. A project is either a full **case study** or a
 | --- | --- | --- |
 | Listing | `title`, `slug`, `client`, `tags[]` → `projectTag`, `thumbnail` (image + hotspot), `previewVideo` (short muted loop, file) | Ribbon + grid tile. Tags appear comma-separated beneath the featured name, in their selected order. Manage reusable names in **Project Tags**. |
 | Listing | `hasCaseStudy` (boolean), `externalUrl` | Tile opens `/projects/[slug]` or the external URL |
+| Listing / Case study | `isReady` (boolean, off by default) | Enables opening a case study from Featured and All projects. Off or unset keeps its tile visible with a locked “Coming soon” tooltip on hover, keyboard focus or tap. Publish to apply changes. External listing links and direct case-study URLs are unaffected. |
 | Case study | `heroImage` | Full-bleed hero |
 | Case study | `introduction` | Intro paragraph under the hero, also the meta description fallback |
 | Case study | `objectives[]` | Overview → objectives paragraphs |

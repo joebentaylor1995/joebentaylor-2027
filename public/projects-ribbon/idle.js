@@ -7,9 +7,10 @@ class IdleMotion {
   if(blocked||document.hidden||matchMedia('(prefers-reduced-motion: reduce)').matches){this.reset(false);return {delta:0,moving:false,stopped:false};}
   if(mode!==this.mode){this.mode=mode;this.reset(false);}
   const idle=Math.max(0,(time-this.lastActivity-3000)/1000);
-  const desired=idle>0?(mode==='featured'?Math.min(20,.25+idle*idle*.22):7):0;
+  // Constant drift: leaving the page alone must never build up scroll speed.
+  const desired=idle>0?(mode==='featured'?.08:3):0;
   const before=this.speed;
-  this.speed+=(desired-this.speed)*(1-Math.exp(-dt*(desired===0?6:1.8)));
+  this.speed=desired>0?desired:this.speed*Math.exp(-dt*6);
   if(desired===0&&this.speed<.002)this.speed=0;
   return {delta:this.speed*dt,moving:idle>0||this.speed>0,stopped:before>0&&this.speed===0};
  }

@@ -4,7 +4,7 @@
 	right: var(--gap-s);
 	bottom: var(--gap-s);
 	width: min(32rem, calc(100vw - 2 * var(--gap-s)));
-	max-height: 45dvh;
+	max-height: 70dvh;
 	padding: var(--gap-s);
 	overflow: auto;
 	overscroll-behavior: contain;
@@ -22,7 +22,7 @@
 		accent-color: var(--brand-c1);
 	}
 
-	button {
+	button, a, select {
 		padding: var(--gap-xs) var(--gap-s);
 		border: 1px solid alpha(--global-white, 25);
 		border-radius: var(--gap-xs);
@@ -40,9 +40,16 @@
 .control {
 	display: grid;
 	gap: var(--gap-xs);
+	margin-block: var(--gap-s);
 
 	span {
 		display: flex;
 		justify-content: space-between;
 	}
+}
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--gap-xs);
 }
