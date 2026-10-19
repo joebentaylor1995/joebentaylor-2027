@@ -2,8 +2,7 @@
 // ------------
 // NOTE • Feeds the WebGL ribbon runtime (public/projects-ribbon) the featured
 // and all-projects lists from Sanity's “Projects page” singleton, in the
-// shape its bundled JSON files use. Falls back to those files when Sanity
-// has nothing published.
+// runtime's catalogue shape. Only published CMS projects are returned.
 
 // Imports
 // ------------

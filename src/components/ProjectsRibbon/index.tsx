@@ -16,10 +16,6 @@ import { holdProjectHero } from './handoff';
 // ------------
 import s from './styles.module.scss';
 
-// Constants
-// ------------
-const FALLBACK_CASE_STUDY = '/projects/pocketchange';
-
 // Component
 // ------------
 const ProjectsRibbon = () => {
@@ -142,9 +138,8 @@ const ProjectsRibbon = () => {
 				return;
 			}
 			if (event.data?.type !== 'projects:open') return;
-			// NOTE • href comes from Sanity: a case study path, an external link, or
-			// nothing (the bundled fallback catalog) — which opens the sample case study
-			const href = typeof event.data.href === 'string' ? event.data.href : FALLBACK_CASE_STUDY;
+			if (typeof event.data.href !== 'string') return;
+			const href = event.data.href;
 			if (/^\/projects\/[^/]+\/?$/.test(href) && event.data.completed === true) {
 				if (typeof event.data.hero !== 'string' || !Number.isFinite(event.data.heroHeight)) return;
 				try {

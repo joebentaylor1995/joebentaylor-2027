@@ -471,6 +471,7 @@ document.querySelector('#upload').onclick=()=>document.querySelector('#files').c
 function showCatalogError(error){const status=document.querySelector('#error');status.hidden=false;status.textContent=error.message||'Images could not load. Please reload the page.';console.error(error)}
 async function applyRibbonCatalog(){
  const revision=++catalogRevision,items=mobile?allProjects:featuredProjects;
+ if(!items.length)throw Error('No projects are available yet. Please check back soon.');
  const previousPoster=featured[mod(Math.round(position),count)]?.poster;
  // Reset the outgoing layout before changing the atlas or its item indices.
  Object.assign(gridView,{target:0,mix:0,returning:false,aligning:false,returnMotion:null,drag:null,pan:{x:0,y:0},goal:{x:0,y:0}});
@@ -494,11 +495,11 @@ async function applyRibbonCatalog(){
  try{
   if(!gl)throw Error('WebGL is unavailable. Please open this in a browser with hardware acceleration enabled.');
   setup();gridView=new ProjectGrid(gl,requestRender);syncDirection();
-  // Host integration: the CMS catalog (Sanity via /api/projects-ribbon), falling back to the bundled JSON.
+  // Only the published CMS catalogue may populate the live ribbon.
   const loadJson=url=>fetch(url).then(response=>{if(!response.ok)throw Error('Project items could not load. Please reload.');return response.json()});
   const preloaded=window.parent.getPreloadedProjects?.();
   const catalog=preloaded?preloaded.catch(()=>loadJson('/api/projects-ribbon/')):loadJson('/api/projects-ribbon/');
-  [featuredProjects,allProjects]=await catalog.then(data=>{window.ribbonPlaceholder=data.placeholder;return[data.featured,data.all]}).catch(()=>Promise.all([loadJson('featured.json'),loadJson('projects.json')]));
+  [featuredProjects,allProjects]=await catalog.then(data=>{window.ribbonPlaceholder=data.placeholder;return[data.featured,data.all]});
   allProjects=allProjects.map((project,index)=>({...project,index}));
   await applyRibbonCatalog();
   // Internal navigation already has its page wave: only cascade the slides afterwards.
