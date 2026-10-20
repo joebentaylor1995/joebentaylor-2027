@@ -18,6 +18,7 @@
  * ```
  */
 
+import { withMediaUrls } from '@utils/mediaUrl';
 import { cacheLife, cacheTag } from 'next/cache';
 import { draftMode } from 'next/headers';
 // Imports
@@ -85,7 +86,7 @@ const cachedFetch = async <T>(query: string, params: Record<string, unknown>): P
 	cacheTag(SANITY_CACHE_TAG);
 	cacheLife('days');
 
-	return ((await isDraftMode()) ? draftClient : client).fetch<T>(query, params);
+	return withMediaUrls(await ((await isDraftMode()) ? draftClient : client).fetch<T>(query, params));
 };
 
 // Exports

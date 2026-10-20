@@ -1,0 +1,18 @@
+// Media Worker — Cloudflare config
+// NOTE • Deploy with `bunx wrangler deploy` from this folder. Setup: docs/Sanity/R2Media.md
+{
+	"$schema": "https://unpkg.com/wrangler@4.151.3/config-schema.json",
+	"name": "joebentaylor-media",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-10-01",
+	"r2_buckets": [{ "binding": "MEDIA", "bucket_name": "joebentaylor-media-eu" }],
+	"vars": {
+		"SANITY_PROJECT_ID": "lsgdcp1a",
+		"SANITY_DATASET": "production"
+	},
+	// NOTE • Served from <name>.<account>.workers.dev. Once joebentaylor.co.uk's
+	// DNS is on Cloudflare, swap to a custom domain:
+	// "routes": [{ "pattern": "media.joebentaylor.co.uk", "custom_domain": true }],
+	"workers_dev": true,
+	"observability": { "enabled": true }
+}
