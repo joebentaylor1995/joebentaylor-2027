@@ -2,6 +2,7 @@
 
 // Imports
 // ------------
+import { observeVideoPlayback } from '@utils/observeVideoPlayback';
 import { useEffect, useRef } from 'react';
 
 // Styles + Interfaces
@@ -28,45 +29,10 @@ const Video = ({ media }: VideoProps) => {
 		};
 		applyAspect();
 		video.addEventListener('loadedmetadata', applyAspect);
-		let visible = false;
-		let disposed = false;
-		const motion = matchMedia('(prefers-reduced-motion: reduce)');
-		const scene = video.closest<HTMLElement>('[data-profile-scene]');
-		const canPlay = () =>
-			visible && !document.hidden && !disposed && !motion.matches && scene?.dataset.scenePaused !== 'true';
-		const updatePlayback = () => {
-			if (canPlay()) {
-				void video
-					.play()
-					.then(() => {
-						// Playback may resolve after the slide leaves the viewport.
-						if (!canPlay()) video.pause();
-					})
-					.catch(() => {
-						/* Browser autoplay restrictions leave the poster visible. */
-					});
-			} else video.pause();
-		};
-		const observer = new IntersectionObserver(
-			([entry]) => {
-				visible = entry.isIntersecting && entry.intersectionRatio >= 0.05;
-				updatePlayback();
-			},
-			{ threshold: [0, 0.05] }
-		);
-		observer.observe(video);
-		const covered = new MutationObserver(updatePlayback);
-		if (scene) covered.observe(scene, { attributes: true, attributeFilter: ['data-scene-paused'] });
-		document.addEventListener('visibilitychange', updatePlayback);
-		motion.addEventListener('change', updatePlayback);
+		const stopPlayback = observeVideoPlayback(video);
 		return () => {
-			disposed = true;
-			observer.disconnect();
-			covered.disconnect();
-			document.removeEventListener('visibilitychange', updatePlayback);
-			motion.removeEventListener('change', updatePlayback);
+			stopPlayback();
 			video.removeEventListener('loadedmetadata', applyAspect);
-			video.pause();
 			video.removeAttribute('src');
 			video.load();
 		};

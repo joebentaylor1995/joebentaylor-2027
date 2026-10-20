@@ -87,7 +87,7 @@ function buildGridLayout(featuredCount,projectCount,anchor=0,along,across){
 const VIDEO_IDLE_MS=500;
 class ProjectGrid {
  constructor(gl,requestFrame){
-  this.gl=gl;this.requestFrame=requestFrame;this.projects=[];this.featured=[];this.vertical=false;
+  this.gl=gl;this.requestFrame=requestFrame;this.projects=[];this.featured=[];this.vertical=false;this.paused=false;
   this.mix=0;this.target=0;this.anchor=0;this.startPosition=0;this.origin={col:0,row:0};this.returning=false;this.aligning=false;
   this.pan={x:0,y:0};this.goal={x:0,y:0};this.speed=0;this.bend=0;
   this.settings={size:100,gap:32,curve:8,response:100,inertia:95,exitEarly:65};
@@ -183,8 +183,9 @@ class ProjectGrid {
   video.setAttribute('muted','');video.setAttribute('playsinline','');video.setAttribute('aria-hidden','true');video.src=src;
   entry.video=video;entry.lastSeen=performance.now();
   const onFrame=()=>{
+   entry.frameCallback=0;
    if(entry.video!==video)return;
-   if(document.hidden||performance.now()-entry.lastSeen>VIDEO_IDLE_MS){video.pause();return}
+   if(this.paused||document.hidden||performance.now()-entry.lastSeen>VIDEO_IDLE_MS){video.pause();return}
    entry.videoDirty=true;this.requestFrame();
    if(video.requestVideoFrameCallback)entry.frameCallback=video.requestVideoFrameCallback(onFrame);
   };
@@ -193,9 +194,10 @@ class ProjectGrid {
  }
  updateVideoTexture(entry){
   const video=entry.video;entry.lastSeen=performance.now();
-  if(!document.hidden&&video.paused&&!entry.playPending){
+  if(this.paused||document.hidden){video.pause();return;}
+  if(video.paused&&!entry.playPending){
    entry.playPending=true;
-   video.play().then(()=>{if(video.requestVideoFrameCallback&&entry.video===video)entry.frameCallback=video.requestVideoFrameCallback(entry.onFrame)}).catch(()=>{}).finally(()=>{entry.playPending=false});
+   video.play().then(()=>{if(this.paused||document.hidden){video.pause();return;}if(video.requestVideoFrameCallback&&entry.video===video&&!entry.frameCallback)entry.frameCallback=video.requestVideoFrameCallback(entry.onFrame)}).catch(()=>{}).finally(()=>{entry.playPending=false});
   }
   if(!entry.videoDirty||video.readyState<2||!video.videoWidth)return;
   entry.videoDirty=false;entry.hasVideoFrame=true;
@@ -204,6 +206,16 @@ class ProjectGrid {
   ctx.drawImage(video,(video.videoWidth-sw)/2,(video.videoHeight-sh)/2,sw,sh,0,0,512,320);
   if(!entry.texture)entry.texture=gl.createTexture();
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,entry.texture);this.textureParams();gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,c);
+ }
+ setPaused(paused){
+  this.paused=paused;
+  if(!paused)return;
+  for(const entry of this.cache.values()){
+   if(!entry.video)continue;
+   entry.video.pause();
+   if(entry.frameCallback&&entry.video.cancelVideoFrameCallback)entry.video.cancelVideoFrameCallback(entry.frameCallback);
+   entry.frameCallback=0;
+  }
  }
  releaseVideo(entry){
   const video=entry.video;if(!video)return;entry.video=null;

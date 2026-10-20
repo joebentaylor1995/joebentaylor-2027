@@ -4,7 +4,7 @@
 // ------------
 import ConsentGate from '@parts/ConsentGate';
 import { openCookieSettings } from '@parts/CookieBar/consent';
-import { getYouTubeEmbedUrl, getYouTubeId, getYouTubeThumbnail, type YouTubeThumbnailSize } from '@utils/youtube';
+import { getYouTubeId, getYouTubeThumbnail, type YouTubeThumbnailSize } from '@utils/youtube';
 import Image from 'next/image';
 import { useState } from 'react';
 
@@ -12,6 +12,7 @@ import { useState } from 'react';
 // ------------
 import type { YouTubeProps } from './interface';
 import s from './styles.module.scss';
+import YouTubePlayer from './YouTubePlayer';
 
 // Component
 // ------------
@@ -44,14 +45,7 @@ const YouTube = ({ media, sizes }: YouTubeProps) => {
 				</>
 			}
 		>
-			<iframe
-				className={s.youtube}
-				src={getYouTubeEmbedUrl(id)}
-				title={media.alt}
-				allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
-				allowFullScreen
-				loading='lazy'
-			/>
+			<YouTubePlayer id={id} title={media.alt} />
 		</ConsentGate>
 	);
 };

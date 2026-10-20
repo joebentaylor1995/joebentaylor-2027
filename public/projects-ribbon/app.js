@@ -6,13 +6,32 @@ const mobileViewport=matchMedia('(width < 768px)');
 let mobile=mobileViewport.matches;
 let hostActive=window.parent===window||/^\/projects\/?$/.test(window.parent.location.pathname),hostPrepared=false;
 const hostTransition=()=>window.parent!==window&&window.parent.document.documentElement.matches('[data-navigation-pending], [data-navigation-wave]');
+const hostScene=window.frameElement?.closest('[data-profile-scene]');
+const scenePaused=()=>hostScene?.dataset.scenePaused==='true';
+const hostSuspended=()=>!hostActive||scenePaused()||document.hidden||hostTransition();
+const canRender=()=>!scenePaused()&&!document.hidden&&(!hostPrepared||!hostSuspended());
+function syncHostActivity(){
+ idleMotion.reset(false);clearTimeout(snapTimer);
+ gridView?.setPaused(hostSuspended());
+ if(hostSuspended()){
+  cancelAnimationFrame(raf);raf=0;
+  for(const item of videoSlides){item.video.pause();if(item.callback&&item.video.cancelVideoFrameCallback)item.video.cancelVideoFrameCallback(item.callback);item.callback=0;}
+ }else{lastTime=0;resumeVideos();}
+ // Finish the single off-page warm frame if opening Profile interrupted it.
+ requestRender();
+}
+function waitForUncoveredScene(){
+ if(!scenePaused())return Promise.resolve();
+ return new Promise(resolve=>{const observer=new MutationObserver(()=>{if(!scenePaused()){observer.disconnect();resolve()}});observer.observe(hostScene,{attributes:true,attributeFilter:['data-scene-paused']})});
+}
 window.addEventListener('message',event=>{
  if(event.source!==window.parent||event.origin!==location.origin||event.data?.type!=='projects:active')return;
  hostActive=event.data.active===true;
  idleMotion.reset(false);clearTimeout(snapTimer);target=position;scrollVelocity=0;
- if(!hostActive){for(const item of videoSlides)item.video.pause();}else{lastTime=0;requestRender();}
+ syncHostActivity();
 });
-if(window.parent!==window)new MutationObserver(()=>{idleMotion.reset(false);if(hostTransition()){for(const item of videoSlides)item.video.pause();}else if(hostActive){lastTime=0;requestRender()}}).observe(window.parent.document.documentElement,{attributes:true,attributeFilter:['data-navigation-pending','data-navigation-wave']});
+if(window.parent!==window)new MutationObserver(syncHostActivity).observe(window.parent.document.documentElement,{attributes:true,attributeFilter:['data-navigation-pending','data-navigation-wave']});
+if(hostScene)new MutationObserver(syncHostActivity).observe(hostScene,{attributes:true,attributeFilter:['data-scene-paused']});
 let settingsKey=mobile?'ribbon-settings-mobile':'ribbon-settings';
 const gl=canvas.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:false});
 let loaderWave=new URL(location.href).searchParams.has('loaderWave')&&gl?new RibbonLoaderWave(gl):null;
@@ -363,7 +382,7 @@ function drawFeaturedRibbons(){
   gl.depthMask(true);gl.disable(gl.BLEND);
  }
 }
-function requestRender(){if(ready&&!raf&&(hostActive||!hostPrepared))raf=requestAnimationFrame(render)}
+function requestRender(){if(ready&&!raf&&canRender())raf=requestAnimationFrame(render)}
 function updateStackedDeparture(dt){
  const destination=gridView&&(gridView.target||gridView.mix>.12)?1:0;
  stackedDeparture+=(destination-stackedDeparture)*(reduced?1:1-Math.exp(-dt*(destination?16:10)));
@@ -371,7 +390,7 @@ function updateStackedDeparture(dt){
  if(state.stacked&&stackedDeparture!==destination)requestRender();
 }
 function render(time){
- if(hostPrepared&&(!hostActive||hostTransition())){raf=0;return;}
+ if(!canRender()){raf=0;return;}
  const dpr=exportPixelRatio||Math.min(devicePixelRatio||1,mobile?1.5:2);
  const w=Math.round(innerWidth*dpr),h=Math.round(innerHeight*dpr);
  if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}
@@ -379,6 +398,11 @@ function render(time){
  try{wavePass=!!loaderWave?.begin();}catch{gl.bindFramebuffer(gl.FRAMEBUFFER,null);loaderWave?.dispose();loaderWave=null;}
  renderScene(time);
  if(wavePass)loaderWave.end();
+ if(!hostPrepared){
+  // Readiness follows an actual paint, which may have been deferred by Profile.
+  hostPrepared=true;
+  requestAnimationFrame(()=>window.parent.postMessage({type:'projects:wave-ready'},location.origin));
+ }
 }
 function renderScene(time){if(projectTransition.active){raf=0;projectTransition.draw(time);return;}frameMeter.begin(time);raf=0;const dt=Math.min((time-lastTime)/1000||.016,.05);lastTime=time;const introMoving=introduction.update(time);const idle=idleMotion.update(time,dt,gridView?.target?'all':'featured',projectTransition.loading||introMoving||!!drag||!!gridView?.drag||!!(gridView&&gridView.mix!==gridView.target));
 mouseTilt.update(dt,!introMoving&&!mobile&&!!state.mouseTilt,state.rotation,reduced,state.mouseTiltMin,state.mouseTiltMax);
@@ -437,8 +461,8 @@ function updateVideoTextures(){
  for(const item of videoSlides){
   const video=item.video;
   {
-   if(!hostActive||hostTransition()||!videoIsVisible(item.index)||document.hidden){if(!video.paused)video.pause();continue;}
-   if(video.paused&&!item.playPending&&!item.playBlocked&&!document.hidden){item.playPending=true;video.play().catch(()=>{item.playBlocked=true}).finally(()=>{item.playPending=false})}
+   if(hostSuspended()||!videoIsVisible(item.index)){if(!video.paused)video.pause();continue;}
+   if(video.paused&&!item.playPending&&!item.playBlocked){item.playPending=true;video.play().then(()=>{if(hostSuspended()||!videoIsVisible(item.index))video.pause()}).catch(()=>{item.playBlocked=true}).finally(()=>{item.playPending=false})}
   }
   if(!videoIsVisible(item.index)||video.readyState<2||(!item.dirty&&video.requestVideoFrameCallback))continue;
   if(mobile&&now-(item.lastUpload||0)<1000/30)continue;
@@ -456,17 +480,17 @@ function startFeaturedVideos(){
   video.setAttribute('muted','');video.setAttribute('playsinline','');video.setAttribute('aria-hidden','true');video.tabIndex=-1;
   video.crossOrigin='anonymous';video.className='texture-video';video.dataset.slide=String(index+1);video.src=src;document.body.append(video);
   const item={index,video,dirty:true,stopped:false,callback:0};videoSlides.push(item);
-  const frame=()=>{if(item.stopped)return;item.dirty=true;if(videoIsVisible(item.index))requestRender();if(video.requestVideoFrameCallback)item.callback=video.requestVideoFrameCallback(frame)};
+  const frame=()=>{item.callback=0;if(item.stopped)return;if(hostSuspended()){video.pause();return;}item.dirty=true;if(videoIsVisible(item.index))requestRender();if(video.requestVideoFrameCallback)item.callback=video.requestVideoFrameCallback(frame)};
   video.addEventListener('loadeddata',()=>{item.dirty=true;requestRender()});
-  video.addEventListener('playing',()=>{requestRender();if(videoSlides.every(item=>!item.video.error&&!item.video.paused))document.querySelector('#upload-note').textContent='Each image or video appears on both sides.'});
+  video.addEventListener('playing',()=>{if(hostSuspended()){video.pause();return;}if(video.requestVideoFrameCallback&&!item.callback)item.callback=video.requestVideoFrameCallback(frame);requestRender();if(videoSlides.every(item=>!item.video.error&&!item.video.paused))document.querySelector('#upload-note').textContent='Each image or video appears on both sides.'});
   video.addEventListener('error',()=>{document.querySelector('#upload-note').textContent='A video could not load. Its poster is shown instead.'});
   if(video.requestVideoFrameCallback)item.callback=video.requestVideoFrameCallback(frame);
-  if(hostActive&&!hostTransition()&&videoIsVisible(index))video.play().catch(()=>{item.playBlocked=true;document.querySelector('#upload-note').textContent='Click or scroll the ribbon to start the muted videos.'});
+  if(!hostSuspended()&&videoIsVisible(index))video.play().then(()=>{if(hostSuspended())video.pause()}).catch(()=>{item.playBlocked=true;document.querySelector('#upload-note').textContent='Click or scroll the ribbon to start the muted videos.'});
  }
 }
-function resumeVideos(){if(!hostActive||hostTransition()||document.hidden||projectTransition.active)return;for(const item of videoSlides){item.playBlocked=false;if(item.video.paused&&videoIsVisible(item.index))item.video.play().catch(()=>{item.playBlocked=true})}}
+function resumeVideos(){if(hostSuspended()||projectTransition.active)return;for(const item of videoSlides){item.playBlocked=false;if(item.video.paused&&videoIsVisible(item.index))item.video.play().then(()=>{if(hostSuspended())item.video.pause()}).catch(()=>{item.playBlocked=true})}}
 canvas.addEventListener('pointerdown',resumeVideos);canvas.addEventListener('wheel',resumeVideos,{passive:true});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){for(const item of videoSlides)item.video.pause()}else{resumeVideos();requestRender()}});
+document.addEventListener('visibilitychange',syncHostActivity);
 document.querySelector('#upload').onclick=()=>document.querySelector('#files').click();document.querySelector('#files').onchange=async e=>{const files=[...e.target.files].filter(f=>f.type.startsWith('image/')).slice(0,12);if(!files.length)return;const urls=files.map(f=>URL.createObjectURL(f));try{const images=await Promise.all(urls.map(imageLoad));names=files.map(f=>f.name.replace(/\.[^.]+$/,''));count=names.length;position=target=0;makeAtlas(images,true);featured=names.map((name,index)=>({name,index,poster:urls[index]}));gridView.setProjects(featured,featured);document.querySelector('#all-count').textContent=featured.length;setProjectView(false);buildDots();document.querySelector('#upload-note').textContent=`${count} image${count===1?'':'s'} loaded. Stored only in this tab.`}catch{document.querySelector('#upload-note').textContent='Could not read those images. Try JPG, PNG, or WebP.'}finally{urls.forEach(URL.revokeObjectURL);e.target.value=''}};
 function showCatalogError(error){const status=document.querySelector('#error');status.hidden=false;status.textContent=error.message||'Images could not load. Please reload the page.';console.error(error)}
 async function applyRibbonCatalog(){
@@ -482,6 +506,7 @@ async function applyRibbonCatalog(){
   if(!posterCache.has(item.poster))posterCache.set(item.poster,imageLoad(item.poster).catch(error=>{posterCache.delete(item.poster);throw error}));
   return posterCache.get(item.poster);
  }));
+ await waitForUncoveredScene();
  if(revision!==catalogRevision)return;
  featured=items.map((item,index)=>({...item,index}));names=featured.map(item=>item.name);count=names.length;
  position=target=Math.max(0,featured.findIndex(item=>item.poster===previousPoster));
@@ -494,7 +519,8 @@ async function applyRibbonCatalog(){
  const status=document.querySelector('#error');status.hidden=false;status.textContent='Loading projects…';
  try{
   if(!gl)throw Error('WebGL is unavailable. Please open this in a browser with hardware acceleration enabled.');
-  setup();gridView=new ProjectGrid(gl,requestRender);syncDirection();
+  await waitForUncoveredScene();
+  setup();gridView=new ProjectGrid(gl,requestRender);gridView.setPaused(hostSuspended());syncDirection();
   // Only the published CMS catalogue may populate the live ribbon.
   const loadJson=url=>fetch(url).then(response=>{if(!response.ok)throw Error('Project items could not load. Please reload.');return response.json()});
   const preloaded=window.parent.getPreloadedProjects?.();
@@ -512,8 +538,6 @@ async function applyRibbonCatalog(){
   // Host integration: no card entrance — the ribbon appears in its resting state (the page transition
   // still plays). The cascade stays available from the tuning panel's Replay button.
   }else introduction.finish();
-  // Let atlas uploads and the first canvas paint finish before the host reveals us.
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{hostPrepared=true;window.parent.postMessage({type:'projects:wave-ready'},location.origin)}));
   const projectSlug=new URL(routeLocation.href).searchParams.get('project');if(projectSlug)projectTransition.openRoute(projectSlug);
  }catch(error){showCatalogError(error);window.parent.postMessage({type:'projects:error'},location.origin)}
 })();

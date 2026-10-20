@@ -1,4 +1,5 @@
 import { mq } from '@tackl';
+import { observeScenePause } from '@utils/observeScenePause';
 import { splitStega } from '@utils/stega';
 import { gsap } from 'gsap';
 import type { MatrixSettings } from './interface';
@@ -106,6 +107,7 @@ export function createMatrixFooter(
 		codeClock = 0,
 		visible = false;
 	const hoverMedia = matchMedia(`${mq.up.l} and (hover: hover) and (pointer: fine)`);
+	let scenePaused = false;
 	const draw = (_time: number, milliseconds: number) => {
 		if (document.hidden || gl.isContextLost()) return;
 		const state = settings();
@@ -157,15 +159,25 @@ export function createMatrixFooter(
 		const entry = entries[entries.length - 1];
 		if (entry.isIntersecting === visible) return;
 		visible = entry.isIntersecting;
-		if (visible) gsap.ticker.add(draw);
-		else gsap.ticker.remove(draw);
+		syncTicker();
 	});
+	const syncTicker = () => {
+		gsap.ticker.remove(draw);
+		if (visible && !scenePaused && !document.hidden) gsap.ticker.add(draw);
+	};
+	const stopObservingPause = observeScenePause(host, paused => {
+		scenePaused = paused;
+		syncTicker();
+	});
+	document.addEventListener('visibilitychange', syncTicker);
 	visibility.observe(canvas);
 	canvas.dataset.ready = 'true';
 	return () => {
 		gsap.ticker.remove(draw);
 		size.disconnect();
 		visibility.disconnect();
+		stopObservingPause();
+		document.removeEventListener('visibilitychange', syncTicker);
 		next?.removeEventListener('pointerenter', enter);
 		next?.removeEventListener('pointerleave', leave);
 		next?.removeEventListener('focus', enter);
