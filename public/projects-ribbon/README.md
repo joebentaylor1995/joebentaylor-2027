@@ -3,9 +3,9 @@
 Self-contained WebGL renderer imported from `cre/outputs/ribbon` on 2026-10-16.
 `src/components/ProjectsRibbon` hosts it at `/projects` in a same-origin frame so
 its canvas, global styles, wheel handlers and rendering loop cannot interfere
-with the site's Lenis/GSAP scene. The React effect unloads the frame when leaving
-the route, including when Next.js Activity retains its hidden DOM, releasing GPU
-and video resources. Returning to the route mounts a fresh renderer.
+with the site's Lenis/GSAP scene. The frame is prepared after the site's opening
+introduction and retained between routes. Leaving Projects suspends its rendering
+and video playback; returning reuses the prepared renderer.
 
 The demo header is removed; the Next.js layout supplies the real site header.
 Display settings, project titles, desktop ribbon/grid switching, mobile ribbon
@@ -50,6 +50,10 @@ tooltip (`isProjectClickable` in `grid.js`, shared by both views and
 Video loop projects also play in the All projects grid (`attachVideo` /
 `updateVideoTexture` in `grid.js`): the poster shows until the loop has a frame,
 and each loop pauses itself when its tile is off-screen or the page is hidden.
+The frame also observes the host's `data-scene-paused` attribute: opening Profile
+stops rendering, featured videos, grid videos, and video-frame callbacks. Late
+playback promises recheck that state before playing. This pause lasts through
+the modal's closing animation; resuming preserves the grid layout and position.
 
 The All projects grid layout comes from `buildGridLayout` in `grid.js`: a
 shuffled block (rebuilt each time the grid opens) wrapped across the grid. No

@@ -238,26 +238,37 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 	useEffect(() => {
 		if (!active) return;
 		const scene = sceneRef.current;
-		const animations =
-			scene
-				?.getAnimations({ subtree: true })
-				.filter(
-					animation =>
-						animation.effect instanceof KeyframeEffect &&
-						animation.effect.target !== scene &&
-						animation.playState === 'running'
-				) ?? [];
+		if (!scene) return;
+		const animations = new Set<Animation>();
 		const timelines = new Set<gsap.core.Animation>();
-		for (const tween of gsap.getTweensOf(scene?.querySelectorAll('*') ?? [])) {
-			let animation: gsap.core.Animation = tween;
-			while (animation.parent && animation.parent !== gsap.globalTimeline) animation = animation.parent;
-			if (!animation.paused()) timelines.add(animation);
-		}
-		for (const animation of animations) animation.pause();
-		for (const animation of timelines) animation.pause();
+		const pause = () => {
+			for (const animation of scene.getAnimations({ subtree: true })) {
+				if (
+					animation.effect instanceof KeyframeEffect &&
+					animation.effect.target !== scene &&
+					animation.playState === 'running'
+				) {
+					animations.add(animation);
+					animation.pause();
+				}
+			}
+			for (const tween of gsap.getTweensOf(scene.querySelectorAll('*'))) {
+				let animation: gsap.core.Animation = tween;
+				while (animation.parent && animation.parent !== gsap.globalTimeline) animation = animation.parent;
+				if (!animation.paused()) {
+					timelines.add(animation);
+					animation.pause();
+				}
+			}
+		};
+		pause();
+		// Lazy content may start a reveal after the modal has already opened.
+		const additions = new MutationObserver(pause);
+		additions.observe(scene, { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
 		return () => {
+			additions.disconnect();
 			for (const animation of animations) animation.play();
-			for (const animation of timelines) animation.resume();
+			for (const animation of timelines) if (animation.parent) animation.resume();
 		};
 	}, [active]);
 

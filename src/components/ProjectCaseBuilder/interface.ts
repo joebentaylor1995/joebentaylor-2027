@@ -20,3 +20,7 @@ export interface YouTubeProps {
 	media: Extract<ProjectMedia, { type: 'youtube' }>;
 	sizes: string;
 }
+export interface YouTubePlayerProps {
+	id: string;
+	title: string;
+}

@@ -4,6 +4,7 @@
 // ------------
 import { GlobalContext } from '@parts/Contexts';
 import { PerformanceContext } from '@parts/Contexts/Performance';
+import { observeScenePause } from '@utils/observeScenePause';
 import { gsap } from 'gsap';
 import ScrollTrigger from 'gsap/ScrollTrigger';
 import { ReactLenis, useLenis } from 'lenis/react';
@@ -51,12 +52,16 @@ const LenisGsapBridge = () => {
 		lenis.on('scroll', ScrollTrigger.update);
 
 		const update = (time: number) => lenis.raf(time * 1000);
-		gsap.ticker.add(update);
+		const stopObservingPause = observeScenePause(wrapper, paused => {
+			gsap.ticker.remove(update);
+			if (!paused) gsap.ticker.add(update);
+		});
 		ScrollTrigger.refresh();
 
 		return () => {
 			lenis.off('scroll', ScrollTrigger.update);
 			gsap.ticker.remove(update);
+			stopObservingPause();
 			ScrollTrigger.defaults({ scroller: window });
 			ScrollTrigger.scrollerProxy(wrapper, {});
 		};

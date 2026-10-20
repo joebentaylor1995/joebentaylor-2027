@@ -41,6 +41,9 @@ const contentSecurityPolicy = {
 		...(isDev ? ["'unsafe-eval'"] : []),
 		...(hasGoogleAnalytics ? googleAnalytics.script : []),
 		'https://app.cal.com',
+		// Consent-gated standard YouTube players pause while covered by Profile.
+		'https://www.youtube.com',
+		'https://s.ytimg.com',
 	],
 	'style-src': ["'self'", "'unsafe-inline'"],
 	// NOTE • https: covers CMS images and media served straight from their CDNs
