@@ -83,24 +83,41 @@ const serveFromBucket = async (request: Request, key: string, env: Env) => {
 	return new Response(body, { status: 206, headers });
 };
 
+// NOTE • Caches the whole file at the edge, so later range requests are cut from it
+const fillEdgeCache = async (url: string, key: string, env: Env) => {
+	const whole = await serveFromBucket(new Request(url), key, env);
+	if (whole?.status === 200) await caches.default.put(url, whole);
+};
+
 // Exports
 // ------------
 export default {
-	async fetch(request, env): Promise<Response> {
+	async fetch(request, env, ctx): Promise<Response> {
 		if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 		if (request.method !== 'GET' && request.method !== 'HEAD') {
 			return new Response('Method not allowed', { status: 405, headers: { allow: 'GET, HEAD, OPTIONS' } });
 		}
 
-		const key = toKey(new URL(request.url).pathname, env);
+		const url = new URL(request.url);
+		const key = toKey(url.pathname, env);
 		if (!key) return notFound();
 
-		try {
-			const cached = await serveFromBucket(request, key, env);
-			if (cached) return cached;
+		// NOTE • Edge cache — custom domains only (a no-op on workers.dev). A hit,
+		// ranges and 304s included, never touches R2. Query strings are ignored.
+		const cacheUrl = url.origin + url.pathname;
+		const isGet = request.method === 'GET';
+		const hit = isGet ? await caches.default.match(new Request(cacheUrl, { headers: request.headers })) : undefined;
+		if (hit) return hit;
 
-			if (!(await mirrorFromSanity(key, env))) return notFound();
-			return (await serveFromBucket(request, key, env)) ?? notFound();
+		try {
+			let response = await serveFromBucket(request, key, env);
+			if (!response) {
+				if (!(await mirrorFromSanity(key, env))) return notFound();
+				response = await serveFromBucket(request, key, env);
+			}
+
+			if (isGet && response) ctx.waitUntil(fillEdgeCache(cacheUrl, key, env));
+			return response ?? notFound();
 		} catch (error: unknown) {
 			// NOTE • R2 rejects unsatisfiable ranges by throwing
 			console.error('Media request failed:', error);

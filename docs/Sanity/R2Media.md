@@ -50,34 +50,44 @@ Visitor ─▶ <media worker>/files/<project>/<dataset>/<sha1>.mp4
    cd workers/media && bunx wrangler deploy
    ```
 
-   The command prints the Worker's URL, for example `https://joebentaylor-media.<account>.workers.dev`.
+   The Worker answers on `https://cdn.joebentaylor.com` (the `routes` entry in `wrangler.jsonc`; Cloudflare
+   creates the DNS record and certificate) and on `https://joebentaylor-media.joebentaylor.workers.dev`.
 
 4. **Check it.** Copy any video URL from the site (it currently starts `https://cdn.sanity.io/files/lsgdcp1a/production/`),
    then swap the host:
 
    ```bash
-   curl -I https://joebentaylor-media.<account>.workers.dev/files/lsgdcp1a/production/<sha1>.mp4
+   curl -I https://cdn.joebentaylor.com/files/lsgdcp1a/production/<sha1>.mp4
    ```
 
    You should get a `200` with `content-type: video/mp4`. The file should now be listed in the bucket. A
    `Range: bytes=0-99` request should return `206`.
 
-5. **Point the site at it.** Set `NEXT_PUBLIC_MEDIA_URL` to the Worker URL (no trailing slash) in `.env`
-   for local development, and in **Netlify → Site configuration → Environment variables** for production.
+5. **Point the site at it.** Set `NEXT_PUBLIC_MEDIA_URL=https://cdn.joebentaylor.com` (no trailing slash) in
+   `.env` for local development, and in **Netlify → Site configuration → Environment variables** for production.
    `NEXT_PUBLIC_` values are inlined at build time, so trigger a new deploy afterwards.
 
-## Optional: a custom domain
+## The joebentaylor.com domain
 
-`joebentaylor.co.uk` uses Netlify DNS, and a Worker custom domain needs the zone on Cloudflare. To use
-`media.joebentaylor.co.uk`, move the domain's nameservers to Cloudflare, re-create the Netlify DNS records there,
-then replace `"workers_dev": true` in `wrangler.jsonc` with the commented `routes` entry. Redeploy and update
-`NEXT_PUBLIC_MEDIA_URL`. `workers.dev` works fine in the meantime.
+A Worker custom domain needs its zone on Cloudflare, and `joebentaylor.co.uk` stays on Netlify DNS. Media is
+therefore served from a separate domain, `joebentaylor.com`, registered at GoDaddy with its nameservers pointed at
+Cloudflare (`alberto` and `beth.ns.cloudflare.com`). Its zone has:
+
+- `cdn.joebentaylor.com`: the media Worker.
+- A Redirect Rule that sends `joebentaylor.com` and `www.joebentaylor.com` to `https://joebentaylor.co.uk`
+  (301, path and query string kept). Its filter names those two hosts only, so `cdn.` isn't redirected.
+
+## Caching
+
+On `cdn.joebentaylor.com` the Worker keeps each whole file in Cloudflare's edge cache, so repeat requests,
+including video range requests and 304s, are answered there without reading R2. The cache is per data centre,
+so each region's first request still reads R2. `workers.dev` has no edge cache, so every request there reads R2.
 
 ## Costs
 
 - R2 storage: 10 GB free, then $0.015/GB-month. Egress is free.
-- Every request runs the Worker (100k/day free; the paid plan is $5/month for 10M) and makes one R2 read
-  (10M/month free).
+- Every request runs the Worker (100k/day free; the paid plan is $5/month for 10M). Edge cache misses also
+  make R2 reads (10M/month free).
 - Sanity bandwidth is used once per file, when it's first mirrored.
 
 ## Development
