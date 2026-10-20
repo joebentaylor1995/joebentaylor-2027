@@ -3,18 +3,7 @@
 
 import { toVarRefs } from '@theme/cssVariables';
 import localFont from 'next/font/local';
-// import { Inter } from 'next/font/google';
 import { fontFamilies, fontWeights } from './values';
-
-// SECTION • Inter font configuration optimized with swap display for better loading performance
-// NOTE • No `weight` array — Inter is a variable font, so this loads ONE file
-// covering every weight (100–900) instead of a request per static weight
-// export const inter = Inter({
-// 	subsets: ['latin'],
-// 	display: 'swap', // Uses fallback font until Inter loads
-// 	variable: '--inter',
-// 	preload: true,
-// });
 
 // SECTION • Local font configuration
 export const ppNeueMontreal = localFont({

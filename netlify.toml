@@ -7,6 +7,10 @@
 
 [build.environment]
   NODE_VERSION = "25"
+  BUN_VERSION = "1.4.2"
+  # Recreate nested dependencies from the lockfile when restoring Netlify's cache.
+  # Sanity clients 7 and 8 require separate get-it major versions.
+  BUN_FLAGS = "--frozen-lockfile --force"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

@@ -1,6 +1,6 @@
-![Tackl Banner](/src/images/readme-banner.png)
+# Joe Ben Taylor — portfolio
 
-✨ An animation-first Next.js starter kit for agencies: zero-runtime SCSS CSS Modules, a zero-JS grid system, CSS-variable design tokens, GSAP + Lenis, and a CMS-ready data layer — tuned so the out-of-the-box Lighthouse story is something you can show a client. ✨
+The source for [joebentaylor.co.uk](https://joebentaylor.co.uk), built on Tackl with Next.js, SCSS CSS Modules, GSAP, Lenis, and Sanity.
 
 ![Version Number](https://img.shields.io/badge/Version-5.2.1-8000FF)
 ![Includes](https://img.shields.io/badge/Includes-GSAP_+_Lenis_-8000FF)
@@ -9,24 +9,18 @@
 
 ## 🚀 Quickstart
 
+Use Bun 1.4.2, as pinned in `package.json` and `netlify.toml`. CI reads the same version from `package.json`. Netlify recreates dependencies from the frozen lockfile on each build to avoid reusing an incompatible nested package from its dependency cache.
+
 ```bash
-# Scaffold into an empty directory / freshly-created git repo (recommended)
-mkdir my-app && cd my-app     # or clone your empty repo and cd in
-bunx tackl                    # asks: DatoCMS, Sanity, or no CMS
+bun install
+cp .env.example .env
+# Fill in the Sanity values before starting the app.
 bun run dev
-
-# …or clone this repo directly (keeps both CMS adapters)
-git clone https://github.com/12-studio/tackl my-app
-cd my-app && bun install && bun run dev
 ```
-
-The CLI keeps your existing `.git`/remote, prunes the CMS you didn't pick (code, dependencies, docs, env keys), and installs with bun. `bun create tackl` and `npm create tackl@latest` work too.
 
 Open [http://localhost:3000](http://localhost:3000). Set your design tokens in `src/theme` (colours, spacing, motion, fonts) and your type styles in `src/css/tackl/_type.scss` — straight from the Figma file.
 
-This site replaces the starter demo with the portfolio homepage and project templates. The unused `DeleteMe` demo has been removed.
-
-Copy `.env.example` to `.env` and fill in your values (the DatoCMS token, etc.). `.env` is gitignored; `.env.example` is the documented template.
+The site uses Sanity for portfolio content and the embedded Studio at `/studio/`. `.env` is gitignored; `.env.example` is the documented template. See [CMS setup](./docs/CMS.md).
 
 ### Scripts
 
@@ -67,7 +61,7 @@ Open the repo in VS Code or Cursor and accept the recommended extensions (`.vsco
 - **View Transitions** — page transitions via the View Transitions API with a typed `Link`/router wrapper
 - **Storybook 10** — token-aware (the preview renders the same `:root` variables as the app), with a live `Theme/Overview` story showing every current token — colours, fonts, the type scale with role descriptors, spacing, radii and motion — straight from the theme objects
 - **Quality gates that actually run** — Biome + Stylelint + strict TypeScript enforced by the Husky pre-commit hook *and* a GitHub Actions workflow (generated-styles check → lint → type-check → build → Playwright smoke test) that ships with every scaffold; the guided commit-message flow stays available as `bun run commit`
-- **CMS adapters behind one seam** — app code imports `fetchContent` from `@cms`; DatoCMS (GraphQL) and Sanity (GROQ) adapters ship in the template, and the CLI prunes to your choice at scaffold time. **Draft preview works with both**: Sanity via the Presentation tool (plus embedded Studio at `/studio`, example schemas, and an offer to run `sanity init`), Dato via a secret-gated toggle for the Web Previews plugin — `fetchContent` serves draft content automatically while draft mode is on
+- **Sanity content** — app code imports `fetchContent` and GROQ queries from `@cms`. The embedded Studio at `/studio/` supports draft preview through the Presentation tool.
 - **SEO plumbing** — `metadata`/`viewport` exports, `sitemap.xml` and `robots.txt` (staging deploys auto-blocked from indexing), all driven by one `NEXT_PUBLIC_SITE_URL`
 - **AI-agent ready (vendor-neutral)** — [`AGENTS.md`](./AGENTS.md) teaches the Tackl conventions to any agent (Cursor, Claude Code, Copilot, Zed, Aider…); [`skills/`](./skills) holds deep-dive Agent Skills; and MCP servers ship pre-configured (`.mcp.json` + `.cursor/mcp.json`) — Next.js devtools plus Chrome DevTools, so agents can inspect builds and drive a real browser against your dev server (screencast tools need `ffmpeg` on PATH)
 
@@ -188,11 +182,9 @@ flowchart TD
     │   └── icon.svg            # Favicon
     ├── src/
     │   ├── cms/                # CMS seam — import from '@cms' only
-    │   │   ├── index.ts        # Adapter switch (the line the CLI rewires)
-    │   │   ├── draft.ts        # Draft-mode switch (rewired alongside index.ts)
-    │   │   ├── dato/           # DatoCMS adapter (GraphQL)
-    │   │   ├── sanity/         # Sanity adapter (GROQ)
-    │   │   └── none/           # No-CMS stub (same surface, returns null)
+    │   │   ├── index.ts        # Shared Sanity exports
+    │   │   ├── draft.ts        # Sanity draft-mode handler
+    │   │   └── sanity/         # Sanity client and GROQ queries
     │   ├── components/         # UI components (one folder each — see WritingComponents.md)
     │   ├── theme/              # Design tokens + the tackl toolkit
     │   │   ├── colors|space|gap|borderRadius|easing|time|fonts|grid/
@@ -237,10 +229,9 @@ flowchart TD
 | [Security](./docs/Tackl/Security.md) | Security headers and the Content-Security-Policy |
 | [PerformanceContext](./docs/Tackl/PerformanceContext.md) | Reduced-motion and device signals |
 | [Motion](./docs/Motion.md) · [GSAP](./docs/GSAP) | Animation patterns |
-| [CMS](./docs/CMS.md) | The `@cms` adapter seam and choosing Dato/Sanity |
+| [CMS](./docs/CMS.md) | The `@cms` content layer and Sanity environment |
 | [MigratingFromV4](./docs/Tackl/MigratingFromV4.md) | Upgrading a Tackl 4 project from styled-components to SCSS modules |
 | [MigratingFromV3](./docs/Tackl/MigratingFromV3.md) | Phased playbook for upgrading a Tackl 3 project |
-| [DatoCMS](./docs/DatoCMS) | Querying, images, structured text, SEO |
 | [Sanity](./docs/Sanity/README.md) | Setting up the Sanity variant |
 | [Lighthouse](./docs/Lighthouse.md) | The Lighthouse CI check and its thresholds |
 
