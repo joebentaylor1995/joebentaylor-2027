@@ -1,0 +1,136 @@
+- generic [active] [ref=e1]:
+  - complementary
+  - region [ref=e2]:
+    - generic [ref=e3]:
+      - heading [level=2] [ref=e4]:
+        - link "Cookies" [ref=e5] [cursor=pointer]:
+          - /url: /cookies/
+      - paragraph [ref=e6]: I use essential cookies to run this website and optional cookies for analytics and the booking calendar.
+      - button "Let me choose" [ref=e7] [cursor=pointer]
+    - generic [ref=e8]:
+      - button "Accept All" [ref=e9] [cursor=pointer]
+      - button "Accept Necessary" [ref=e10] [cursor=pointer]
+  - generic [ref=e18]:
+    - generic [ref=e19]:
+      - banner:
+        - navigation "Homepage navigation":
+          - link "Go to home page" [ref=e20] [cursor=pointer]:
+            - /url: /
+            - img "Logo" [ref=e21]
+          - generic:
+            - emphasis: Available for hire
+            - generic: Based in Doncaster, UK
+        - navigation "Page navigation":
+          - button "Open Profile" [ref=e32] [cursor=pointer]: Profile
+          - link "Projects" [ref=e33] [cursor=pointer]:
+            - /url: /projects/
+          - button "Open Booking Form" [ref=e34] [cursor=pointer]: Let's Talk
+      - main [ref=e35]:
+        - generic [ref=e38]:
+          - complementary [aria-hidden]
+          - generic [ref=e41]:
+            - heading "Digital Narrative Architect" [level=1] [ref=e43]
+            - paragraph [ref=e47]:
+              - generic [ref=e48]: Building
+              - generic [ref=e50]: brands
+              - generic [ref=e52]: and
+              - generic [ref=e54]: digital
+              - generic [ref=e56]: worlds
+              - generic [ref=e58]: where
+              - generic [ref=e60]: logic
+              - generic [ref=e62]: meets
+              - generic [ref=e64]: emotion,
+              - generic [ref=e66]: craft
+              - generic [ref=e68]: meets
+              - generic [ref=e70]: code,
+              - generic [ref=e72]: and
+              - generic [ref=e74]: meaningful
+              - generic [ref=e76]: stories
+              - generic [ref=e78]: are
+              - generic [ref=e80]: made
+              - generic [ref=e82]: to
+              - generic [ref=e84]: be
+              - generic [ref=e86]: felt,
+              - generic [ref=e88]: not
+              - generic [ref=e90]: just
+              - generic [ref=e92]: seen.
+          - generic [ref=e94]:
+            - heading "Clients include" [level=2] [ref=e95]
+            - list [ref=e97]:
+              - listitem [ref=e98]:
+                - img "Google" [ref=e99]
+              - listitem [ref=e100]:
+                - img "Hilton" [ref=e101]
+              - listitem [ref=e102]:
+                - img "Durst" [ref=e103]
+              - listitem [ref=e104]:
+                - img "Global Citizen" [ref=e105]
+              - listitem [ref=e106]:
+                - img "Game" [ref=e107]
+              - listitem [ref=e108]:
+                - img "Missguided" [ref=e109]
+              - listitem [ref=e110]:
+                - img "Meta" [ref=e111]
+              - listitem [ref=e112]:
+                - img "Estee Lauder" [ref=e113]
+              - listitem [ref=e114]:
+                - img "Nationwide" [ref=e115]
+              - listitem [ref=e116]:
+                - img "Halfords" [ref=e117]
+              - listitem [ref=e118]:
+                - img "Spireworks" [ref=e119]
+              - listitem [ref=e120]:
+                - img "Polypipe" [ref=e121]
+              - listitem [ref=e122]:
+                - img "Uswitch" [ref=e123]
+              - listitem [ref=e124]:
+                - img "Symphony" [ref=e125]
+              - listitem [ref=e126]:
+                - img "Footprint" [ref=e127]
+              - listitem [ref=e128]:
+                - img "BLLA" [ref=e129]
+              - listitem [ref=e130]:
+                - img "Ideal Heating" [ref=e131]
+            - list [aria-hidden] [ref=e132]:
+              - listitem [ref=e133]
+              - listitem [ref=e134]
+              - listitem [ref=e135]
+              - listitem [ref=e136]
+              - listitem [ref=e137]
+              - listitem [ref=e138]
+              - listitem [ref=e139]
+              - listitem [ref=e140]
+              - listitem [ref=e141]
+              - listitem [ref=e142]
+              - listitem [ref=e143]
+              - listitem [ref=e144]
+              - listitem [ref=e145]
+              - listitem [ref=e146]
+              - listitem [ref=e147]
+              - listitem [ref=e148]
+              - listitem [ref=e149]
+          - generic:
+            - emphasis:
+              - generic: "1995"
+              - generic [aria-hidden]:
+                - generic: "1"
+              - generic [aria-hidden]:
+                - generic: "9"
+              - generic [aria-hidden]:
+                - generic: "9"
+              - generic [aria-hidden]:
+                - generic: "5"
+            - emphasis: ©
+            - emphasis:
+              - generic: "2026"
+              - generic [aria-hidden]:
+                - generic: "2"
+              - generic [aria-hidden]:
+                - generic: "0"
+              - generic [aria-hidden]:
+                - generic: "2"
+              - generic [aria-hidden]:
+                - generic: "6"
+    - button [disabled] [aria-hidden]
+  - button "Open Next.js Dev Tools" [ref=e155] [cursor=pointer]
+  - alert [ref=e159]

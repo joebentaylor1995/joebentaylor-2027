@@ -1,0 +1,37 @@
+- generic [active] [ref=e1]:
+  - complementary
+  - generic [ref=e18]:
+    - generic [ref=e19]:
+      - banner:
+        - navigation "Homepage navigation":
+          - link "Go to home page" [ref=e20] [cursor=pointer]:
+            - /url: /
+            - img "Logo" [ref=e21]
+          - generic:
+            - emphasis: Available for hire
+            - generic: Based in Doncaster, UK
+        - navigation "Page navigation":
+          - button "Open Profile" [ref=e32] [cursor=pointer]: Profile
+          - link "Projects on Dribbble — projects page coming soon (opens in a new tab)" [ref=e49] [cursor=pointer]:
+            - /url: https://dribbble.com/joebentaylor
+            - text: Projects
+            - generic [aria-hidden]: Coming soon
+          - button "Open Booking Form" [ref=e34] [cursor=pointer]: Let's Talk
+      - main [ref=e35]:
+        - generic [ref=e51]:
+          - paragraph [ref=e52]: "404"
+          - heading "Page not found" [level=1] [ref=e53]
+          - paragraph [ref=e54]: The page you're looking for doesn't exist or has moved.
+          - link "Back to home" [ref=e56] [cursor=pointer]:
+            - /url: /
+    - button [disabled] [aria-hidden]
+  - generic [ref=e42] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e43]
+    - generic [ref=e57]:
+      - button "Open issues overlay" [ref=e58]:
+        - generic [ref=e59]:
+          - generic [aria-hidden] [ref=e60]: "0"
+          - generic [ref=e61]: "1"
+        - generic [ref=e62]: Issue
+      - button "Collapse issues badge" [ref=e63]
+  - alert [ref=e47]: Page not found — Joe Ben Taylor

@@ -1,0 +1,23 @@
+- generic [active] [ref=f5e1]:
+  - complementary
+  - generic [ref=f5e9]:
+    - generic [ref=f5e10]:
+      - banner:
+        - navigation "Homepage navigation":
+          - link "Go to home page" [ref=f5e11] [cursor=pointer]:
+            - /url: /
+            - img "Logo" [ref=f5e12]
+          - generic:
+            - emphasis: Available for hire
+            - generic: Based in Doncaster, UK
+        - navigation "Page navigation":
+          - button "Open Profile" [ref=f5e23] [cursor=pointer]: Profile
+          - link "Projects" [ref=f5e24] [cursor=pointer]:
+            - /url: /projects/
+          - button "Open Booking Form" [ref=f5e25] [cursor=pointer]: Let's Talk
+      - main [ref=f5e26]:
+        - region "Projects" [ref=f5e27]:
+          - iframe [ref=f5e28]
+    - button [disabled] [aria-hidden]
+  - button "Open Next.js Dev Tools" [ref=f5e34] [cursor=pointer]
+  - alert [ref=f5e38]

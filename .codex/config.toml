@@ -1,0 +1,19 @@
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = [
+    "-y",
+    "chrome-devtools-mcp@latest",
+    "--isolated",
+    "--viewport=1440x900",
+    "--experimentalScreencast",
+    "--screenshotFormat=jpeg",
+    "--screenshotMaxWidth=1440",
+    "--no-usage-statistics",
+]
+
+[mcp_servers.next-devtools]
+command = "npx"
+args = [
+    "-y",
+    "next-devtools-mcp@latest",
+]
