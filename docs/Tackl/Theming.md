@@ -152,7 +152,7 @@ mq.down.m      // '(max-width: 699.98px)'
 gsap.matchMedia().add(mq.up.l, () => { /* desktop-only tweens */ });
 ```
 
-`bpd` / `mq.down` sit 0.02px under the breakpoint so up and down never both match. `useAnimation`'s default conditions (`isMobile` / `isTablet` / `isDesktop`) are built from `mq`, and `useResponsive` uses `breakpoints.l`. Add a breakpoint to the grid tokens, run `bun run styles`, and `bp()`, `mq`, and the [span props](./GridSystemProps.md) all pick it up.
+`bpd` / `mq.down` sit 0.02px under the breakpoint so up and down never both match. `useAnimation`'s default conditions (`isMobile` / `isTablet` / `isDesktop`) are built from `mq`. Add a breakpoint to the grid tokens, run `bun run styles`, and `bp()`, `mq`, and the [span props](./GridSystemProps.md) all pick it up.
 
 ## Cascade layers
 

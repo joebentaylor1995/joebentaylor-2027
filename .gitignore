@@ -94,7 +94,6 @@ lighthouse-report.json
 lhr-*.json
 # Ignore any custom output folders
 lh-output/
-/output/lighthouse*/
 # Ignore any temp files
 *.lhci-*
 storybook-static
@@ -103,3 +102,7 @@ storybook-static
 /test-results/
 /playwright-report/
 /playwright/.cache/
+/.playwright-cli/
+
+# Generated reports, screenshots, and temporary verification scripts
+/output/

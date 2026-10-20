@@ -1,7 +1,7 @@
 /** @type { import('@storybook/nextjs').Preview } */
 
 import { withThemeByDataAttribute } from '@storybook/addon-themes';
-import { inter } from '@theme/fonts';
+import { ppNeueMontreal, sequel } from '@theme/fonts';
 
 // Styles
 // ------------
@@ -11,8 +11,8 @@ import '@/css/tokens.css';
 import '@/css/global.scss';
 
 // NOTE • On <html>, like app/(site)/layout.tsx — the --font-* tokens on :root
-// read --inter, so it has to be set at the root to resolve
-document.documentElement.classList.add(inter.variable);
+// read the local font variables, so they have to be set at the root to resolve.
+document.documentElement.classList.add(ppNeueMontreal.variable, sequel.variable);
 
 const customViewports = {
 	mobile: {
