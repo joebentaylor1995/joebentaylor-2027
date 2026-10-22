@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('project title hands over to water, responds to the pointer and respects reduced motion', async ({ page }) => {
 	await page.goto('/projects/pocketchange/');

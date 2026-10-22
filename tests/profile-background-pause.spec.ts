@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { expect, type Frame, type Page, test } from '@playwright/test';
+import { expect, type Frame, type Page, test } from './helpers/test';
 
 const videoPlayback = execFileSync(
 	'bun',
@@ -46,7 +46,9 @@ test.beforeEach(async ({ page }) => {
 	});
 });
 
-test.afterEach(({ page }) => {
+test.afterEach(({ page }, testInfo) => {
+	// NOTE • A quarantined test is skipped before beforeEach records its errors
+	if (testInfo.expectedStatus === 'skipped') return;
 	expect(pageErrors.get(page)).toEqual([]);
 });
 

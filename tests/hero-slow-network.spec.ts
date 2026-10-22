@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('slow hero textures do not miss the opening WebGL wave', async ({ page }) => {
 	let release = () => {};

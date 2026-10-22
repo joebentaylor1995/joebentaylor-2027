@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const width of [390, 440, 768, 1440]) {
 	test(`cookie design and choices at ${width}px`, async ({ page }) => {

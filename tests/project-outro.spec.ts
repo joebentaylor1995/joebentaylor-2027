@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const mobile of [false, true]) {
 	test(`project outro rises and reverses on ${mobile ? 'mobile' : 'desktop'}`, async ({ page }) => {

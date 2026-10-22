@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const route of ['profile', 'contact']) {
 	test(`${route} opens after the loader on a direct visit and survives reload`, async ({ page }) => {

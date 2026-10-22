@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('wave settings save both profiles and reload with the approved defaults', async ({ page }) => {
 	await page.goto('/?heroSettings');

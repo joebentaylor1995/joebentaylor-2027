@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('modal settings are opt-in, update live, persist drafts and reset', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });

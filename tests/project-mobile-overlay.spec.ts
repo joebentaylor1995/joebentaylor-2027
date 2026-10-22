@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('mobile overview scrolls over the settled hero and reverses', async ({ page }) => {
 	await page.setViewportSize({ width: 440, height: 796 });

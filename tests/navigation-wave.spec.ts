@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('navigation reveals the destination and header together through the lens', async ({ page }) => {
 	const errors: string[] = [];

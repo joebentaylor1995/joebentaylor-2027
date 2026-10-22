@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('scene remains ready and error-free through idle, pointer movement and resize', async ({ page }) => {
 	const errors: string[] = [];

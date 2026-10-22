@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('global sizing preview affects tablet only and resets on reload', async ({ page }) => {
 	await page.setViewportSize({ width: 768, height: 1000 });

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const route of ['/projects/pocketchange/', '/projects/', '/cookies']) {
 	test(`non-homepage loader fades without a wave on ${route}`, async ({ page }) => {

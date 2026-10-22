@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const width of [1440, 440]) {
 	test(`profile title fill wave plays on opening and resets after closing at ${width}px`, async ({ page }) => {

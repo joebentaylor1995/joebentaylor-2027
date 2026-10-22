@@ -2,7 +2,7 @@
 // ------------
 // NOTE • The 404 page and the security headers from next.config.js — both
 // fail quietly when broken, so they're checked here.
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('unknown URLs get the styled 404 with a 404 status', async ({ page }) => {
 	const response = await page.goto('/this-page-does-not-exist/');

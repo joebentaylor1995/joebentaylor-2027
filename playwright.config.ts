@@ -11,6 +11,11 @@ const baseURL = `http://localhost:${port}`;
 export default defineConfig({
 	testDir: './tests',
 	timeout: 60_000,
+	// NOTE • The CI runner is slower than a dev machine (software WebGL, 2
+	// workers), so timing-sensitive tests get two retries there. A test that
+	// fails all three attempts is a real failure; one that passes on retry is
+	// reported as flaky. Consistent failures live in tests/quarantine.ts.
+	retries: process.env.CI ? 2 : 0,
 	use: {
 		baseURL,
 		// NOTE • Sandboxed environments (agent containers, locked-down CI) often

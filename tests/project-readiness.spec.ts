@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from './helpers/test';
 
 declare const ready: boolean;
 declare const introduction: { active: boolean };
