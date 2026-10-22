@@ -71,6 +71,7 @@ const cleanBlock = (block: Project['caseBuilder'][number]): Project['caseBuilder
 	if (block.type === 'single') return { ...block, media: cleanMediaType(block.media) };
 	if (block.type === 'dual')
 		return { ...block, media: [cleanMediaType(block.media[0]), cleanMediaType(block.media[1])] };
+	if (block.type === 'model') return block;
 	// NOTE • The animation name picks a component, so it must compare cleanly
 	return { ...block, animation: stegaClean(block.animation), images: block.images.filter(hasSrc) };
 };
@@ -154,6 +155,8 @@ const isPlayable = (media: ProjectMedia | null | undefined) =>
 const isCompleteBlock = (block: Project['caseBuilder'][number]) => {
 	if (block.type === 'single') return isPlayable(block.media);
 	if (block.type === 'dual') return block.media?.length === 2 && block.media.every(isPlayable);
+	// NOTE • A model needs both its file and the poster that stands in for it
+	if (block.type === 'model') return Boolean(block.src && block.poster);
 	return Boolean(block.images?.some(hasSrc));
 };
 

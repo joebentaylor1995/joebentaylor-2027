@@ -15,7 +15,7 @@ import {
 } from 'sanity';
 import { AwardInput } from '../../components/AwardInput';
 import { CompressedVideoInput } from '../../components/CompressedVideoInput';
-import { galleryPreviewUrl } from '../objects/caseGalleries';
+import { insertPreviewUrl } from '../objects/caseBlocks';
 
 // Helpers
 // ------------
@@ -314,10 +314,11 @@ export const project = defineType({
 			type: 'array',
 			group: 'builder',
 			description:
-				'Stack full-width, two-up and animated gallery blocks. Drag to reorder. At least one is required.',
+				'Stack full-width, two-up, 3D model and animated gallery blocks. Drag to reorder. At least one is required.',
 			of: [
 				defineArrayMember({ type: 'caseSingle' }),
 				defineArrayMember({ type: 'caseDual' }),
+				defineArrayMember({ type: 'caseModel' }),
 				defineArrayMember({ type: 'caseGalleryScatterDrift' }),
 				defineArrayMember({ type: 'caseGalleryPanorama' }),
 				defineArrayMember({ type: 'caseGalleryOrbit' }),
@@ -325,14 +326,14 @@ export const project = defineType({
 			options: {
 				insertMenu: {
 					groups: [
-						{ name: 'media', title: 'Media', of: ['caseSingle', 'caseDual'] },
+						{ name: 'media', title: 'Media', of: ['caseSingle', 'caseDual', 'caseModel'] },
 						{
 							name: 'animated',
 							title: 'Animated galleries',
 							of: ['caseGalleryScatterDrift', 'caseGalleryPanorama', 'caseGalleryOrbit'],
 						},
 					],
-					views: [{ name: 'list' }, { name: 'grid', previewImageUrl: galleryPreviewUrl }],
+					views: [{ name: 'list' }, { name: 'grid', previewImageUrl: insertPreviewUrl }],
 				},
 			},
 			hidden: isListingOnly,

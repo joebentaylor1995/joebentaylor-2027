@@ -95,6 +95,14 @@ export const GET_PROJECT = defineQuery(`
 			"id": _key,
 			_type == "caseSingle" => { "type": "single", "media": media${MEDIA} },
 			_type == "caseDual" => { "type": "dual", "media": media[]${MEDIA} },
+			_type == "caseModel" => {
+				"type": "model",
+				"src": model.asset->url,
+				"poster": poster.asset->url,
+				"alt": coalesce(alt, ""),
+				"aspect": poster.asset->metadata.dimensions.aspectRatio,
+				"background": background.hex
+			},
 			// NOTE • Each animated gallery is its own block type, named after its animation
 			_type match "caseGallery*" => {
 				"type": "gallery",

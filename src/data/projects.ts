@@ -23,6 +23,17 @@ export type ProjectCaseBlock =
 			images: GalleryImage[];
 			// NOTE • A hex colour behind the cards; the stage falls back to a light neutral
 			background?: string | null;
+	  }
+	| {
+			id: string;
+			type: 'model';
+			// NOTE • The .glb's URL — fetched only when a visitor opens the viewer
+			src: string;
+			poster: string;
+			alt: string;
+			// NOTE • Width ÷ height of the poster, which sets the block's shape
+			aspect?: number | null;
+			background?: string | null;
 	  };
 
 export interface Project {

@@ -18,10 +18,6 @@ const MIN_IMAGES = 6;
 const MAX_IMAGES = 9;
 export const GALLERY_PREFIX = 'Animated Gallery — ';
 
-// NOTE • Insert-menu thumbnails, served from public/ by the Next app hosting the Studio
-export const galleryPreviewUrl = (schemaTypeName: string) =>
-	schemaTypeName.startsWith('caseGallery') ? `/images/studio/${schemaTypeName}.webp` : undefined;
-
 // Helpers
 // ------------
 // NOTE • `aspect` is the card shape the animation crops every image to
