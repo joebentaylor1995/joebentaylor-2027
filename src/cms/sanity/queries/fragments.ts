@@ -25,6 +25,12 @@ export const MEDIA = /* groq */ `{
 	!(kind in ["video", "youtube"]) => { "src": image.asset->url, "aspect": image.asset->metadata.dimensions.aspectRatio }
 }`;
 
+export const GALLERY_IMAGE = /* groq */ `{
+	"src": asset->url,
+	"alt": coalesce(alt, ""),
+	"hotspot": hotspot{ x, y }
+}`;
+
 // NOTE • A physics toolkit tile — layer geometry defaults are applied in
 // src/data/content.ts, so only set values come back
 export const TOOLKIT = /* groq */ `{

@@ -13,7 +13,7 @@ Studio
 └── 💬 Reviews                review        (documents)  → profile panel + case studies
 ```
 
-Reusable objects: `seo`, `mediaItem`, `caseSingle`, `caseDual`, `link`.
+Reusable objects: `seo`, `mediaItem`, `caseSingle`, `caseDual`, `caseGalleryScatterDrift`, `caseGalleryPanorama`, `caseGalleryOrbit`, `link`.
 
 ---
 
@@ -89,7 +89,7 @@ One document per piece of work. A project is either a full **case study** or a
 | Case study | `introduction` | Intro paragraph under the hero, also the meta description fallback |
 | Case study | `objectives[]` | Overview → objectives paragraphs |
 | Case study | `deliverables[]`, `website`, `credits[]` (`person` → `person`, free-text `role`), `recognition[]` (award, organisation) | Overview sidebar |
-| Case study | `caseBuilder[]` — **visual builder** of blocks: `caseSingle` (one full-width media) and `caseDual` (two side by side); each media is an image, a short video loop with poster, or a YouTube link (YouTube's standard player, marketing-consent gated — thumbnail otherwise); alt text is required | Rendered by `ProjectCaseBuilder`; new block types slot into this array |
+| Case study | `caseBuilder[]` — **visual builder** of blocks: `caseSingle` (one full-width media) and `caseDual` (two side by side), plus **animated galleries** — `caseGallery*` blocks titled “Animated Gallery — …” that animate 6–9 uploaded stills in code instead of shipping a video (`caseGalleryScatterDrift`: a tilted collage of 4:3 cards drifting upward in a seamless loop; `caseGalleryPanorama`: one 3:4 card at a time, panning round a ring; `caseGalleryOrbit`: a ring of 1:1 cards making one eased revolution); each media is an image, a short video loop with poster, or a YouTube link (YouTube's standard player, marketing-consent gated — thumbnail otherwise); alt text is required | Rendered by `ProjectCaseBuilder` (galleries by `AnimatedGallery`); new block types slot into this array |
 | Case study | `reviews[]` → `review` | Outro testimonial (first review is featured) |
 | SEO | `seo` | Per-page title/description/share image |
 

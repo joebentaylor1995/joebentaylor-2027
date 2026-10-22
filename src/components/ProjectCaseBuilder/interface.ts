@@ -9,6 +9,7 @@ export interface SingleMediaProps {
 export interface DualMediaProps {
 	media: [ProjectMedia, ProjectMedia];
 }
+export type GalleryMediaProps = Omit<Extract<ProjectCaseBlock, { type: 'gallery' }>, 'id' | 'type'>;
 export interface MediaProps {
 	media: ProjectMedia;
 	sizes: string;

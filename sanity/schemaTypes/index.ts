@@ -12,6 +12,7 @@ import { project } from './documents/project';
 import { projectTag } from './documents/projectTag';
 import { review } from './documents/review';
 import { caseDual, caseSingle } from './objects/caseBlocks';
+import { caseGalleryOrbit, caseGalleryPanorama, caseGalleryScatterDrift } from './objects/caseGalleries';
 import { mediaItem } from './objects/mediaItem';
 import { seo } from './objects/seo';
 import { toolkit, toolLayer } from './objects/toolkit';
@@ -41,6 +42,9 @@ export const schemaTypes = [
 	mediaItem,
 	caseSingle,
 	caseDual,
+	caseGalleryScatterDrift,
+	caseGalleryPanorama,
+	caseGalleryOrbit,
 	toolkit,
 	toolLayer,
 ];

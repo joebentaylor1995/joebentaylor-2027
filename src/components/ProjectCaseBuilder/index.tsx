@@ -1,5 +1,6 @@
 'use client';
 
+import AnimatedGallery from '@parts/AnimatedGallery';
 import { preloadNearbyMedia } from '@utils/preloadNearbyMedia';
 import { YOUTUBE_ASPECT } from '@utils/youtube';
 // Imports
@@ -8,7 +9,13 @@ import Image from 'next/image';
 import { type ComponentType, type CSSProperties, useEffect, useRef, useState } from 'react';
 // Styles + Interfaces
 // ------------
-import type { DualMediaProps, MediaProps, ProjectCaseBuilderProps, SingleMediaProps } from './interface';
+import type {
+	DualMediaProps,
+	GalleryMediaProps,
+	MediaProps,
+	ProjectCaseBuilderProps,
+	SingleMediaProps,
+} from './interface';
 import { mountMediaReveal } from './reveal';
 import { MEDIA_REPLAY, MEDIA_SETTINGS_CHANGED } from './settings';
 import s from './styles.module.scss';
@@ -57,6 +64,21 @@ export const DualMedia = ({ media }: DualMediaProps) => (
 				sizes='(max-width: 1023px) calc(100vw - 32px), (max-width: 1440px) calc(33.825vw - 44px), 443px'
 			/>
 		))}
+	</div>
+);
+
+export const GalleryMedia = ({ animation, images, background }: GalleryMediaProps) => (
+	<div className={s.jacket} data-media-layout='gallery'>
+		<div className={s.mediaSlot} data-media-tile>
+			<figure className={s.media}>
+				<AnimatedGallery
+					animation={animation}
+					images={images}
+					background={background}
+					sizes='(max-width: 1023px) 60vw, (max-width: 1440px) 40vw, 560px'
+				/>
+			</figure>
+		</div>
 	</div>
 );
 
@@ -119,8 +141,10 @@ const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
 			{blocks.map(block =>
 				block.type === 'single' ? (
 					<SingleMedia key={block.id} media={block.media} />
-				) : (
+				) : block.type === 'dual' ? (
 					<DualMedia key={block.id} media={block.media} />
+				) : (
+					<GalleryMedia key={block.id} {...block} />
 				)
 			)}
 		</section>
