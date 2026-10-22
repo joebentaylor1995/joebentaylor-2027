@@ -15,6 +15,7 @@
 			"**/*.css",
 			"!skills",
 			"!public/projects-ribbon",
+			"!public/draco",
 			"!src/css/tokens.css"
 		]
 	},

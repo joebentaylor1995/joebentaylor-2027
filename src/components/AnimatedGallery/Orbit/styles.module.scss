@@ -1,0 +1,25 @@
+// NOTE • The ring writes one property per frame (--spin). Each card swings out
+// to its place on the circle, then turns back by the same angle to stay upright
+.ring {
+	position: absolute;
+	inset: 0;
+}
+
+.card {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: calc(var(--card-width, 0.222) * 100cqw);
+	aspect-ratio: var(--card-aspect, 1);
+	overflow: hidden;
+	border-radius: 1.5cqw;
+	transform:
+		translate(-50%, -50%) rotate(calc(var(--angle, 0deg) + var(--spin, 0deg)))
+		translateY(calc(var(--radius, 0.266) * -100cqw)) rotate(calc(-1 * (var(--angle, 0deg) + var(--spin, 0deg))));
+	will-change: transform;
+
+	img {
+		object-fit: cover;
+		object-position: var(--focus, 50% 50%);
+	}
+}

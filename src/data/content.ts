@@ -67,10 +67,14 @@ const cleanMediaType = <T extends ProjectMedia>(media: T): T => {
 	const type = stegaClean(media.type);
 	return { ...media, type, ...(type === 'youtube' && { src: stegaClean(media.src) }) };
 };
-const cleanBlock = (block: Project['caseBuilder'][number]): Project['caseBuilder'][number] =>
-	block.type === 'single'
-		? { ...block, media: cleanMediaType(block.media) }
-		: { ...block, media: [cleanMediaType(block.media[0]), cleanMediaType(block.media[1])] };
+const cleanBlock = (block: Project['caseBuilder'][number]): Project['caseBuilder'][number] => {
+	if (block.type === 'single') return { ...block, media: cleanMediaType(block.media) };
+	if (block.type === 'dual')
+		return { ...block, media: [cleanMediaType(block.media[0]), cleanMediaType(block.media[1])] };
+	if (block.type === 'model') return block;
+	// NOTE • The animation name picks a component, so it must compare cleanly
+	return { ...block, animation: stegaClean(block.animation), images: block.images.filter(hasSrc) };
+};
 
 // SECTION • Profile panel normalisers
 type Hotspot = { x?: number; y?: number } | null | undefined;
@@ -148,8 +152,13 @@ const isPlayable = (media: ProjectMedia | null | undefined) =>
 	media?.type === 'youtube' ? Boolean(getYouTubeId(stegaClean(media.src))) : hasSrc(media);
 
 // NOTE • A block whose asset hasn't been uploaded yet is skipped, not crashed on
-const isCompleteBlock = (block: Project['caseBuilder'][number]) =>
-	block.type === 'single' ? isPlayable(block.media) : block.media?.length === 2 && block.media.every(isPlayable);
+const isCompleteBlock = (block: Project['caseBuilder'][number]) => {
+	if (block.type === 'single') return isPlayable(block.media);
+	if (block.type === 'dual') return block.media?.length === 2 && block.media.every(isPlayable);
+	// NOTE • A model needs both its file and the poster that stands in for it
+	if (block.type === 'model') return Boolean(block.src && block.poster);
+	return Boolean(block.images?.some(hasSrc));
+};
 
 // NOTE • Unpublished references come back null — drop them; a project with
 // no thumbnail yet still shows, on the placeholder

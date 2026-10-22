@@ -13,6 +13,12 @@ import { KIND_LABELS, previewMedia } from './mediaItem';
 
 // Exports
 // ------------
+// NOTE • Insert-menu grid thumbnails, served from public/images/studio by the
+// Next app hosting the Studio — add a block's name here once it has one
+const BLOCKS_WITH_THUMBNAILS = ['caseModel', 'caseGalleryScatterDrift', 'caseGalleryPanorama', 'caseGalleryOrbit'];
+export const insertPreviewUrl = (schemaTypeName: string) =>
+	BLOCKS_WITH_THUMBNAILS.includes(schemaTypeName) ? `/images/studio/${schemaTypeName}.webp` : undefined;
+
 export const caseSingle = defineType({
 	name: 'caseSingle',
 	title: 'Full width',

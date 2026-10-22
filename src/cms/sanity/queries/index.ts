@@ -6,7 +6,7 @@
 // Imports
 // ------------
 import { defineQuery } from 'next-sanity';
-import { MEDIA, REVIEW, RIBBON_PROJECT, SEO, TOOLKIT } from './fragments';
+import { GALLERY_IMAGE, MEDIA, REVIEW, RIBBON_PROJECT, SEO, TOOLKIT } from './fragments';
 
 // Exports
 // ------------
@@ -94,7 +94,26 @@ export const GET_PROJECT = defineQuery(`
 		"caseBuilder": caseBuilder[]{
 			"id": _key,
 			_type == "caseSingle" => { "type": "single", "media": media${MEDIA} },
-			_type == "caseDual" => { "type": "dual", "media": media[]${MEDIA} }
+			_type == "caseDual" => { "type": "dual", "media": media[]${MEDIA} },
+			_type == "caseModel" => {
+				"type": "model",
+				"src": model.asset->url,
+				"poster": poster.asset->url,
+				"alt": coalesce(alt, ""),
+				"aspect": poster.asset->metadata.dimensions.aspectRatio,
+				"background": background.hex
+			},
+			// NOTE • Each animated gallery is its own block type, named after its animation
+			_type match "caseGallery*" => {
+				"type": "gallery",
+				"animation": select(
+					_type == "caseGalleryScatterDrift" => "scatterDrift",
+					_type == "caseGalleryPanorama" => "panorama",
+					_type == "caseGalleryOrbit" => "orbit"
+				),
+				"images": images[defined(asset)]${GALLERY_IMAGE},
+				"background": background.hex
+			}
 		},
 		"review": reviews[0]->{
 			quote,

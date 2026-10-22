@@ -6,9 +6,35 @@ export type ProjectMedia =
 	// NOTE • `src` is the YouTube link as pasted in Sanity
 	| { type: 'youtube'; src: string; alt: string };
 
+// NOTE • Each value is one code-driven animation, picked in Sanity as its own
+// "Animated Gallery — …" block (sanity/schemaTypes/objects/caseGalleries.ts)
+export const GALLERY_ANIMATIONS = ['scatterDrift', 'panorama', 'orbit'] as const;
+export type GalleryAnimation = (typeof GALLERY_ANIMATIONS)[number];
+// NOTE • Each animation crops its cards to a fixed shape; the hotspot (0–1 from the top left) keeps the subject in frame
+export type GalleryImage = { src: string; alt: string; hotspot?: { x: number; y: number } | null };
+
 export type ProjectCaseBlock =
 	| { id: string; type: 'single'; media: ProjectMedia }
-	| { id: string; type: 'dual'; media: [ProjectMedia, ProjectMedia] };
+	| { id: string; type: 'dual'; media: [ProjectMedia, ProjectMedia] }
+	| {
+			id: string;
+			type: 'gallery';
+			animation: GalleryAnimation;
+			images: GalleryImage[];
+			// NOTE • A hex colour behind the cards; the stage falls back to a light neutral
+			background?: string | null;
+	  }
+	| {
+			id: string;
+			type: 'model';
+			// NOTE • The .glb's URL — fetched only when a visitor opens the viewer
+			src: string;
+			poster: string;
+			alt: string;
+			// NOTE • Width ÷ height of the poster, which sets the block's shape
+			aspect?: number | null;
+			background?: string | null;
+	  };
 
 export interface Project {
 	slug: string;

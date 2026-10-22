@@ -15,6 +15,7 @@ import {
 } from 'sanity';
 import { AwardInput } from '../../components/AwardInput';
 import { CompressedVideoInput } from '../../components/CompressedVideoInput';
+import { insertPreviewUrl } from '../objects/caseBlocks';
 
 // Helpers
 // ------------
@@ -312,11 +313,27 @@ export const project = defineType({
 			title: 'Case study builder',
 			type: 'array',
 			group: 'builder',
-			description: 'Stack full-width and two-up media blocks. Drag to reorder. At least one is required.',
-			of: [defineArrayMember({ type: 'caseSingle' }), defineArrayMember({ type: 'caseDual' })],
+			description:
+				'Stack full-width, two-up, 3D model and animated gallery blocks. Drag to reorder. At least one is required.',
+			of: [
+				defineArrayMember({ type: 'caseSingle' }),
+				defineArrayMember({ type: 'caseDual' }),
+				defineArrayMember({ type: 'caseModel' }),
+				defineArrayMember({ type: 'caseGalleryScatterDrift' }),
+				defineArrayMember({ type: 'caseGalleryPanorama' }),
+				defineArrayMember({ type: 'caseGalleryOrbit' }),
+			],
 			options: {
 				insertMenu: {
-					views: [{ name: 'list' }, { name: 'grid' }],
+					groups: [
+						{ name: 'media', title: 'Media', of: ['caseSingle', 'caseDual', 'caseModel'] },
+						{
+							name: 'animated',
+							title: 'Animated galleries',
+							of: ['caseGalleryScatterDrift', 'caseGalleryPanorama', 'caseGalleryOrbit'],
+						},
+					],
+					views: [{ name: 'list' }, { name: 'grid', previewImageUrl: insertPreviewUrl }],
 				},
 			},
 			hidden: isListingOnly,
