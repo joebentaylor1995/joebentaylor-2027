@@ -6,7 +6,7 @@
 	// Text colour inside the nav's hover block
 	--header-inverse: var(--global-white);
 
-	&[data-tone='light'] {
+	&[data-tone='light'], :global(body:has([data-not-found-scene])) & {
 		--header-foreground: var(--global-white);
 		--header-inverse: var(--brand-c4);
 	}
