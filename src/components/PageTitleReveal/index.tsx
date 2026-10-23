@@ -7,12 +7,20 @@ import { isProjectHandoffPending, PROJECT_HANDOFF_SETTLED } from '@utils/project
 import { splitStega } from '@utils/stega';
 import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
-import { useRef } from 'react';
+import { type CSSProperties, useRef } from 'react';
 
 // Styles + Interfaces
 // ------------
 import type { PageTitleRevealProps } from './interface';
 import s from './styles.module.scss';
+
+// Constants
+// ------------
+// NOTE • The words reveal runs in CSS — a GSAP tween per word read every word's
+// computed style on mount, a forced style recalc that stalled the first scroll.
+// Keep these in step with --word-duration and --word-stagger in styles.module.scss.
+const WORD_DURATION = 0.85;
+const WORD_STAGGER = 0.025;
 
 // Component
 // ------------
@@ -48,21 +56,10 @@ const PageTitleReveal = ({
 				return;
 			}
 			title.dataset.waveState = 'waiting';
+			const wordCount = title.querySelectorAll('[data-reveal-word]').length;
 			const tween =
 				variant === 'words'
-					? gsap.fromTo(
-							title.querySelectorAll('[data-reveal-word]'),
-							{ yPercent: 105, opacity: 0 },
-							{
-								yPercent: 0,
-								opacity: 1,
-								duration: 0.85,
-								stagger: 0.025,
-								ease: 'power3.out',
-								paused: true,
-								onComplete: complete,
-							}
-						)
+					? gsap.delayedCall(WORD_DURATION + WORD_STAGGER * Math.max(0, wordCount - 1), complete).pause()
 					: variant === 'block'
 						? gsap
 								.timeline({ paused: true, onComplete: complete })
@@ -138,6 +135,7 @@ const PageTitleReveal = ({
 	// NOTE • Words are split from the clean text; the Visual Editing payload is
 	// rendered once, intact, so the whole reveal stays click-to-edit
 	const words = variant === 'words' && typeof children === 'string' ? splitStega(children) : null;
+	let wordIndex = 0;
 
 	// Render
 	return (
@@ -157,7 +155,9 @@ const PageTitleReveal = ({
 								match[0]
 							) : (
 								<span key={match.index} className={s.wordMask}>
-									<span data-reveal-word>{match[0]}</span>
+									<span data-reveal-word style={{ '--word-index': wordIndex++ } as CSSProperties}>
+										{match[0]}
+									</span>
 								</span>
 							)
 						)

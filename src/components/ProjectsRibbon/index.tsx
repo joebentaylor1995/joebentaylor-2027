@@ -153,16 +153,11 @@ const ProjectsRibbon = () => {
 			) {
 				router.prefetch(event.data.href);
 				const data = event.data;
-				if (
-					typeof data.hero === 'string' &&
-					typeof data.title === 'string' &&
-					typeof data.description === 'string'
-				) {
+				if (typeof data.hero === 'string' && typeof data.title === 'string') {
 					setPreview({
 						request: data.request,
 						project: {
 							title: data.title,
-							description: data.description,
 							hero: { src: data.hero, alt: data.title },
 						},
 					});
