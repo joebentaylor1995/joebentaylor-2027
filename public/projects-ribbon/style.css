@@ -12,7 +12,8 @@
 
 .view-switch{position:fixed;z-index:4;top:38px;left:50%;transform:translateX(-50%);display:flex;gap:3px;padding:4px;background:rgba(22,22,22,.92);border:1px solid #343434;border-radius:26px;backdrop-filter:blur(20px)}
 .view-switch button{font-size:11px;padding:9px 15px;border-radius:22px;white-space:nowrap;color:#999;transition:background .25s,color .25s}.view-switch button[aria-pressed=true]{background:#f1f1eb;color:#151515}.view-switch span{font-size:9px;margin-left:5px;opacity:.6}
-#hover-title{position:fixed;z-index:3;pointer-events:none;font-size:12px;color:#f5f5f0;background:rgba(12,12,12,.88);border:1px solid #444;border-radius:8px;padding:9px 12px;max-width:260px;backdrop-filter:blur(16px)}
+/* Host integration: every project tooltip is borderless brand-c3 (#212121 = --brand-c3 in src/theme; the ribbon frame doesn't load the site's tokens) */
+#hover-title{position:fixed;z-index:3;pointer-events:none;font-size:12px;color:#f5f5f0;background:#212121;border-radius:8px;padding:9px 12px;max-width:260px}
 #hover-title[hidden],[hidden]{display:none!important}.grid-note{font-size:11px;line-height:1.5;color:#aaa;margin:0 0 23px}.all-projects footer nav{visibility:hidden;pointer-events:none}.all-projects .intro{opacity:0}/* Host integration: a soft, well-blurred drop shadow (two layers) so the bottom-left info stays legible over any tile, in both views */
 footer .project,footer .hint{text-shadow:none;filter:drop-shadow(0 1px 4px rgba(0,0,0,.45)) drop-shadow(0 4px 28px rgba(0,0,0,.7))}.all-projects footer .project{padding:10px 13px;background:rgba(0,0,0,.78);border-radius:8px;width:auto;min-width:160px}
 #stage:focus-visible{outline:1px solid #eaff00;outline-offset:-5px}
@@ -89,8 +90,6 @@ footer nav{display:none}
 #slide-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(560px,60vw)}
 /* Host integration: padlock in the "Coming soon" tooltip for projects without a link */
 #hover-title .lock{display:inline-block;vertical-align:-1px;margin-right:6px}
-/* Host integration: the case study tooltip ("View") — no border, brand-c3 fill (#212121 = --brand-c3 in src/theme; the ribbon frame doesn't load the site's tokens) */
-#hover-title.is-case-study{border:0;background:#212121}
 /* Host integration: All projects vignette — darkens the edges (most at the bottom, under the project info) so the frame stays legible over any tile. Sits above the canvas, below the header, footer and tooltip; fades with the view switch */
 body::after{content:'';position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .6s ease;background:radial-gradient(ellipse 75% 70% at 50% 45%,rgba(18,18,18,0) 45%,rgba(18,18,18,.55) 80%,rgba(18,18,18,.85) 100%),linear-gradient(to top,rgba(18,18,18,.75) 0,rgba(18,18,18,0) 28%),linear-gradient(to bottom,rgba(18,18,18,.55) 0,rgba(18,18,18,0) 18%)}
 .all-projects::after{opacity:1}
