@@ -19,6 +19,7 @@ export const NAV_BACK = 'nav-back';
 const pageAnimation = {
 	'project-mesh': 'none',
 	'next-project': 'none',
+	'project-modal': 'none',
 	[NAV_FORWARD]: 'navForward',
 	[NAV_BACK]: 'navBack',
 	default: 'none',

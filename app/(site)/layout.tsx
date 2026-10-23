@@ -94,7 +94,8 @@ export const viewport: Viewport = {
 
 // Component
 // ------------
-const RootLayout = async ({ children }: { children: React.ReactNode }) => {
+// NOTE • `modal` is the @modal slot: a non-featured case study, shown in the profile panel
+const RootLayout = async ({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) => {
 	// NOTE • Cached Sanity read (see src/cms/sanity/client.ts) — the shell still prerenders
 	const settings = await getSettings();
 
@@ -123,7 +124,7 @@ const RootLayout = async ({ children }: { children: React.ReactNode }) => {
 					<SiteLoader />
 					<LinkPreloader />
 					<NavigationWave>
-						<ProfileReveal profile={<Profile />}>
+						<ProfileReveal profile={<Profile />} project={modal}>
 							<Header />
 							<ViewTransition name='page-viewport' update='none' default='none'>
 								<main id='page'>

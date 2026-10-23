@@ -8,6 +8,7 @@ import type { ProjectHeroProps } from '@parts/ProjectHero/interface';
 // ------------
 import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { mq } from '@tackl';
+import { markProjectModalEntry } from '@utils/projectModal';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useRef, useState } from 'react';
 import { holdProjectHero } from './handoff';
@@ -135,6 +136,17 @@ const ProjectsRibbon = () => {
 						},
 					});
 				}
+				return;
+			}
+			// NOTE • A non-featured case study: open the profile panel on it (@modal slot), no hero handoff
+			if (
+				event.data?.type === 'projects:modal' &&
+				typeof event.data.href === 'string' &&
+				/^\/projects\/[^/]+\/?$/.test(event.data.href)
+			) {
+				const href = event.data.href.replace(/\/?$/, '/');
+				markProjectModalEntry(href);
+				router.push(href, { transitionTypes: ['project-modal'], scroll: false });
 				return;
 			}
 			if (event.data?.type !== 'projects:open') return;

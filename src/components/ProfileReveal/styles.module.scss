@@ -88,6 +88,13 @@
 	}
 }
 
+// NOTE • Profile and project content share the panel; the wrapper adds no box of its own
+.content {
+	display: contents;
+
+	&[hidden] { display: none; }
+}
+
 .overlay {
 	[data-cursor='close'] > & { cursor: none; }
 

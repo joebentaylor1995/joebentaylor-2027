@@ -122,6 +122,8 @@ export interface RibbonProject {
 	poster: string;
 	video?: string | null;
 	href?: string | null;
+	/** In the Featured list — opens as a full case study; other case studies open in the project modal. */
+	featured?: boolean;
 }
 
 export interface ProjectsPageContent {
