@@ -2,6 +2,7 @@
 
 import { GlobalContext } from '@parts/Contexts';
 import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
+import { mq } from '@tackl';
 import { lockProjectScroll } from '@utils/lockProjectScroll';
 import { releaseNavigationScene } from '@utils/navigationScene';
 import { gsap } from 'gsap';
@@ -9,6 +10,10 @@ import { type ReactNode, use, useEffect, useMemo, useRef, ViewTransition } from 
 import { readWaveSettings, WAVE_SETTINGS_CHANGED } from './settings';
 import s from './styles.module.scss';
 import { waveTexture } from './texture';
+
+// NOTE • Phones swap the wave for a plain crossfade, animated in CSS (src/css/_page-transitions.scss).
+// Cleanup drops data-navigation-wave, which switches that CSS off, so keep the two durations in step.
+const CROSSFADE_DURATION = 600;
 
 // Native snapshots retain canvases, video and font rendering without DOM rasterisation.
 export default function NavigationWave({ children }: { children: ReactNode }) {
@@ -72,35 +77,47 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 					navigation.played = true;
 					if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 					const settings = readWaveSettings();
+					const crossfade = matchMedia(mq.down.m).matches;
 					const width = innerWidth,
 						height = innerHeight;
 					const x = (width * settings.originX) / 100,
 						y = height * (1 - settings.originY / 100);
 					const feather = Math.max(1, height * 0.16 * settings.width * settings.softness);
 					const end = Math.hypot(Math.max(x, width - x), Math.max(y, height - y)) + feather;
-					const duration = settings.duration;
+					const duration = crossfade ? CROSSFADE_DURATION : settings.duration;
 					const ease = gsap.parseEase(settings.ease);
 					const root = document.documentElement;
 					root.dataset.navigationWave = 'running';
-					root.dataset.navigationWaveLens = String(settings.bend > 0 && settings.strength > 0);
+					root.dataset.navigationWaveLens = String(!crossfade && settings.bend > 0 && settings.strength > 0);
 					root.dataset.navigationWaveProgress = '0';
 					const releaseScroll = lockProjectScroll();
-					map.current?.setAttribute('href', waveTexture(settings));
+					if (!crossfade) map.current?.setAttribute('href', waveTexture(settings));
 					// Gradients interpolate discretely in mask-image keyframes. Keep the
 					// native animation as the clock, and move mask and lens together below.
-					const animation = root.animate([{ opacity: 1 }, { opacity: 1 }], {
-						duration,
-						fill: 'both',
-						pseudoElement: `::view-transition-new(${instance.name})`,
-					});
-					const hold = root.animate([{ opacity: 1 }, { opacity: 1 }], {
-						duration,
-						pseudoElement: `::view-transition-old(${instance.name})`,
-					});
+					const animations = crossfade
+						? []
+						: [
+								root.animate([{ opacity: 1 }, { opacity: 1 }], {
+									duration,
+									fill: 'both',
+									pseudoElement: `::view-transition-new(${instance.name})`,
+								}),
+								root.animate([{ opacity: 1 }, { opacity: 1 }], {
+									duration,
+									pseudoElement: `::view-transition-old(${instance.name})`,
+								}),
+							];
+					const started = performance.now();
+					const elapsed = () =>
+						crossfade ? performance.now() - started : Number(animations[0]?.currentTime || 0);
 					let raf = 0;
 					const tick = () => {
-						const progress = Math.min(1, Number(animation.currentTime || 0) / duration);
+						const progress = Math.min(1, elapsed() / duration);
 						root.dataset.navigationWaveProgress = String(progress);
+						if (crossfade) {
+							if (progress < 1) raf = requestAnimationFrame(tick);
+							return;
+						}
 						// Grow from zero immediately; a negative radius hides the first part
 						// of the animation and feels like a delay after the click.
 						const radius = end * ease(progress);
@@ -133,11 +150,13 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 						delete root.dataset.navigationWaveLens;
 						root.style.removeProperty('--navigation-wave-mask');
 					};
-					void animation.finished.then(cleanup, cleanup);
+					const finished = crossfade
+						? new Promise(resolve => setTimeout(resolve, duration))
+						: animations[0].finished;
+					void finished.then(cleanup, cleanup);
 					return () => {
 						cleanup();
-						animation.cancel();
-						hold.cancel();
+						for (const animation of animations) animation.cancel();
 					};
 				}}
 			>

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 for (const mobile of [false, true]) {
-	test(`Next Project uses the feathered wave under a fixed header (${mobile ? 'mobile' : 'desktop'})`, async ({
+	test(`Next Project ${mobile ? 'crossfades' : 'uses the feathered wave'} under a fixed header (${mobile ? 'mobile' : 'desktop'})`, async ({
 		page,
 	}) => {
 		if (mobile) await page.setViewportSize({ width: 440, height: 780 });
@@ -32,14 +32,27 @@ for (const mobile of [false, true]) {
 						.maskImage,
 					filter: getComputedStyle(document.documentElement, '::view-transition-new(navigation-surface)')
 						.filter,
+					fade: animations.some(
+						animation =>
+							animation instanceof CSSAnimation &&
+							animation.animationName === 'vt-fade' &&
+							(animation.effect as KeyframeEffect).pseudoElement ===
+								'::view-transition-new(navigation-surface)'
+					),
 					sliding: animations.some(
 						animation =>
 							animation instanceof CSSAnimation && animation.animationName.startsWith('vt-project-')
 					),
 				};
 			});
-			expect(captured.mask).toContain('radial-gradient');
-			expect(captured.filter).toContain('navigation-wave-lens');
+			// Phones swap the wave for a plain crossfade (see NavigationWave)
+			if (mobile) {
+				expect(captured.fade).toBe(true);
+				expect(captured.mask).toBe('none');
+			} else {
+				expect(captured.mask).toContain('radial-gradient');
+				expect(captured.filter).toContain('navigation-wave-lens');
+			}
 			expect(captured.sliding).toBe(false);
 			await expect(page.locator('header')).toHaveCSS('view-transition-name', 'site-header');
 			await expect(page.locator('[data-project-hero]:visible h1 [data-reveal-variant="wave"]')).toHaveAttribute(

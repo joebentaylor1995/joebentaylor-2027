@@ -42,6 +42,21 @@ class ProjectTransition {
   }
   return this.heroChoices.get(project.poster);
  }
+ // Host integration: one request per case study, shared by the idle prefetch and a tap, so a tap rarely waits on the network
+ heroData(slug){
+  this.heroCache=this.heroCache||new Map();
+  if(!this.heroCache.has(slug))this.heroCache.set(slug,fetch('/api/projects-ribbon/?project='+encodeURIComponent(slug)).then(response=>{if(!response.ok)throw Error('Unable to load project hero');return response.json()}).catch(error=>{this.heroCache.delete(slug);throw error}));
+  return this.heroCache.get(slug);
+ }
+ // Host integration: once the ribbon is ready, fetch each featured case study's hero details in idle slots and hand them to the host, which warms the exact hero image variant its page uses — so a tap starts the transition without waiting on the network
+ prefetch(projects){
+  const idle=window.requestIdleCallback?callback=>window.requestIdleCallback(callback,{timeout:1500}):callback=>setTimeout(callback,120);
+  idle(()=>this.warm());
+  if(window.parent===window)return;
+  const queue=projects.filter(project=>project.featured!==false&&isProjectClickable(project)&&/^\/projects\/[^/]+\/?$/.test(project.href));
+  const next=()=>{const project=queue.shift();if(!project)return;const slug=new URL(project.href,location.origin).pathname.split('/')[2];this.heroData(slug).then(data=>window.parent.postMessage({type:'projects:prefetch',href:project.href,...data},location.origin)).catch(()=>{}).finally(()=>idle(next))};
+  idle(next);
+ }
  async open(project,hit){
   if(this.active||this.loading||this.returning||gridView?.mix>0&&gridView.mix<1)return;
   this.embedded=window.parent!==window;this.loading=true;const serial=++this.serial;
@@ -54,11 +69,9 @@ class ProjectTransition {
     const path=new URL(this.href,location.origin);
     if(path.origin!==location.origin||!/^\/projects\/[^/]+\/?$/.test(path.pathname))throw Error('Invalid case study path');
     const slug=path.pathname.split('/')[2];
-    const response=await fetch('/api/projects-ribbon/?project='+encodeURIComponent(slug));
-    if(!response.ok)throw Error('Unable to load project hero');
-    const data=await response.json();if(serial!==this.serial)return;
+    const data=await this.heroData(slug);if(serial!==this.serial)return;
     const prepared=await new Promise((resolve,reject)=>{
-     const listener=event=>{if(event.source!==window.parent||event.origin!==location.origin||event.data?.type!=='projects:prepared'||event.data.request!==serial)return;cleanup();event.data.error?reject(Error('Unable to prepare project hero')):resolve(event.data)};
+     const listener=event=>{if(!fromHost(event)||event.data?.type!=='projects:prepared'||event.data.request!==serial)return;cleanup();event.data.error?reject(Error('Unable to prepare project hero')):resolve(event.data)};
      const timeout=setTimeout(()=>{cleanup();reject(Error('Project preparation timed out'))},15000);
      const cleanup=()=>{clearTimeout(timeout);window.removeEventListener('message',listener)};
      window.addEventListener('message',listener);
@@ -68,12 +81,18 @@ class ProjectTransition {
     project={...project,hero:prepared.hero};this.heroHeight=prepared.heroHeight;this.heroTop=prepared.heroTop;
    }
    const image=await imageLoad(this.hero(project),!this.embedded);if(serial!==this.serial)return;
-   this.pending={project,hit,image};requestRender();
+   this.pending={project,hit,image,destination:this.upload(image)};requestRender();
   }catch(error){if(serial===this.serial){this.loading=false;canvas.removeAttribute('aria-busy');canvas.style.cursor='grab';showCatalogError(error)}}
+ }
+ // Upload the hero while the ribbon is at rest after the tap: on phones the upload alone outlasts a frame, and inside begin() it would stutter the expansion's first frame
+ upload(image){
+  const gl=this.gl,unit=gl.getParameter(gl.ACTIVE_TEXTURE);gl.activeTexture(gl.TEXTURE0);const bound=gl.getParameter(gl.TEXTURE_BINDING_2D);
+  const t=this.texture();gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);
+  gl.bindTexture(gl.TEXTURE_2D,bound);gl.activeTexture(unit);return t;
  }
  lock(){this.savedInert=[...document.body.children].filter(el=>el!==canvas&&el!==this.page&&el!==this.fade&&!['SCRIPT','HEADER'].includes(el.tagName)).map(el=>[el,el.inert]);for(const [el]of this.savedInert)el.inert=true;for(const item of videoSlides)item.video.pause();document.title=this.project.name+' — Joe Ben Taylor';document.body.classList.add('project-open');}
  begin(view){
-  const {project,hit,image}=this.pending;this.pending=null;this.project=project;this.image=image;this.active=true;this.loading=false;this.start=null;this.progress=0;
+  const {project,hit,image,destination}=this.pending;this.pending=null;this.project=project;this.image=image;this.active=true;this.loading=false;this.start=null;this.progress=0;
   this.backURL=routeLocation.pathname+routeLocation.search+routeLocation.hash;
   const url=new URL(routeLocation.href);url.searchParams.set('project',this.slug(project));if(!this.embedded)routeHistory.pushState({ribbonProject:true,projectSlug:this.slug(project),hero:image.src},'',url);
   this.page.querySelector('img').src=image.src;this.page.querySelector('img').alt=project.name;
@@ -81,7 +100,7 @@ class ProjectTransition {
   canvas.removeAttribute('aria-busy');
   const gl=this.gl;gl.activeTexture(gl.TEXTURE0);gl.bindFramebuffer(gl.FRAMEBUFFER,null);
   this.background=this.texture();gl.copyTexImage2D(gl.TEXTURE_2D,0,gl.RGB,0,0,canvas.width,canvas.height,0);
-  this.destination=this.texture();gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);
+  this.destination=destination;
   let source;
   if(hit?.grid){const d=gridView.dimensions();source={grid:{centre:{x:(hit.col+gridView.rowShift(hit.row))*d.pitchX+gridView.pan.x,y:hit.row*d.pitchY+gridView.pan.y},size:d,bend:gridView.bend}};}
   else{
@@ -104,15 +123,21 @@ class ProjectTransition {
   this.vertices=gl.createBuffer();this.resources.push(['buffer',this.vertices]);gl.bindBuffer(gl.ARRAY_BUFFER,this.vertices);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.STATIC_DRAW);
   this.indices=gl.createBuffer();this.resources.push(['buffer',this.indices]);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.indices);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indices),gl.STATIC_DRAW);this.vertexCount=indices.length;
  }
+ // Link the expansion program in idle time: the first compile in a fresh WebKit process can stall the main thread for most of a second, which would swallow the whole animation on the first tap
+ warm(){if(this.warmProgram)return;try{this.warmProgram=this.link()}catch{}}
  compile(){
-  const gl=this.gl;this.program=gl.createProgram();this.resources.push(['program',this.program]);
+  const gl=this.gl;this.program=this.warmProgram||this.link();this.warmProgram=null;this.resources.push(['program',this.program]);
+  this.uniforms={};for(const key of ['Progress','Background','Source','Hero','Atlas','Crop','SourceCrop','Blend','Opacity','HeroViewport','HeroOffset'])this.uniforms[key]=gl.getUniformLocation(this.program,'u'+key);
+ }
+ link(){
+  const gl=this.gl,program=gl.createProgram();
   const shaders=[
    [gl.VERTEX_SHADER,`attribute vec3 aStart;attribute vec2 aUV;uniform float uProgress,uBackground;varying vec2 vUV;void main(){vUV=aUV;vec3 end=vec3(aUV.x*2.-1.,1.-aUV.y*2.,1.);float depth=mix(max(.04,aStart.z),1.,uProgress);vec2 screen=mix(aStart.xy/max(.04,aStart.z),end.xy,uProgress);vec3 p=vec3(screen*depth,depth);if(uBackground>.5)p=end;gl_Position=vec4(p.xy,0.,p.z);}`],
    [gl.FRAGMENT_SHADER,`precision highp float;uniform sampler2D uSource,uHero;uniform vec4 uAtlas;uniform vec2 uCrop,uSourceCrop;uniform float uBlend,uBackground,uOpacity,uHeroViewport,uHeroOffset;varying vec2 vUV;void main(){vec2 uv=clamp(vUV,vec2(.001),vec2(.999));if(uBackground>.5){gl_FragColor=vec4(texture2D(uSource,vec2(vUV.x,1.-vUV.y)).rgb,uOpacity);return;}vec3 before=texture2D(uSource,uAtlas.xy+clamp((vUV-.5)*uSourceCrop+.5,vec2(.001),vec2(.999))*uAtlas.zw).rgb;vec3 after=texture2D(uHero,(vec2(vUV.x,vUV.y*uHeroViewport+uHeroOffset)-.5)*uCrop+.5).rgb;gl_FragColor=vec4(mix(before,after,uBlend),uOpacity);}`]
   ];
-  for(const [type,src]of shaders){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));gl.attachShader(this.program,s);gl.deleteShader(s)}
-  gl.linkProgram(this.program);if(!gl.getProgramParameter(this.program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.program));
-  this.uniforms={};for(const key of ['Progress','Background','Source','Hero','Atlas','Crop','SourceCrop','Blend','Opacity','HeroViewport','HeroOffset'])this.uniforms[key]=gl.getUniformLocation(this.program,'u'+key);
+  for(const [type,src]of shaders){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));gl.attachShader(program,s);gl.deleteShader(s)}
+  gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS)){const log=gl.getProgramInfoLog(program);gl.deleteProgram(program);throw Error(log)}
+  return program;
  }
  draw(time){
   if(!this.program||this.settled&&!this.returning)return;if(this.start===null)this.start=time;

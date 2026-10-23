@@ -3,6 +3,9 @@
 const routeWindow = window.parent === window ? window : window.parent;
 const routeLocation = routeWindow.location;
 const routeHistory = routeWindow.history;
+// Same origin is the trust boundary: WebKit can report either window as a same-origin message's source,
+// so checking only for the host's window would drop its messages at random
+const fromHost = event => event.origin === location.origin && (event.source === routeWindow || event.source === window);
 
 function syncProjectRoute() {
  if (typeof ready === 'undefined' || !ready) return;
@@ -14,7 +17,7 @@ function syncProjectRoute() {
  }
 }
 window.addEventListener('message', event => {
- if (event.source === routeWindow && event.origin === location.origin && event.data?.type === 'projects:route') syncProjectRoute();
+ if (fromHost(event) && event.data?.type === 'projects:route') syncProjectRoute();
 });
 // In the host, useSearchParams forwards Back/Forward without retaining listeners
 // on the parent after this frame unmounts. Standalone previews listen locally.

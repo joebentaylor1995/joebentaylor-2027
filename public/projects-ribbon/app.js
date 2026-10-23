@@ -25,7 +25,7 @@ function waitForUncoveredScene(){
  return new Promise(resolve=>{const observer=new MutationObserver(()=>{if(!scenePaused()){observer.disconnect();resolve()}});observer.observe(hostScene,{attributes:true,attributeFilter:['data-scene-paused']})});
 }
 window.addEventListener('message',event=>{
- if(event.source!==window.parent||event.origin!==location.origin||event.data?.type!=='projects:active')return;
+ if(!fromHost(event)||event.data?.type!=='projects:active')return;
  hostActive=event.data.active===true;
  idleMotion.reset(false);clearTimeout(snapTimer);target=position;scrollVelocity=0;
  syncHostActivity();
@@ -36,7 +36,7 @@ let settingsKey=mobile?'ribbon-settings-mobile':'ribbon-settings';
 const gl=canvas.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:false});
 let loaderWave=new URL(location.href).searchParams.has('loaderWave')&&gl?new RibbonLoaderWave(gl):null;
 window.addEventListener('message',event=>{
- if(event.source!==window.parent||event.origin!==location.origin||event.data?.type!=='projects:loader-wave'||!loaderWave)return;
+ if(!fromHost(event)||event.data?.type!=='projects:loader-wave'||!loaderWave)return;
  const progress=event.data.progress;if(!Number.isFinite(progress))return;
  loaderWave.progress=Math.max(0,Math.min(1,progress));
  for(const key of Object.keys(loaderWave.settings))if(Number.isFinite(event.data.settings?.[key]))loaderWave.settings[key]=event.data.settings[key];
@@ -404,6 +404,8 @@ function render(time){
   requestAnimationFrame(()=>window.parent.postMessage({type:'projects:wave-ready'},location.origin));
   // The grid is desktop-only; warm its tile textures in idle time so the first switch doesn't hitch
   if(!mobile)gridView?.prewarm();
+  // Warm every featured case study's hero so a tap starts its transition straight away
+  projectTransition.prefetch(featured);
  }
 }
 function renderScene(time){if(projectTransition.active){raf=0;projectTransition.draw(time);return;}frameMeter.begin(time);raf=0;const dt=Math.min((time-lastTime)/1000||.016,.05);lastTime=time;const introMoving=introduction.update(time);const idle=idleMotion.update(time,dt,gridView?.target?'all':'featured',projectTransition.loading||introMoving||!!drag||!!gridView?.drag||!!(gridView&&gridView.mix!==gridView.target));
@@ -425,7 +427,8 @@ mobileViewport.addEventListener('change',()=>{
  requestRender();
 });
 // Host integration: a poster that fails or stalls is swapped for the CMS placeholder (src/data/site.ts) so the ribbon never breaks.
-function imageLoad(src,allowFallback=true){return new Promise((resolve,reject)=>{const im=new Image();const fallback=allowFallback&&window.ribbonPlaceholder;const recover=error=>fallback&&src!==fallback?resolve(imageLoad(fallback)):reject(error);const timer=setTimeout(()=>{im.onload=im.onerror=null;recover(Error('A project image is taking too long to load. Please reload.'))},20000);im.onload=()=>{clearTimeout(timer);resolve(im)};im.onerror=()=>{clearTimeout(timer);recover(Error('A project image could not load. Please reload.'))};im.crossOrigin='anonymous';im.src=src})}
+// Resolve only once decoded: WebKit can paint an image the host is still decoding (its poster preload) as nothing, leaving a black atlas tile
+function imageLoad(src,allowFallback=true){return new Promise((resolve,reject)=>{const im=new Image();const fallback=allowFallback&&window.ribbonPlaceholder;const recover=error=>fallback&&src!==fallback?resolve(imageLoad(fallback)):reject(error);const timer=setTimeout(()=>{im.onload=im.onerror=null;recover(Error('A project image is taking too long to load. Please reload.'))},20000);im.onload=()=>{clearTimeout(timer);(im.decode?im.decode().catch(()=>{}):Promise.resolve()).then(()=>resolve(im))};im.onerror=()=>{clearTimeout(timer);recover(Error('A project image could not load. Please reload.'))};im.crossOrigin='anonymous';im.src=src})}
 function cover(ctx,img,x,y,w,h){const s=Math.max(w/img.width,h/img.height),sw=w/s,sh=h/s;ctx.drawImage(img,(img.width-sw)/2,(img.height-sh)/2,sw,sh,x,y,w,h)}
 function makeAtlas(images){
  stopVideos();
@@ -496,7 +499,8 @@ document.addEventListener('visibilitychange',syncHostActivity);
 document.querySelector('#upload').onclick=()=>document.querySelector('#files').click();document.querySelector('#files').onchange=async e=>{const files=[...e.target.files].filter(f=>f.type.startsWith('image/')).slice(0,12);if(!files.length)return;const urls=files.map(f=>URL.createObjectURL(f));try{const images=await Promise.all(urls.map(imageLoad));names=files.map(f=>f.name.replace(/\.[^.]+$/,''));count=names.length;position=target=0;makeAtlas(images,true);featured=names.map((name,index)=>({name,index,poster:urls[index]}));gridView.setProjects(featured,featured);document.querySelector('#all-count').textContent=featured.length;setProjectView(false);buildDots();document.querySelector('#upload-note').textContent=`${count} image${count===1?'':'s'} loaded. Stored only in this tab.`}catch{document.querySelector('#upload-note').textContent='Could not read those images. Try JPG, PNG, or WebP.'}finally{urls.forEach(URL.revokeObjectURL);e.target.value=''}};
 function showCatalogError(error){const status=document.querySelector('#error');status.hidden=false;status.textContent=error.message||'Images could not load. Please reload the page.';console.error(error)}
 async function applyRibbonCatalog(){
- const revision=++catalogRevision,items=mobile?allProjects:featuredProjects;
+ // Host integration: phones show only the featured case studies — fewer posters to load before the first frame
+ const revision=++catalogRevision,items=featuredProjects;
  if(!items.length)throw Error('No projects are available yet. Please check back soon.');
  const previousPoster=featured[mod(Math.round(position),count)]?.poster;
  // Reset the outgoing layout before changing the atlas or its item indices.
@@ -513,7 +517,7 @@ async function applyRibbonCatalog(){
  featured=items.map((item,index)=>({...item,index}));names=featured.map(item=>item.name);count=names.length;
  position=target=Math.max(0,featured.findIndex(item=>item.poster===previousPoster));
  makeAtlas(images);gridView.setProjects(featured,allProjects);buildDots();startFeaturedVideos();
- canvas.setAttribute('aria-label',`${mobile?'All':'Featured'} projects. Scroll or drag to explore the curved ribbon.`);
+ canvas.setAttribute('aria-label','Featured projects. Scroll or drag to explore the curved ribbon.');
  document.querySelector('#all-count').textContent=allProjects.length;
  document.querySelector('#error').hidden=true;requestRender();
 }

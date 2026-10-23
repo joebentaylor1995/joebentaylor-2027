@@ -64,6 +64,21 @@
 
 	[data-state='open'] > & { clip-path: inset(0); }
 
+	// NOTE • Phones close with transforms, not clip-path: WebKit repaints a clip-path wipe every
+	// frame, and over the gradient-heavy foot of the profile that drops frames. The panel slides
+	// out while .panelContent slides back by the same distance, so the wipe looks identical.
+	// The clip only snaps closed once the slide has finished.
+	@include bpd(m) {
+		@media (prefers-reduced-motion: no-preference) {
+			[data-state='closing'] > & {
+				transform: translateX(100%);
+				transition:
+					transform 1s cubic-bezier(0.76, 0, 0.24, 1),
+					clip-path 0s linear 1s;
+			}
+		}
+	}
+
 	@media (prefers-reduced-motion: reduce) { transition: none; }
 }
 
@@ -78,6 +93,13 @@
 		transition-duration: 1.35s;
 		transition-delay: 0.12s;
 		transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	@include bpd(m) {
+		@media (prefers-reduced-motion: no-preference) {
+			[data-state='closing'] > .panel > & { transform: translateX(calc(clamp(24px, 7vw, 96px) - 100%)); }
+			[data-state='closed'] > .panel > & { transition: none; }
+		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

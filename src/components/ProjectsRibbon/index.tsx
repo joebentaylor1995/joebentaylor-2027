@@ -1,6 +1,7 @@
 'use client';
 
 import { GlobalContext } from '@parts/Contexts';
+import { HERO_DESKTOP_QUERY } from '@parts/Hero/layout';
 import ProjectHero from '@parts/ProjectHero';
 import { heroFrame } from '@parts/ProjectHero/framing';
 import type { ProjectHeroProps } from '@parts/ProjectHero/interface';
@@ -9,6 +10,7 @@ import type { ProjectHeroProps } from '@parts/ProjectHero/interface';
 import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { mq } from '@tackl';
 import { markProjectModalEntry } from '@utils/projectModal';
+import { getImageProps } from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useRef, useState } from 'react';
 import { holdProjectHero } from './handoff';
@@ -16,6 +18,18 @@ import { holdProjectHero } from './handoff';
 // Styles
 // ------------
 import s from './styles.module.scss';
+
+// Helpers
+// ------------
+// NOTE • Same props as ProjectHero's image, so the browser caches the very candidate the hero will pick
+const warmHero = (src: string) => {
+	const { props } = getImageProps({ src, alt: '', fill: true, sizes: '100vw', quality: 90 });
+	const image = new Image();
+	if (props.sizes) image.sizes = props.sizes;
+	if (props.srcSet) image.srcset = props.srcSet;
+	image.src = props.src;
+	image.decode?.().catch(() => {});
+};
 
 // Component
 // ------------
@@ -105,7 +119,10 @@ const ProjectsRibbon = () => {
 
 	useEffect(() => {
 		const openProject = async (event: MessageEvent) => {
-			if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow) return;
+			// NOTE • Same origin is the trust boundary: WebKit can report this window, not the frame, as the source
+			// of the ribbon's messages, and requiring the frame dropped `wave-ready` — the ribbon never appeared
+			const fromRibbon = event.source === frame.current?.contentWindow || event.source === window;
+			if (event.origin !== window.location.origin || !fromRibbon) return;
 			if (event.data?.type === 'projects:error') {
 				frame.current?.setAttribute('data-ready', 'true');
 				return;
@@ -113,6 +130,18 @@ const ProjectsRibbon = () => {
 			if (event.data?.type === 'projects:wave-ready') {
 				frame.current?.setAttribute('data-ready', 'true');
 				frame.current?.setAttribute('data-ribbon-ready', 'true');
+				return;
+			}
+			// NOTE • The ribbon prefetches each featured case study in idle time: warm its route and
+			// the exact hero image its page will request, so a tap starts the transition at once
+			if (
+				event.data?.type === 'projects:prefetch' &&
+				typeof event.data.href === 'string' &&
+				/^\/projects\/[^/]+\/?$/.test(event.data.href) &&
+				typeof event.data.hero === 'string'
+			) {
+				router.prefetch(event.data.href);
+				warmHero(event.data.hero);
 				return;
 			}
 			if (
@@ -179,7 +208,11 @@ const ProjectsRibbon = () => {
 		const start = () => {
 			if (started) return;
 			started = true;
-			const playIntroduction = /^\/projects\/?$/.test(location.pathname) && !isLoaderSettled();
+			// NOTE • Phones fade the loader out instead of waving it, so they never need the ribbon's refraction pass
+			const playIntroduction =
+				/^\/projects\/?$/.test(location.pathname) &&
+				!isLoaderSettled() &&
+				matchMedia(HERO_DESKTOP_QUERY).matches;
 			// Replace avoids adding iframe-only entries to the browser's Back stack.
 			element.contentWindow?.location.replace(
 				`/projects-ribbon/index.html${playIntroduction ? '?loaderWave=1' : '?entrance=cascade'}`

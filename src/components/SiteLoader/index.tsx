@@ -92,8 +92,10 @@ const SiteLoader = () => {
 			const waveSettings = readIntroProfiles()[mobile ? 'mobile' : 'desktop'];
 			const waveDuration = projectsListing ? 1 / waveSettings.speed : 1.35;
 			const page = homepage ? null : document.getElementById('page');
-			const windowReveal = !homepage && !projectsListing && loaderSettings.revealEffect === 'window';
-			const fadeReveal = !homepage && !projectsListing && loaderSettings.revealEffect === 'fade';
+			// NOTE • Phones skip the wave (and its WebGL refraction) on every page: the loader fades out
+			// over the ready scene, exactly as on the homepage
+			const windowReveal = !mobile && !homepage && !projectsListing && loaderSettings.revealEffect === 'window';
+			const fadeReveal = !mobile && !homepage && !projectsListing && loaderSettings.revealEffect === 'fade';
 			const entrancePath = window.location.pathname;
 			// The slow zoom can outlive the loader. Never apply it to a project
 			// reached through a subsequent, already-framed ribbon transition.
@@ -196,7 +198,7 @@ const SiteLoader = () => {
 					.call(landLoader, [], landedAt);
 
 				// One wavefront removes the stationary logo and opens the scene.
-				const revealAt = fadeReveal ? cutAt : homepage ? landedAt + (mobile ? 0 : revealGap) : cutAt;
+				const revealAt = fadeReveal ? cutAt : mobile ? landedAt : homepage ? landedAt + revealGap : cutAt;
 				const wave = { radius: 0 };
 				// quickSetter does not expand the CSSPlugin's multi-property "scale" alias.
 				const setRingScaleX = gsap.quickSetter(ring, 'scaleX');
@@ -212,13 +214,13 @@ const SiteLoader = () => {
 						const sceneReady = () => hero?.getAttribute(readyAttribute) === 'true';
 						const resume = () => {
 							stopWaitingForScene();
-							setProjectWave(0);
+							setProjectWave(mobile ? 1 : 0);
 							// Let the first GPU frame and overlay change paint before starting either clock.
 							let frames = 0;
 							const release = () => {
 								if (++frames < 2) return;
 								gsap.ticker.remove(release);
-								if (!fadeReveal && (!homepage || !mobile) && sceneReady()) {
+								if (!fadeReveal && !mobile && sceneReady()) {
 									root.dataset.webglReveal = 'true';
 								}
 								if (!fadeReveal) revealScene();
@@ -280,7 +282,7 @@ const SiteLoader = () => {
 						},
 						revealAt
 					).set(root, { autoAlpha: 0, pointerEvents: 'none' }, revealAt + revealDuration);
-				} else if (homepage && mobile) {
+				} else if (mobile) {
 					tl.to(
 						root,
 						{
