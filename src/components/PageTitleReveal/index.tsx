@@ -59,7 +59,15 @@ const PageTitleReveal = ({
 			const wordCount = title.querySelectorAll('[data-reveal-word]').length;
 			const tween =
 				variant === 'words'
-					? gsap.delayedCall(WORD_DURATION + WORD_STAGGER * Math.max(0, wordCount - 1), complete).pause()
+					? // A plain timer tween, not delayedCall: a paused delay doesn't survive replays
+						gsap.to(
+							{},
+							{
+								duration: WORD_DURATION + WORD_STAGGER * Math.max(0, wordCount - 1),
+								paused: true,
+								onComplete: complete,
+							}
+						)
 					: variant === 'block'
 						? gsap
 								.timeline({ paused: true, onComplete: complete })
