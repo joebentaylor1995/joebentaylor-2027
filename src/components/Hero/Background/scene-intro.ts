@@ -99,9 +99,10 @@ export const mobileIntroDefaults: IntroSettings = {
 	decay: 2,
 	speed: 0.95,
 	ease: 'none',
-	headingStart: 0.5,
-	starStart: 1.05,
-	paragraphStart: 1.05,
+	// The loader's fade lasts 0.36s: the heading wipe picks up as it ends, the copy just after
+	headingStart: 0.3,
+	starStart: 0.7,
+	paragraphStart: 0.5,
 	portraitScale: 2.06,
 	portraitFinish: 90,
 };

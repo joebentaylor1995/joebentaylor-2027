@@ -3,6 +3,7 @@
 // Imports
 // ------------
 import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
+import { afterHeroEntrance } from '@utils/afterHeroEntrance';
 import { preloadProject } from '@utils/preloadProject';
 import { preloadProjects } from '@utils/preloadProjects';
 import { useRouter } from 'next/navigation';
@@ -18,9 +19,16 @@ export default function LinkPreloader() {
 			router.prefetch('/projects');
 			preloadProjects();
 		};
-		if (isLoaderSettled()) prepareProjects();
-		else window.addEventListener(LOADER_SETTLED, prepareProjects, { once: true });
-		return () => window.removeEventListener(LOADER_SETTLED, prepareProjects);
+		let stopWaiting = () => {};
+		const prepare = () => {
+			stopWaiting = afterHeroEntrance(prepareProjects);
+		};
+		if (isLoaderSettled()) prepare();
+		else window.addEventListener(LOADER_SETTLED, prepare, { once: true });
+		return () => {
+			window.removeEventListener(LOADER_SETTLED, prepare);
+			stopWaiting();
+		};
 	}, [router]);
 	useEffect(() => {
 		const warmed = new Map<string, number>();

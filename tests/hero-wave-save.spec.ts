@@ -19,9 +19,9 @@ test('wave settings save both profiles and reload with the approved defaults', a
 	await expect(page.getByRole('spinbutton', { name: 'Wave start delay (s) value', exact: true })).toHaveValue('0.35');
 	await page.getByLabel('Intro settings device').selectOption('mobile');
 	await page.getByText('Heading & paragraph timing', { exact: true }).click();
-	await expect(page.getByRole('spinbutton', { name: 'Heading start value', exact: true })).toHaveValue('0.5');
-	await expect(page.getByRole('spinbutton', { name: 'Star start value', exact: true })).toHaveValue('1.05');
-	await expect(page.getByRole('spinbutton', { name: 'Paragraph start value', exact: true })).toHaveValue('1.05');
+	await expect(page.getByRole('spinbutton', { name: 'Heading start value', exact: true })).toHaveValue('0.3');
+	await expect(page.getByRole('spinbutton', { name: 'Star start value', exact: true })).toHaveValue('0.7');
+	await expect(page.getByRole('spinbutton', { name: 'Paragraph start value', exact: true })).toHaveValue('0.5');
 	await page.getByLabel('Intro settings device').selectOption('desktop');
 	await page.getByRole('button', { name: 'Reset intro', exact: true }).click();
 	await page.getByRole('button', { name: 'Save wave settings', exact: true }).click();
