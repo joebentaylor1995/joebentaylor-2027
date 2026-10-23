@@ -203,6 +203,11 @@ const CallToAction = () => {
 			loading = false,
 			visible = false;
 		let scene: MatrixScene | undefined;
+		// NOTE • Freeze on the last frame while the profile closes: rendering under the panel's
+		// clip-path wipe drops frames on phones
+		const reveal = section.closest('#profile-panel')?.parentElement;
+		const closing = () => reveal?.dataset.state === 'closing';
+		const sync = () => scene?.setVisible(visible && !closing());
 		const load = () => {
 			if (loading || disposed) return Promise.resolve();
 			loading = true;
@@ -210,7 +215,7 @@ const CallToAction = () => {
 				.then(({ createMatrix }) => {
 					if (disposed) return;
 					scene = createMatrix(canvas, section);
-					scene.setVisible(visible);
+					sync();
 				})
 				.catch(() => {
 					if (!disposed) section.dataset.state = 'fallback';
@@ -227,15 +232,18 @@ const CallToAction = () => {
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				visible = entry.isIntersecting;
-				scene?.setVisible(visible);
+				sync();
 			},
 			{ root: section.closest('#profile-panel'), threshold: 0 }
 		);
 		observer.observe(section);
+		const states = new MutationObserver(sync);
+		if (reveal) states.observe(reveal, { attributes: true, attributeFilter: ['data-state'] });
 		return () => {
 			disposed = true;
 			stopPreparing();
 			observer.disconnect();
+			states.disconnect();
 			scene?.destroy();
 			section.removeEventListener('matrixrestore', restore);
 			section.dataset.state = 'loading';

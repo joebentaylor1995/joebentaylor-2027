@@ -5,8 +5,11 @@
 // navBack) and the rules below animate its snapshots. The root snapshot
 // stays still, so the header and any fixed chrome never move; only the page
 // content animates.
+// NOTE • meta.load-css skips the injected Tackl layer, so this file uses it itself
 // NOTE • These selectors are global by nature — a CSS Module would hash the
 // class names inside ::view-transition-*(), so they live here instead.
+
+@use 'tackl' as *;
 
 @layer base {
 	:root { --navigation-wave-mask: none; }
@@ -20,6 +23,14 @@
 
 	:root[data-navigation-wave]::view-transition-new(.pageWave) {
 		mask-image: var(--navigation-wave-mask);
+	}
+
+	// Phones crossfade instead of the wave: the new page fades in over the old one, held
+	// at full opacity so nothing dips through. Only navigations set data-navigation-wave,
+	// so streaming updates on the same page stay still. 600ms matches CROSSFADE_DURATION in NavigationWave.
+	@include bpd(m) {
+		:root[data-navigation-wave]::view-transition-old(.pageWave) { animation: 600ms linear both vt-hold; }
+		:root[data-navigation-wave]::view-transition-new(.pageWave) { animation: 600ms cubic-bezier(0.4, 0, 0.2, 1) both vt-fade; }
 	}
 
 	:root[data-navigation-wave-lens='true']::view-transition-new(.pageWave) { filter: url('#navigation-wave-lens'); }
@@ -162,6 +173,10 @@
 		from {
 			opacity: 0;
 		}
+	}
+
+	@keyframes vt-hold {
+		from, to { opacity: 1; }
 	}
 
 	@keyframes vt-slide {

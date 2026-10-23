@@ -40,7 +40,9 @@ for (const viewport of [
 		await page.setViewportSize(viewport);
 		let releaseDepth = () => {};
 		let depthGate = Promise.resolve();
+		let depthRequested = false;
 		await page.route('**/images/hero-depth/depth.webp', async route => {
+			depthRequested = true;
 			await depthGate;
 			await route.continue();
 		});
@@ -62,6 +64,7 @@ for (const viewport of [
 			depthGate = new Promise<void>(resolve => {
 				releaseDepth = resolve;
 			});
+			depthRequested = false;
 			await page.getByRole('link', { name: 'Go to home page' }).click();
 			await expect(page.locator('html')).toHaveAttribute('data-navigation-wave', 'running');
 			await expect(page).toHaveURL(/\/$/);
@@ -70,16 +73,24 @@ for (const viewport of [
 			});
 			await expect(page.locator('html')).not.toHaveAttribute('data-navigation-wave');
 			const portrait = page.getByTestId('hero-depth');
-			await expect(portrait).toHaveAttribute('data-ready', 'false');
-			await portrait.locator('img').evaluate((image: HTMLImageElement) => image.decode());
-			const native = await page.screenshot({ clip, path: info.outputPath(`${visit}-native.png`) });
-			releaseDepth();
-			await expect(portrait).toHaveAttribute('data-ready', 'true');
-			const gpu = await page.screenshot({ clip, path: info.outputPath(`${visit}-gpu.png`) });
-			const difference = await compareFrames(page, native, gpu);
-			console.log(`${viewport.width}×${viewport.height} ${visit} portrait handover`, difference);
-			expect(difference.meanDifference).toBeLessThan(3);
-			expect(difference.changedFraction).toBeLessThan(0.04);
+			// NOTE • A quick round trip (the phone crossfade) can serve the depth map from the browser's
+			// in-memory image cache, which the route can't hold — then the GPU portrait is already up and
+			// there is no native frame to compare against
+			if (visit === 'first' || depthRequested) {
+				await expect(portrait).toHaveAttribute('data-ready', 'false');
+				await portrait.locator('img').evaluate((image: HTMLImageElement) => image.decode());
+				const native = await page.screenshot({ clip, path: info.outputPath(`${visit}-native.png`) });
+				releaseDepth();
+				await expect(portrait).toHaveAttribute('data-ready', 'true');
+				const gpu = await page.screenshot({ clip, path: info.outputPath(`${visit}-gpu.png`) });
+				const difference = await compareFrames(page, native, gpu);
+				console.log(`${viewport.width}×${viewport.height} ${visit} portrait handover`, difference);
+				expect(difference.meanDifference).toBeLessThan(3);
+				expect(difference.changedFraction).toBeLessThan(0.04);
+			} else {
+				releaseDepth();
+				await expect(portrait).toHaveAttribute('data-ready', 'true');
+			}
 			await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
 			await page.getByRole('link', { name: 'Projects', exact: true }).click();
 			await expect(page.locator('html')).toHaveAttribute('data-navigation-wave', 'running');

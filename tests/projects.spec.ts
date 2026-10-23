@@ -39,13 +39,16 @@ test('projects retains the ribbon, grid, settings and host navigation', async ({
 	expect(errors).toEqual([]);
 });
 
-test('mobile uses all projects in the vertical stacked ribbon', async ({ page }) => {
+test('mobile shows only the featured case studies in the vertical stacked ribbon', async ({ page }) => {
 	await page.setViewportSize({ width: 440, height: 780 });
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/projects/?projectSettings');
 	await page.getByRole('button', { name: 'Accept Necessary' }).click();
 	const embedded = page.frameLocator('iframe[title="Interactive projects"]');
-	await expect(embedded.locator('#slide-number')).toHaveText(/01 \/ \d+/, { timeout: 30_000 });
+	const { featured } = await (await page.request.get('/api/projects-ribbon/')).json();
+	await expect(embedded.locator('#slide-number')).toHaveText(`01 / ${String(featured.length).padStart(2, '0')}`, {
+		timeout: 30_000,
+	});
 	await expect(embedded.locator('.view-switch')).toBeHidden();
 	await expect(embedded.locator('#vertical')).toBeChecked();
 	await expect(embedded.locator('#stacked')).toBeChecked();
