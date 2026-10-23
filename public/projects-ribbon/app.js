@@ -8,10 +8,12 @@ let hostActive=window.parent===window||/^\/projects\/?$/.test(window.parent.loca
 const hostTransition=()=>window.parent!==window&&window.parent.document.documentElement.matches('[data-navigation-pending], [data-navigation-wave]');
 const hostScene=window.frameElement?.closest('[data-profile-scene]');
 const scenePaused=()=>hostScene?.dataset.scenePaused==='true';
-const hostSuspended=()=>!hostActive||scenePaused()||document.hidden||hostTransition();
+// Phones keep drawing through the page crossfade, so the ribbon is already moving as it fades in
+const hostSuspended=()=>!hostActive||scenePaused()||document.hidden||(!mobile&&hostTransition());
 const canRender=()=>!scenePaused()&&!document.hidden&&(!hostPrepared||!hostSuspended());
 function syncHostActivity(){
- idleMotion.reset(false);clearTimeout(snapTimer);
+ clearTimeout(snapTimer);
+ if(hostSuspended())idleMotion.reset(false);else idleMotion.drift();
  gridView?.setPaused(hostSuspended());
  if(hostSuspended()){
   cancelAnimationFrame(raf);raf=0;
@@ -27,7 +29,7 @@ function waitForUncoveredScene(){
 window.addEventListener('message',event=>{
  if(!fromHost(event)||event.data?.type!=='projects:active')return;
  hostActive=event.data.active===true;
- idleMotion.reset(false);clearTimeout(snapTimer);target=position;scrollVelocity=0;
+ clearTimeout(snapTimer);target=position;scrollVelocity=0;
  syncHostActivity();
 });
 if(window.parent!==window)new MutationObserver(syncHostActivity).observe(window.parent.document.documentElement,{attributes:true,attributeFilter:['data-navigation-pending','data-navigation-wave']});

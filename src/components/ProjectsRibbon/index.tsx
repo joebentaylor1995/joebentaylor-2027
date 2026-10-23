@@ -9,6 +9,7 @@ import type { ProjectHeroProps } from '@parts/ProjectHero/interface';
 // ------------
 import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { mq } from '@tackl';
+import { afterHeroEntrance } from '@utils/afterHeroEntrance';
 import { markProjectModalEntry } from '@utils/projectModal';
 import { getImageProps } from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -39,6 +40,7 @@ const ProjectsRibbon = () => {
 	// Refs
 	const frame = useRef<HTMLIFrameElement>(null);
 	const measure = useRef<HTMLDivElement>(null);
+	const startRibbon = useRef<() => void>(null);
 	const [preview, setPreview] = useState<{ request: number; project: ProjectHeroProps['project'] } | null>(null);
 	// State
 	const searchParams = useSearchParams();
@@ -218,10 +220,19 @@ const ProjectsRibbon = () => {
 				`/projects-ribbon/index.html${playIntroduction ? '?loaderWave=1' : '?entrance=cascade'}`
 			);
 		};
-		if (/^\/projects\/?$/.test(location.pathname) || isLoaderSettled()) start();
-		else window.addEventListener(LOADER_SETTLED, start, { once: true });
+		startRibbon.current = start;
+		// Elsewhere the ribbon boots in the background, after the homepage's text entrance
+		let stopWaiting = () => {};
+		const prepare = () => {
+			stopWaiting = afterHeroEntrance(start);
+		};
+		if (/^\/projects\/?$/.test(location.pathname)) start();
+		else if (isLoaderSettled()) prepare();
+		else window.addEventListener(LOADER_SETTLED, prepare, { once: true });
 		return () => {
-			window.removeEventListener(LOADER_SETTLED, start);
+			window.removeEventListener(LOADER_SETTLED, prepare);
+			stopWaiting();
+			startRibbon.current = null;
 			delete element.dataset.ribbonReady;
 			// The layout owns this frame; only a document teardown unloads it.
 			delete element.dataset.ready;
@@ -230,6 +241,8 @@ const ProjectsRibbon = () => {
 	}, []);
 
 	useEffect(() => {
+		// Visiting /projects before the background boot starts it straight away
+		if (active) startRibbon.current?.();
 		// Also handles Next.js navigation back to /projects from its header link.
 		frame.current?.contentWindow?.postMessage({ type: 'projects:active', active }, window.location.origin);
 		if (active)
