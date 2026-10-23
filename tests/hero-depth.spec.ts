@@ -51,6 +51,27 @@ test('portrait continues scaling with the viewport width', async ({ page }) => {
 	await expect.poll(portraitWidth).toBeCloseTo(1283 * 1.12, 1);
 });
 
+test('portrait keeps scaling with the viewport height on tall windows', async ({ page }) => {
+	await page.goto('/');
+	const portrait = page.getByTestId('hero-depth').locator('picture');
+	const portraitWidth = () => portrait.evaluate(element => (element as HTMLElement).offsetWidth);
+	// Rotated bottom edge per pixel of portrait width, at the default -6° tilt.
+	const bottomSpan = Math.cos(Math.PI / 30) / (4046 / 2799) - Math.sin(Math.PI / 30);
+	let previous = 0;
+	for (const [height, expected] of [
+		[900, 1440 * 1.12],
+		[1280, 1280 / bottomSpan],
+		[1600, 1600 / bottomSpan],
+		[2000, 2000 / bottomSpan],
+	]) {
+		await page.setViewportSize({ width: 1440, height });
+		await expect.poll(portraitWidth).toBeCloseTo(expected, -1);
+		const width = await portraitWidth();
+		expect(width).toBeGreaterThan(previous);
+		previous = width;
+	}
+});
+
 test('early hover does not interrupt intro and a slow ripple keeps updating without input', async ({ page }) => {
 	await page.goto('/?heroSettings');
 	const content = page.locator('[data-hero-content]');

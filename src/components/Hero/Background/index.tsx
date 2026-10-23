@@ -19,7 +19,10 @@ import { type IntroSettings, introDefaults, introReplays, introSettings, mobileI
 import s from './styles.module.scss';
 
 // Cover sizing uses the landscape source (4046 × 2799), including mobile zoom.
-const PORTRAIT_SIZES = `${HERO_DESKTOP_QUERY} 112vw, max(122vw, 177vh)`;
+// Desktop scales with width, or with height on tall windows (see portraitFitWidth).
+const DESKTOP_PORTRAIT_VW = Math.ceil(defaultSettings.zoom * 100);
+const DESKTOP_PORTRAIT_VH = Math.ceil((defaultSettings.zoom * 100) / portraitBottomSpan(defaultSettings));
+const PORTRAIT_SIZES = `${HERO_DESKTOP_QUERY} max(${DESKTOP_PORTRAIT_VW}vw, ${DESKTOP_PORTRAIT_VH}vh), max(122vw, 177vh)`;
 
 // NOTE • Art-directed so phones get a lighter encode: the photo is the LCP
 // element, and on mobile networks quality 90 at full cover width is the single

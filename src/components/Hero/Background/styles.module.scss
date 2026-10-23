@@ -27,8 +27,9 @@
         @include heroDesktop {
             inset: auto;
             left: calc(50% + var(--desktop-portrait-x));
-            top: calc(50% + var(--desktop-portrait-y) + max(0px, (100cqh - 100cqw * var(--desktop-portrait-bottom-span)) / 2));
-            width: calc(100% * var(--desktop-portrait-scale));
+            top: calc(50% + var(--desktop-portrait-y));
+            // Matches portraitFitWidth: tall windows keep the portrait growing with their height.
+            width: calc(max(100cqw, 100cqh / var(--desktop-portrait-bottom-span)) * var(--desktop-portrait-scale));
             aspect-ratio: var(--portrait-aspect);
             transform: translate(-50%, -50%) rotate(var(--desktop-portrait-rotation));
         }
