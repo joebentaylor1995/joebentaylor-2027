@@ -294,6 +294,8 @@ class ProjectGrid {
   showProjectTooltip(hit?.project,point);
   if(!hit)canvas.setAttribute('aria-label','All projects. Drag in any direction or scroll vertically to explore the infinite grid.');
  }
+ // Host integration: builds the image tiles' textures one at a time in idle slots once the ribbon is ready, so the first switch to All projects doesn't decode and upload every tile in a single frame. Video tiles are skipped so their loops aren't all downloaded up front.
+ prewarm(){if(this.prewarming)return;this.prewarming=true;const idle=window.requestIdleCallback?callback=>window.requestIdleCallback(callback,{timeout:1000}):callback=>setTimeout(callback,50);let index=this.featured.length;const next=()=>{while(index<this.projects.length){const i=index++,project=this.projects[i];if(project.type==='video'&&project.video)continue;this.requestTexture(i);const entry=this.cache.get(project.poster),settled=()=>{if(!entry||entry.texture||entry.failed||this.cache.get(project.poster)!==entry)idle(next);else setTimeout(settled,50)};settled();return}};idle(next)}
  requestTexture(index){
   // Host integration: Video loop tiles key by their video so the poster and the loop share one entry.
   const project=this.projects[index],key=project.type==='video'&&project.video?project.video:project.poster;

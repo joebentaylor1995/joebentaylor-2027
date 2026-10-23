@@ -22,6 +22,16 @@ import { insertPreviewUrl } from '../objects/caseBlocks';
 const isListingOnly = ({ document }: ConditionalPropertyCallbackContext) => !document?.hasCaseStudy;
 const requiredForCaseStudy = (message: string) => (value: unknown, context: ValidationContext) =>
 	context.document?.hasCaseStudy && (value === undefined || (Array.isArray(value) && !value.length)) ? message : true;
+// NOTE • Sanity's API version for the Featured lookup below
+const VALIDATION_API_VERSION = '2025-06-01';
+// NOTE • Featured lives on the Projects page, not the project — ask it whether this one is listed
+const isFeatured = async (context: ValidationContext) => {
+	const id = context.document?._id?.replace(/^drafts\./, '');
+	if (!id) return false;
+	return context
+		.getClient({ apiVersion: VALIDATION_API_VERSION })
+		.fetch<boolean>('count(*[_id == "projectsPage"][0].featured[_ref == $id]) > 0', { id });
+};
 
 // Exports
 // ------------
@@ -182,10 +192,16 @@ export const project = defineType({
 			type: 'text',
 			rows: 5,
 			group: 'caseStudy',
+			description:
+				'Featured case studies only — shown under the title in the hero. Mini case studies (not featured) open straight to the overview and don’t use it.',
 			placeholder:
 				'One or two sentences on the client, the brief and what you made — shown under the title in the hero.',
 			hidden: isListingOnly,
-			validation: rule => rule.custom(requiredForCaseStudy('Case studies need an introduction')),
+			validation: rule =>
+				rule.custom(async (value, context) => {
+					if (!context.document?.hasCaseStudy || value) return true;
+					return (await isFeatured(context)) ? 'Featured case studies need an introduction' : true;
+				}),
 		}),
 		defineField({
 			name: 'objectives',

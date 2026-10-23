@@ -26,9 +26,10 @@ const CURSOR_MAX_STRETCH = 0.25;
 
 // Component
 // ------------
-const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
+const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => {
 	// Context
-	const { profileOpen, setProfileOpen, lenisRef } = use(GlobalContext);
+	const { profileOpen, setProfileOpen, projectModalOpen, closeProjectModal, leaveProjectModal, lenisRef } =
+		use(GlobalContext);
 	const { isReducedMotion } = use(PerformanceContext);
 
 	// Refs
@@ -43,12 +44,28 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 	// State
 	const [presented, setPresented] = useState(false);
 	const [Settings, setSettings] = useState<ComponentType | null>(null);
-	const active = profileOpen || presented;
+	// NOTE • Which content the panel shows — kept through the closing slide
+	const [shown, setShown] = useState<'profile' | 'project'>('profile');
+
+	// Derived
+	const isOpen = profileOpen || projectModalOpen;
+	const active = isOpen || presented;
+	const isProject = shown === 'project';
+	const close = isProject ? closeProjectModal : () => setProfileOpen(false);
+	// NOTE • Read by the keyboard handler without re-binding it each render
+	const closeAction = useRef(close);
+	closeAction.current = close;
 
 	// Effects
 	useEffect(() => {
-		if (profileOpen && panelRef.current) return preloadNearbyMedia(panelRef.current);
-	}, [profileOpen]);
+		if (profileOpen) setShown('profile');
+		else if (projectModalOpen) setShown('project');
+	}, [profileOpen, projectModalOpen]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: new panel content brings new media to warm.
+	useEffect(() => {
+		if (isOpen && panelRef.current) return preloadNearbyMedia(panelRef.current);
+	}, [isOpen, shown]);
 
 	useEffect(() => {
 		if (!new URLSearchParams(window.location.search).has('modalSettings')) return;
@@ -102,7 +119,7 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			lastPointer = event;
 			const target = document.elementFromPoint(event.clientX, event.clientY);
 			const projectPanel = target?.closest('[data-project-panel][data-open="true"]');
-			if ((!profileOpen && !projectPanel) || target?.closest('[data-modal-settings], dialog[open]')) {
+			if ((!isOpen && !projectPanel) || target?.closest('[data-modal-settings], dialog[open]')) {
 				hide();
 				return;
 			}
@@ -190,10 +207,10 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			mouse.removeEventListener('change', hide);
 			hide();
 		};
-	}, [profileOpen]);
+	}, [isOpen]);
 
 	useEffect(() => {
-		if (profileOpen) {
+		if (isOpen) {
 			setPresented(true);
 			return;
 		}
@@ -206,19 +223,23 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 				...(panelContentRef.current?.getAnimations() ?? []),
 			];
 			void Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
-				if (!cancelled) setPresented(false);
+				if (cancelled) return;
+				setPresented(false);
+				// NOTE • A closed project modal only now leaves its route (no-op after Back)
+				leaveProjectModal();
 			});
 		});
 		return () => {
 			cancelled = true;
 			cancelAnimationFrame(frame);
 		};
-	}, [profileOpen]);
+	}, [isOpen, leaveProjectModal]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: switching content resets the panel's scroll.
 	useLayoutEffect(() => {
 		const wrapper = panelRef.current;
 		const content = panelContentRef.current;
-		if (!profileOpen || !wrapper || !content) return;
+		if (!isOpen || !wrapper || !content) return;
 
 		// Reset before the opening frame, including native/reduced-motion scrolling.
 		wrapper.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -233,7 +254,7 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			gsap.ticker.remove(update);
 			modalLenis.destroy();
 		};
-	}, [profileOpen, isReducedMotion]);
+	}, [isOpen, shown, isReducedMotion]);
 
 	useEffect(() => {
 		if (!active) return;
@@ -291,7 +312,7 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			if (document.querySelector('dialog[open]')) return;
 			if (event.key === 'Escape') {
 				event.preventDefault();
-				setProfileOpen(false);
+				closeAction.current();
 			}
 			if (event.key !== 'Tab') return;
 			const focusable = Array.from(
@@ -320,11 +341,11 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			if (scrollRoot) scrollRoot.style.overflow = scrollOverflow;
 			if (previousFocus instanceof HTMLElement) previousFocus.focus({ preventScroll: true });
 		};
-	}, [active, lenisRef, setProfileOpen]);
+	}, [active, lenisRef]);
 
 	// Render
 	return (
-		<div ref={jacketRef} className={s.jacket} data-state={profileOpen ? 'open' : active ? 'closing' : 'closed'}>
+		<div ref={jacketRef} className={s.jacket} data-state={isOpen ? 'open' : active ? 'closing' : 'closed'}>
 			{Settings && <Settings />}
 			<div
 				ref={panelRef}
@@ -332,7 +353,7 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 				className={s.panel}
 				role='dialog'
 				aria-modal={active && !Settings ? true : undefined}
-				aria-label='Profile'
+				aria-label={isProject ? 'Project' : 'Profile'}
 				aria-hidden={!active}
 				inert={!active}
 			>
@@ -342,16 +363,21 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 							ref={closeRef}
 							type='button'
 							className={s.closeButton}
-							aria-label='Close profile'
+							aria-label={isProject ? 'Close project' : 'Close profile'}
 							data-cursor-sticky
-							onClick={() => setProfileOpen(false)}
+							onClick={close}
 						>
 							<Image src='/images/reviews/arrow.svg' width={16} height={11} alt='' />
 						</button>
 					</div>
-					<ProfilePresenceContext.Provider value={active}>
-						{profile ?? <div className={s.placeholder} aria-hidden='true' />}
-					</ProfilePresenceContext.Provider>
+					<div className={s.content} hidden={isProject}>
+						<ProfilePresenceContext.Provider value={active && !isProject}>
+							{profile ?? <div className={s.placeholder} aria-hidden='true' />}
+						</ProfilePresenceContext.Provider>
+					</div>
+					<div className={s.content} hidden={!isProject}>
+						{project}
+					</div>
 				</div>
 			</div>
 			<div
@@ -366,11 +392,11 @@ const ProfileReveal = ({ children, profile }: I.ProfileRevealProps) => {
 			<button
 				type='button'
 				className={s.overlay}
-				aria-label='Close profile backdrop'
+				aria-label={isProject ? 'Close project backdrop' : 'Close profile backdrop'}
 				aria-hidden='true'
 				tabIndex={-1}
-				disabled={!profileOpen}
-				onClick={() => setProfileOpen(false)}
+				disabled={!isOpen}
+				onClick={close}
 			/>
 			<div ref={cursorRef} className={s.cursor} aria-hidden='true'>
 				<span className={s.cursorAppearance}>

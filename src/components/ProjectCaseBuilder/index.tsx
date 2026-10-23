@@ -130,6 +130,13 @@ const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
 			if (!motion.matches) return;
 			dispose = mountMediaReveal(host);
 		};
+		// NOTE • A project modal stays mounted (hidden) between visits, so its tiles
+		// keep their revealed state — clear it so every opening plays the reveal.
+		// This effect re-runs when the hidden modal is shown again; resizes and
+		// settings changes go through setup() and still keep finished reveals.
+		if (host.closest('[data-project-modal]'))
+			for (const tile of host.querySelectorAll<HTMLElement>('[data-media-tile]'))
+				delete tile.dataset.revealComplete;
 		void setup();
 		const replay = () => {
 			dispose?.();

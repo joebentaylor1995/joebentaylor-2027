@@ -235,19 +235,31 @@ export const getProjectsPage = async (): Promise<ProjectsPageContent> => {
 		seo: ProjectsPageContent['seo'];
 	}>(GET_PROJECTS_PAGE);
 
-	// NOTE • The ribbon runs in an iframe the overlays can't reach — send it clean data
-	const featured = stegaClean(toRibbonProjects(data?.featured));
+	// NOTE • The ribbon runs in an iframe the overlays can't reach — send it clean data.
+	// Every project says whether it's featured, so a click knows how to open it
+	const featured = stegaClean(toRibbonProjects(data?.featured)).map(project => ({ ...project, featured: true }));
 	// An unavailable or empty CMS catalogue must never publish the demo projects.
 
 	// NOTE • The grid shows every project: featured first, then the hand-ordered
 	// All projects list, then everything else newest first
 	const seen = new Set(featured.map(({ id }) => id));
-	const rest = stegaClean([...toRibbonProjects(data?.all), ...toRibbonProjects(data?.others)]).filter(({ id }) => {
-		if (seen.has(id)) return false;
-		seen.add(id);
-		return true;
-	});
+	const rest = stegaClean([...toRibbonProjects(data?.all), ...toRibbonProjects(data?.others)])
+		.filter(({ id }) => {
+			if (seen.has(id)) return false;
+			seen.add(id);
+			return true;
+		})
+		.map(project => ({ ...project, featured: false }));
 	return { featured, all: [...featured, ...rest], seo: data?.seo ?? null };
+};
+
+// NOTE • A case study that's in the CMS catalogue but not Featured opens in the
+// project modal instead of its own hero page. Anything the catalogue doesn't
+// list (an unreachable CMS serving the local fallback) keeps the full page.
+export const isModalCaseStudy = async (slug: string): Promise<boolean> => {
+	const { all } = await getProjectsPage();
+	const href = `/projects/${slug}`;
+	return all.some(project => project.href === href && project.featured === false);
 };
 
 // NOTE • The case study after this one in the ribbon's Featured order,

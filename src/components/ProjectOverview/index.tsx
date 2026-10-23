@@ -12,9 +12,10 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
-const ProjectOverview = ({ overview }: ProjectOverviewProps) => (
+const ProjectOverview = ({ overview, eyebrow }: ProjectOverviewProps) => (
 	<section className={s.jacket} aria-labelledby='project-overview-title' data-project-overview>
 		<div className={s.heading}>
+			{eyebrow && <SpecialHeading text={eyebrow} tag='h1' />}
 			<h2 id='project-overview-title' data-type='displayL'>
 				<span>Project</span>
 				<br />

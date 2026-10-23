@@ -64,10 +64,10 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 			</svg>
 			<ViewTransition
 				name='navigation-surface'
-				update={{ 'project-mesh': 'none', default: 'pageWave' }}
+				update={{ 'project-mesh': 'none', 'project-modal': 'none', default: 'pageWave' }}
 				default='none'
 				onUpdate={(instance, types) => {
-					if (!routeChanged || types.includes('project-mesh')) return;
+					if (!routeChanged || types.includes('project-mesh') || types.includes('project-modal')) return;
 					if (navigation.played) return;
 					navigation.played = true;
 					if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;

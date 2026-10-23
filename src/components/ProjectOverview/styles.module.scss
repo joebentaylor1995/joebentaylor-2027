@@ -3,12 +3,16 @@
 	background: var(--brand-c4);
 }
 
+// NOTE • A column anchored to the bottom, so an optional eyebrow (the project's
+// name, on a mini case study) stacks above the heading without moving it
 .heading {
 	display: flex;
-	align-items: flex-end;
+	flex-direction: column;
+	justify-content: flex-end;
+	gap: var(--gap-m);
 	padding: var(--gap-l);
 
-	span { color: alpha(--global-white, 40); }
+	h2 span { color: alpha(--global-white, 40); }
 
 	@include bp(l) {
 		min-height: 100svh;
