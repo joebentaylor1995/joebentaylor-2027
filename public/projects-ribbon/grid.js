@@ -26,7 +26,7 @@ function showProjectTooltip(project,point){
  const label=document.querySelector('#hover-title'),stage=document.querySelector('#stage'),kind=projectKind(project),key=project.name+'\n'+kind;
  if(tooltipKey!==key){
   if(kind==='Coming soon')label.replaceChildren(projectLockIcon(),document.createTextNode(kind));else label.textContent=kind;
-  label.classList.toggle('is-case-study',kind==='View');tooltipKey=key;
+  tooltipKey=key;
   stage.setAttribute('aria-label',`${project.name} — ${kind==='View'?'case study. Press Enter to open.':kind==='View Offsite'?'external project. Opens in a new tab.':'coming soon'}`);
  }
  label.hidden=false;stage.setAttribute('aria-describedby','hover-title');stage.setAttribute('aria-disabled',String(!isProjectClickable(project)));
