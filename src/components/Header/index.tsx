@@ -22,6 +22,8 @@ const Header = () => {
 	// Context
 	const { profileOpen, setProfileOpen, contactOpen, setContactOpen, pagePath: pathname } = use(GlobalContext);
 	const isDarkPage = /^\/(cookies|terms-privacy|llms)\/?$/.test(pathname) || /^\/projects(?:\/|$)/.test(pathname);
+	// Case studies scroll under the header without the progressive blur
+	const isCaseStudy = /^\/projects\/[^/]+\/?$/.test(pathname);
 	// State
 	// Refs
 	const ref = useRef<HTMLElement>(null);
@@ -105,14 +107,16 @@ const Header = () => {
 					data-profile={profileOpen ? 'open' : 'closed'}
 					data-tone={isDarkPage ? 'light' : 'dark'}
 				>
-					<div className={s.blur} aria-hidden='true' data-header-blur>
-						<span />
-						<span />
-						<span />
-						<span />
-						<span />
-						<span />
-					</div>
+					{!isCaseStudy && (
+						<div className={s.blur} aria-hidden='true' data-header-blur>
+							<span />
+							<span />
+							<span />
+							<span />
+							<span />
+							<span />
+						</div>
+					)}
 					<nav className={s.left} aria-label='Homepage navigation'>
 						<Link href='/' aria-label='Go to home page' onNavigate={() => prepareNavigationScene('/')}>
 							<Logo className={s.logo} />
