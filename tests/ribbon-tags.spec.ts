@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('ribbon displays selected tags in order and hides empty subtitles', async ({ page }) => {
 	await page.route('**/api/projects-ribbon/', async route => {

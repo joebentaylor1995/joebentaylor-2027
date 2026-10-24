@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('settled animation does not query shader attributes on every frame', async ({ page }) => {
 	await page.addInitScript(() => {

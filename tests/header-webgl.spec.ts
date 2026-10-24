@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('header gaps pass through to the hero and navigation remains clickable', async ({ page }) => {
 	await page.goto('/projects/pocketchange/');

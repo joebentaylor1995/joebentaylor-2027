@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('desktop reveal waits for slow shader compilation and renders the whole wave', async ({ page }) => {
 	await page.addInitScript(() => {

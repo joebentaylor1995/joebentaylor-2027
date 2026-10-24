@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
 import { createPhysics } from '../src/components/Profile/Usps/Toolkit/physics';
+import { expect, test } from './helpers/test';
 
 test('tools enter from above, collide with the floor, drag, release and stay contained after resize', () => {
 	const world = createPhysics(

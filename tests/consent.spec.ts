@@ -2,7 +2,7 @@
 // ------------
 // Covers the choice, its persistence before first paint, and
 // withdrawing consent from the settings.
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 const consentAttribute = () => document.documentElement.getAttribute('data-cookie-consent');
 

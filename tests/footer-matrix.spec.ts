@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('footer matrix approved defaults render without controls', async ({ page }) => {
 	const errors: string[] = [];

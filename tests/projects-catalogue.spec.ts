@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('the server catalogue contains only CMS projects with explicit readiness', async ({ request }) => {
 	const response = await request.get('/api/projects-ribbon/');

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('media settings control native reveal timing and easing', async ({ page }) => {
 	page.setDefaultTimeout(10000);

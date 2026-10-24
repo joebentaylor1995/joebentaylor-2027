@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('desktop project reveal follows scroll in both directions and returns to top', async ({ page }) => {
 	await page.goto('/projects/pocketchange/');

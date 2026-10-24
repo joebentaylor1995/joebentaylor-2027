@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('connect footer renders its assets, links and complete charge cycle', async ({ page, request }) => {
 	await page.goto('/');

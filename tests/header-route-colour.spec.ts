@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('legal header returns to dark on client navigation home and stays correct on back', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });

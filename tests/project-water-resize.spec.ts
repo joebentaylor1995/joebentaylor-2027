@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('water survives a hidden route becoming visible again', async ({ page }) => {
 	const errors: string[] = [];

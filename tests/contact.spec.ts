@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('booking modal covers the viewport, traps focus and restores it on close', async ({ page }) => {
 	await page.goto('/');

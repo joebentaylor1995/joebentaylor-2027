@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('hero decoration refresh preserves water buffers while viewport resize reallocates them', async ({ page }) => {
 	await page.addInitScript(() => {

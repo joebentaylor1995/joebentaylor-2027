@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('profile preserves the scrolled case study and restores scrolling on close', async ({ page }) => {
 	await page.setViewportSize({ width: 1440, height: 900 });

@@ -1,4 +1,4 @@
-import { expect, type Locator, test } from '@playwright/test';
+import { expect, type Locator, test } from './helpers/test';
 
 test('Recognition settings update live, persist, reset, and scrolling controls direction', async ({ page }) => {
 	await page.goto('/?modalSettings');

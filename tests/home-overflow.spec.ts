@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('homepage does not scroll horizontally across desktop and mobile widths', async ({ page }) => {
 	await page.goto('/');

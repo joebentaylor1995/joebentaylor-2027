@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('mobile marquee stays in HTML while desktop uses WebGL', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });

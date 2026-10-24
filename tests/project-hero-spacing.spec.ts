@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const width of [375, 440, 768, 1440]) {
 	test(`case study content spacing at ${width}px`, async ({ page }) => {

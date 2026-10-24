@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const rate of [4, 6]) {
 	test(`mobile loader fade frame budget at ${rate}x CPU slowdown`, async ({ browser }, testInfo) => {

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('root rem scale begins above 1600px without changing smaller layouts', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });

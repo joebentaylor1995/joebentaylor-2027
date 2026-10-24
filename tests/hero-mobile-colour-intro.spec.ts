@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('mobile portrait colour settles after the loader fade', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });

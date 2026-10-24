@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const source of ['/', '/projects/pocketchange/']) {
 	test(`projects catalogue warms after the introduction on ${source}`, async ({ page }) => {

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('projects cross dissolve completes before the ribbon reveal starts', async ({ page }) => {
 	await page.goto('/');

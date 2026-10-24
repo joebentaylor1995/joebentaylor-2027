@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const mobile of [false, true]) {
 	test(`Next Project ${mobile ? 'crossfades' : 'uses the feathered wave'} under a fixed header (${mobile ? 'mobile' : 'desktop'})`, async ({

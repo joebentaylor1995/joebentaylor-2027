@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('desktop column overrides stay local and preserve smaller layouts', async ({ page }) => {
 	await page.goto('/');

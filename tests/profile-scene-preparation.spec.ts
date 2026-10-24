@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('recognition prepares a complete frame before entering view without showing fallback posters', async ({
 	page,

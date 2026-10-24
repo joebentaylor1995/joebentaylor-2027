@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from './helpers/test';
 
 const compareFrames = async (page: Page, before: Buffer, after: Buffer) =>
 	page.evaluate(
