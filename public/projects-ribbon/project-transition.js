@@ -102,15 +102,11 @@ class ProjectTransition {
   this.background=this.texture();gl.copyTexImage2D(gl.TEXTURE_2D,0,gl.RGB,0,0,canvas.width,canvas.height,0);
   this.destination=destination;
   let source;
-  this.parallax=[1,0,0];
   if(hit?.grid){const d=gridView.dimensions();source={grid:{centre:{x:(hit.col+gridView.rowShift(hit.row))*d.pitchX+gridView.pan.x,y:hit.row*d.pitchY+gridView.pan.y},size:d,bend:gridView.bend}};}
   else{
    const band=hit?.band||0,shift=Math.max(1,Math.floor(count*(band===1?1:2)/3));
    const offset=band?mod(-position+count-1-shift+.5,count):mod(position,count);
    const slide=hit?.slide??Math.floor(offset+.5);source={band,offset,slide};
-   // Start from the crop the ribbon drew this slide with, then ease it out as the image expands
-   const distance=mod(slide-offset+count/2,count)-count/2,parallax=slideParallax(distance,reduced?0:state.parallax/100);
-   this.parallax=state.vertical?[parallax.zoom,0,-parallax.shift]:[parallax.zoom,parallax.shift,0];
   }
   const index=featured.findIndex(item=>item.poster===project.poster);
   this.sourceTexture=index>=0?texture:gridView.requestTexture(hit?.index??project.index);
@@ -131,13 +127,13 @@ class ProjectTransition {
  warm(){if(this.warmProgram)return;try{this.warmProgram=this.link()}catch{}}
  compile(){
   const gl=this.gl;this.program=this.warmProgram||this.link();this.warmProgram=null;this.resources.push(['program',this.program]);
-  this.uniforms={};for(const key of ['Progress','Background','Source','Hero','Atlas','Crop','SourceCrop','Blend','Opacity','HeroViewport','HeroOffset','Parallax'])this.uniforms[key]=gl.getUniformLocation(this.program,'u'+key);
+  this.uniforms={};for(const key of ['Progress','Background','Source','Hero','Atlas','Crop','SourceCrop','Blend','Opacity','HeroViewport','HeroOffset'])this.uniforms[key]=gl.getUniformLocation(this.program,'u'+key);
  }
  link(){
   const gl=this.gl,program=gl.createProgram();
   const shaders=[
    [gl.VERTEX_SHADER,`attribute vec3 aStart;attribute vec2 aUV;uniform float uProgress,uBackground;varying vec2 vUV;void main(){vUV=aUV;vec3 end=vec3(aUV.x*2.-1.,1.-aUV.y*2.,1.);float depth=mix(max(.04,aStart.z),1.,uProgress);vec2 screen=mix(aStart.xy/max(.04,aStart.z),end.xy,uProgress);vec3 p=vec3(screen*depth,depth);if(uBackground>.5)p=end;gl_Position=vec4(p.xy,0.,p.z);}`],
-   [gl.FRAGMENT_SHADER,`precision highp float;uniform sampler2D uSource,uHero;uniform vec4 uAtlas;uniform vec2 uCrop,uSourceCrop;uniform vec3 uParallax;uniform float uBlend,uBackground,uOpacity,uHeroViewport,uHeroOffset;varying vec2 vUV;void main(){vec2 uv=clamp(vUV,vec2(.001),vec2(.999));if(uBackground>.5){gl_FragColor=vec4(texture2D(uSource,vec2(vUV.x,1.-vUV.y)).rgb,uOpacity);return;}vec3 before=texture2D(uSource,uAtlas.xy+clamp((vUV-.5)*uSourceCrop/uParallax.x+.5+uParallax.yz,vec2(.001),vec2(.999))*uAtlas.zw).rgb;vec3 after=texture2D(uHero,(vec2(vUV.x,vUV.y*uHeroViewport+uHeroOffset)-.5)*uCrop+.5).rgb;gl_FragColor=vec4(mix(before,after,uBlend),uOpacity);}`]
+   [gl.FRAGMENT_SHADER,`precision highp float;uniform sampler2D uSource,uHero;uniform vec4 uAtlas;uniform vec2 uCrop,uSourceCrop;uniform float uBlend,uBackground,uOpacity,uHeroViewport,uHeroOffset;varying vec2 vUV;void main(){vec2 uv=clamp(vUV,vec2(.001),vec2(.999));if(uBackground>.5){gl_FragColor=vec4(texture2D(uSource,vec2(vUV.x,1.-vUV.y)).rgb,uOpacity);return;}vec3 before=texture2D(uSource,uAtlas.xy+clamp((vUV-.5)*uSourceCrop+.5,vec2(.001),vec2(.999))*uAtlas.zw).rgb;vec3 after=texture2D(uHero,(vec2(vUV.x,vUV.y*uHeroViewport+uHeroOffset)-.5)*uCrop+.5).rgb;gl_FragColor=vec4(mix(before,after,uBlend),uOpacity);}`]
   ];
   for(const [type,src]of shaders){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));gl.attachShader(program,s);gl.deleteShader(s)}
   gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS)){const log=gl.getProgramInfoLog(program);gl.deleteProgram(program);throw Error(log)}
@@ -156,7 +152,7 @@ class ProjectTransition {
   gl.uniform1i(u.Source,0);gl.uniform1i(u.Hero,1);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.destination);gl.activeTexture(gl.TEXTURE0);
   gl.uniform1f(u.Background,1);gl.uniform1f(u.Opacity,1);gl.bindTexture(gl.TEXTURE_2D,this.background);gl.drawElements(gl.TRIANGLES,this.vertexCount,gl.UNSIGNED_SHORT,0);
   gl.uniform1f(u.Background,0);gl.uniform1f(u.Opacity,1);gl.uniform1f(u.Progress,t);gl.uniform1f(u.Blend,projectEase(Math.max(0,Math.min(1,(t-.25)/.7))));
-  gl.uniform4fv(u.Atlas,this.sourceAtlas);const cropProgress=t,boxHeight=this.sourceHeight+(innerHeight-this.sourceHeight)*cropProgress,boxWidth=this.sourceHeight*1.6+(innerWidth-this.sourceHeight*1.6)*cropProgress,aspect=boxWidth/boxHeight;gl.uniform2fv(u.SourceCrop,projectCover(1.6,aspect));const [zoom,shiftX,shiftY]=this.parallax||[1,0,0];gl.uniform3f(u.Parallax,zoom+(1-zoom)*cropProgress,shiftX*(1-cropProgress),shiftY*(1-cropProgress));const heroHeight=boxHeight+((this.heroHeight||innerHeight)-innerHeight)*t;gl.uniform2fv(u.Crop,projectCover(this.image.width/this.image.height,boxWidth/heroHeight));gl.uniform1f(u.HeroViewport,boxHeight/heroHeight);gl.uniform1f(u.HeroOffset,-(this.heroTop||0)*t/heroHeight);
+  gl.uniform4fv(u.Atlas,this.sourceAtlas);const cropProgress=t,boxHeight=this.sourceHeight+(innerHeight-this.sourceHeight)*cropProgress,boxWidth=this.sourceHeight*1.6+(innerWidth-this.sourceHeight*1.6)*cropProgress,aspect=boxWidth/boxHeight;gl.uniform2fv(u.SourceCrop,projectCover(1.6,aspect));const heroHeight=boxHeight+((this.heroHeight||innerHeight)-innerHeight)*t;gl.uniform2fv(u.Crop,projectCover(this.image.width/this.image.height,boxWidth/heroHeight));gl.uniform1f(u.HeroViewport,boxHeight/heroHeight);gl.uniform1f(u.HeroOffset,-(this.heroTop||0)*t/heroHeight);
   gl.bindTexture(gl.TEXTURE_2D,this.sourceTexture);gl.drawElements(gl.TRIANGLES,this.vertexCount,gl.UNSIGNED_SHORT,0);gl.disable(gl.BLEND);
   if(this.progress<1)requestRender();else if(this.returning){this.close();this.cancelReturn();}else{this.settled=true;if(this.embedded){const serial=this.serial;this.handoffTimer=setTimeout(()=>{if(serial!==this.serial||!this.active||this.returning)return;window.parent.postMessage({type:'projects:open',href:this.href,hero:this.image.src,heroHeight:this.heroHeight,heroTop:this.heroTop,completed:true},location.origin)},100);return;}document.body.classList.add('project-arrived');this.page.querySelector('button').focus({preventScroll:true});}
  }

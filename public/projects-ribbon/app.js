@@ -49,7 +49,7 @@ window.addEventListener('message',event=>{
  if(loaderWave.progress>=1){loaderWave.dispose();loaderWave=null;}
  requestRender();
 });
-const desktopDefaults={rotation:0,mouseTilt:0,mouseTiltMin:-6,mouseTiltMax:6,velocityTilt:0,velocityCurve:0,velocityTiltAmount:12,velocityCurveAmount:20,distance:100,curve:74,scale:100,speed:106,blur:65,blurThreshold:30,parallax:40,twist:0,stacked:0,vertical:0,amount:180,spread:48};
+const desktopDefaults={rotation:0,mouseTilt:0,mouseTiltMin:-6,mouseTiltMax:6,velocityTilt:0,velocityCurve:0,velocityTiltAmount:12,velocityCurveAmount:20,distance:100,curve:74,scale:100,speed:106,blur:65,blurThreshold:30,twist:0,stacked:0,vertical:0,amount:180,spread:48};
 const mobileDefaults={vertical:1,stacked:1,rotation:0,distance:100,curve:95,scale:112,speed:136,blur:24};
 const defaults={...desktopDefaults,...(mobile?mobileDefaults:{})};
 const state={...defaults};
@@ -60,7 +60,7 @@ function featuredView(){
  if(mobile)view.scale*=innerWidth/innerHeight/mobileReferenceAspect;
  return view;
 }
-try{const saved=JSON.parse(localStorage.getItem(settingsKey)||'{}');for(const key of ['velocityTilt','velocityCurve','velocityTiltAmount','velocityCurveAmount','mouseTilt','mouseTiltMin','mouseTiltMax','rotation','distance','curve','scale','speed','blur','blurThreshold','parallax','stacked','vertical','amount','spread'])if(Number.isFinite(saved[key]))state[key]=saved[key]}catch{}
+try{const saved=JSON.parse(localStorage.getItem(settingsKey)||'{}');for(const key of ['velocityTilt','velocityCurve','velocityTiltAmount','velocityCurveAmount','mouseTilt','mouseTiltMin','mouseTiltMax','rotation','distance','curve','scale','speed','blur','blurThreshold','stacked','vertical','amount','spread'])if(Number.isFinite(saved[key]))state[key]=saved[key]}catch{}
 function saveSettings(){if(new URLSearchParams(location.search).has('capture'))return;try{localStorage.setItem(settingsKey,JSON.stringify(state))}catch{}}
 // Apply the requested mobile tuning once, including on phones with saved settings.
 function migrateMobileSettings(){if(mobile){if(new URLSearchParams(location.search).has('capture')){Object.assign(state,mobileDefaults);return;}try{if(localStorage.getItem('ribbon-mobile-tuning')!=='4'){Object.assign(state,mobileDefaults);saveSettings();localStorage.setItem('ribbon-mobile-tuning','4')}}catch{Object.assign(state,mobileDefaults)}}}
@@ -86,7 +86,7 @@ let uiKey='';
 const frameMeter=new FrameMeter();
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 if(reduced)position=0;
-const controls=[['rotation','Head tilt',-45,45,'°'],['distance','Viewing distance',0,100,'%'],['curve','Curvature',0,100,'%'],['scale','Ribbon size',60,150,'%'],['speed','Scroll sensitivity',25,200,'%'],['blur','Motion blur',0,150,'%'],['blurThreshold','Blur threshold',0,100,'%'],['parallax','Image parallax',0,100,'%'],['amount','Twist amount',0,180,'°'],['spread','Twist spread',20,160,'%']];
+const controls=[['rotation','Head tilt',-45,45,'°'],['distance','Viewing distance',0,100,'%'],['curve','Curvature',0,100,'%'],['scale','Ribbon size',60,150,'%'],['speed','Scroll sensitivity',25,200,'%'],['blur','Motion blur',0,150,'%'],['blurThreshold','Blur threshold',0,100,'%'],['amount','Twist amount',0,180,'°'],['spread','Twist spread',20,160,'%']];
 for(const [key,label,min,max,unit]of controls){const row=document.createElement('div');row.className='control';row.innerHTML=`<div class="control-top"><label for="${key}">${label}</label><output for="${key}" id="${key}-value">${state[key]}${unit}</output></div><input id="${key}" type="range" min="${min}" max="${max}" value="${state[key]}">`;document.querySelector('#controls').append(row);row.querySelector('input').addEventListener('input',e=>{state[key]=+e.target.value;document.getElementById(key+'-value').textContent=state[key]+unit;saveSettings();requestRender()})}
 const velocityShape=new VelocityShape();
 const velocityControls=document.createElement('div');
@@ -281,7 +281,7 @@ function setup(){
  gl.attachShader(program,shader(gl.FRAGMENT_SHADER,`
  precision highp float;
  uniform sampler2D uTexture;
- uniform float uOffset,uCount,uReveal,uEffect,uIntensity,uMotionBlur,uReverse,uFade,uVertical,uOpacity,uParallax;
+ uniform float uOffset,uCount,uReveal,uEffect,uIntensity,uMotionBlur,uReverse,uFade,uVertical,uOpacity;
  uniform float uCascadeEase,uCascadeStagger;
  uniform vec2 uAtlasSize;
  uniform vec2 uResolution;
@@ -290,10 +290,7 @@ function setup(){
  vec4 sampleSlide(float slide,float y){
   float index=mod(floor(slide),uCount);
   if(uReverse>.5)index=uCount-1.0-index;
-  float zoom=1.0+${PARALLAX_ZOOM}*uParallax;
-  float shift=clamp((floor(slide)-uOffset)/${PARALLAX_RANGE},-1.0,1.0)*(1.0-1.0/zoom)*.5;
-  float along=.5+(fract(slide)-.5)/zoom+shift,across=.5+(y-.5)/zoom;
-  vec2 imageUV=uVertical>.5?vec2(1.0-across,1.0-along):vec2(along,across);
+  vec2 imageUV=uVertical>.5?vec2(1.0-y,1.0-fract(slide)):vec2(fract(slide),y);
   return texture2D(uTexture,(vec2(mod(index,uAtlasSize.x),floor(index/uAtlasSize.x))+clamp(imageUV,vec2(.001),vec2(.999)))/uAtlasSize);
  }
  void main(){
@@ -346,7 +343,7 @@ function setup(){
  ribbonIndices=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ribbonIndices);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indices),gl.STATIC_DRAW);
  const a=gl.getAttribLocation(program,'aPosition');ribbonAttrib=a;
  gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);
- for(const n of ['Rotation','Distance','Curve','Scale','Aspect','Offset','Count','Twist','Amount','Spread','Reveal','Effect','Intensity','Resolution','MotionBlur','Band','Reverse','Fade','Vertical','StackExit','Opacity','Parallax'])uniforms[n]=gl.getUniformLocation(program,'u'+n);
+ for(const n of ['Rotation','Distance','Curve','Scale','Aspect','Offset','Count','Twist','Amount','Spread','Reveal','Effect','Intensity','Resolution','MotionBlur','Band','Reverse','Fade','Vertical','StackExit','Opacity'])uniforms[n]=gl.getUniformLocation(program,'u'+n);
  gl.uniform1i(gl.getUniformLocation(program,'uTexture'),0);
  uniforms.AtlasSize=gl.getUniformLocation(program,'uAtlasSize');
  uniforms.CascadeEase=gl.getUniformLocation(program,'uCascadeEase');uniforms.CascadeStagger=gl.getUniformLocation(program,'uCascadeStagger');
@@ -356,13 +353,6 @@ function setup(){
 }
 // Threshold is measured against slide velocity, independent of frame rate.
 // A soft knee keeps the onset smooth while remaining exactly sharp below it.
-// Each image is zoomed inside its slide and drifts with the slide's distance from the screen centre, so it
-// trails the frame as the ribbon moves. Mirrored in the ribbon shader; the project transition starts from it.
-const PARALLAX_ZOOM=.25,PARALLAX_RANGE=1.5;
-function slideParallax(distance,strength){
- const zoom=1+PARALLAX_ZOOM*strength;
- return {zoom,shift:Math.max(-1,Math.min(1,distance/PARALLAX_RANGE))*(1-1/zoom)*.5};
-}
 function featuredBlur(velocity,threshold,strength){
  const excess=Math.max(0,Math.abs(velocity)-threshold/10);
  return Math.min(.75,.045*excess*excess/(excess+1))*strength/100;
@@ -430,7 +420,7 @@ mouseTilt.update(dt,!introMoving&&!mobile&&!!state.mouseTilt,state.rotation,redu
 if(mouseTilt.moving)requestRender();
 updateStackedDeparture(dt);
 if(idle.delta){if(gridView?.target){gridView.goal.x+=idle.delta;gridView.goal.y+=idle.delta;}else{clearTimeout(snapTimer);target+=idle.delta*(state.vertical?-1:1);}}
-if(idle.stopped&&!gridView?.target)scheduleSnap();const gridMoving=gridView?.update(dt);updateVideoTextures();gl.useProgram(program);gl.bindBuffer(gl.ARRAY_BUFFER,ribbonBuffer);gl.enableVertexAttribArray(ribbonAttrib);gl.vertexAttribPointer(ribbonAttrib,2,gl.FLOAT,false,0,0);gl.enable(gl.DEPTH_TEST);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);const previousPosition=position;position=reduced?target:position+(target-position)*(1-Math.exp(-dt*9));if(Math.abs(target-position)<.0001)position=target;const velocity=(position-previousPosition)/Math.max(dt,.001);scrollVelocity+=(velocity-scrollVelocity)*(1-Math.exp(-dt*14));if(Math.abs(scrollVelocity)<.001)scrollVelocity=0;velocityShape.update(dt,scrollVelocity,state,!mobile&&!reduced&&!introMoving&&!idle.delta&&!gridView?.target&&!(gridView?.mix>0),reduced);if(velocityShape.moving)requestRender();const shaped=featuredView();if(Math.abs(target)>count*100){const shift=Math.trunc(target/count)*count;position-=shift;target-=shift}const dpr=exportPixelRatio||Math.min(devicePixelRatio||1,mobile?1.5:2),w=Math.round(innerWidth*dpr),h=Math.round(innerHeight*dpr);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h)}gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.uniform1f(uniforms.Vertical,state.vertical);gl.uniform1f(uniforms.Rotation,shaped.rotation*Math.PI/180);gl.uniform1f(uniforms.Distance,state.distance/100);gl.uniform1f(uniforms.Curve,shaped.curve/100);gl.uniform1f(uniforms.Scale,shaped.scale/100);gl.uniform1f(uniforms.Aspect,w/h);gl.uniform1f(uniforms.Offset,mod(position,count));gl.uniform1f(uniforms.Count,count);gl.uniform1f(uniforms.Twist,state.twist);gl.uniform1f(uniforms.Amount,state.amount*Math.PI/180);gl.uniform1f(uniforms.Spread,state.spread/100);gl.uniform1f(uniforms.Reveal,introduction.progress);gl.uniform1f(uniforms.Effect,reduced?1:introduction.settings.effect);gl.uniform1f(uniforms.Intensity,introduction.settings.intensity/100);gl.uniform2f(uniforms.Resolution,w,h);gl.uniform1f(uniforms.MotionBlur,reduced||introMoving?0:featuredBlur(scrollVelocity,state.blurThreshold,state.blur));gl.uniform1f(uniforms.Parallax,reduced?0:state.parallax/100);drawFeaturedRibbons();if(gridView&&gridView.mix>0)gridView.render(texture,count,shaped);updateUI();frameMeter.end();if(projectTransition.pending){try{projectTransition.begin(shaped)}catch(error){projectTransition.close();showCatalogError(error)}return;}if(idle.moving||introMoving||gridMoving||scrollVelocity!==0||position!==target||videoSlides.some(item=>!item.video.requestVideoFrameCallback&&!item.video.paused&&!document.hidden))requestRender()}
+if(idle.stopped&&!gridView?.target)scheduleSnap();const gridMoving=gridView?.update(dt);updateVideoTextures();gl.useProgram(program);gl.bindBuffer(gl.ARRAY_BUFFER,ribbonBuffer);gl.enableVertexAttribArray(ribbonAttrib);gl.vertexAttribPointer(ribbonAttrib,2,gl.FLOAT,false,0,0);gl.enable(gl.DEPTH_TEST);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);const previousPosition=position;position=reduced?target:position+(target-position)*(1-Math.exp(-dt*9));if(Math.abs(target-position)<.0001)position=target;const velocity=(position-previousPosition)/Math.max(dt,.001);scrollVelocity+=(velocity-scrollVelocity)*(1-Math.exp(-dt*14));if(Math.abs(scrollVelocity)<.001)scrollVelocity=0;velocityShape.update(dt,scrollVelocity,state,!mobile&&!reduced&&!introMoving&&!idle.delta&&!gridView?.target&&!(gridView?.mix>0),reduced);if(velocityShape.moving)requestRender();const shaped=featuredView();if(Math.abs(target)>count*100){const shift=Math.trunc(target/count)*count;position-=shift;target-=shift}const dpr=exportPixelRatio||Math.min(devicePixelRatio||1,mobile?1.5:2),w=Math.round(innerWidth*dpr),h=Math.round(innerHeight*dpr);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h)}gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.uniform1f(uniforms.Vertical,state.vertical);gl.uniform1f(uniforms.Rotation,shaped.rotation*Math.PI/180);gl.uniform1f(uniforms.Distance,state.distance/100);gl.uniform1f(uniforms.Curve,shaped.curve/100);gl.uniform1f(uniforms.Scale,shaped.scale/100);gl.uniform1f(uniforms.Aspect,w/h);gl.uniform1f(uniforms.Offset,mod(position,count));gl.uniform1f(uniforms.Count,count);gl.uniform1f(uniforms.Twist,state.twist);gl.uniform1f(uniforms.Amount,state.amount*Math.PI/180);gl.uniform1f(uniforms.Spread,state.spread/100);gl.uniform1f(uniforms.Reveal,introduction.progress);gl.uniform1f(uniforms.Effect,reduced?1:introduction.settings.effect);gl.uniform1f(uniforms.Intensity,introduction.settings.intensity/100);gl.uniform2f(uniforms.Resolution,w,h);gl.uniform1f(uniforms.MotionBlur,reduced||introMoving?0:featuredBlur(scrollVelocity,state.blurThreshold,state.blur));drawFeaturedRibbons();if(gridView&&gridView.mix>0)gridView.render(texture,count,shaped);updateUI();frameMeter.end();if(projectTransition.pending){try{projectTransition.begin(shaped)}catch(error){projectTransition.close();showCatalogError(error)}return;}if(idle.moving||introMoving||gridMoving||scrollVelocity!==0||position!==target||videoSlides.some(item=>!item.video.requestVideoFrameCallback&&!item.video.paused&&!document.hidden))requestRender()}
 window.addEventListener('resize',requestRender);
 mobileViewport.addEventListener('change',()=>{
  mobile=mobileViewport.matches;mouseTilt.y=.5;settingsKey=mobile?'ribbon-settings-mobile':'ribbon-settings';
