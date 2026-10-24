@@ -34,6 +34,11 @@
 	}
 
 	:root[data-navigation-wave-lens='true']::view-transition-new(.pageWave) { filter: url('#navigation-wave-lens'); }
+
+	// The settings panel's midway preview: the live page drawn through one frame
+	// of the same mask and lens, over the background in place of the old page
+	:root[data-navigation-wave-preview] #page { mask-image: var(--navigation-wave-mask); }
+	:root[data-navigation-wave-preview][data-navigation-wave-lens='true'] #page { filter: url('#navigation-wave-lens'); }
 	html[data-next-project-transition] header { view-transition-name: site-header; }
 
 	::view-transition-old(root),

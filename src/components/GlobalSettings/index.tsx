@@ -9,6 +9,7 @@ import {
 	WAVE_STORAGE_KEY,
 	type WaveSettings,
 	waveDefaults,
+	wavePreview,
 	waveRanges,
 } from '@parts/NavigationWave/settings';
 import { grid } from '@theme/grid';
@@ -28,7 +29,18 @@ export default function GlobalSettings() {
 	const [wave, setWave] = useState<WaveSettings>(waveDefaults);
 	const [waveStatus, setWaveStatus] = useState('Changes apply to the next navigation and are saved in this browser.');
 
+	const [preview, setPreview] = useState<number | null>(null);
+
 	useEffect(() => setWave(readWaveSettings()), []);
+
+	// Draw the chosen point of the wave on this page, redrawn as any setting changes
+	// biome-ignore lint/correctness/useExhaustiveDependencies: wave changes repaint the stored settings.
+	useEffect(() => {
+		if (preview === null) wavePreview.clear?.();
+		else wavePreview.paint?.(preview / 100);
+	}, [preview, wave]);
+
+	useEffect(() => () => wavePreview.clear?.(), []);
 
 	const updateWave = (settings: WaveSettings) => {
 		try {
@@ -60,6 +72,31 @@ export default function GlobalSettings() {
 				<details open>
 					<summary>Navigation wave</summary>
 					<p>Applies across the site, separately from the opening introduction.</p>
+					<label className={s.control}>
+						<span>
+							<span>
+								<input
+									type='checkbox'
+									aria-label='Preview the wave midway'
+									checked={preview !== null}
+									onChange={event => setPreview(event.target.checked ? 50 : null)}
+								/>{' '}
+								Preview at
+							</span>
+							<output>{preview === null ? 'off' : `${preview}%`}</output>
+						</span>
+						<input
+							type='range'
+							aria-label='Preview at'
+							min={0}
+							max={100}
+							step={1}
+							value={preview ?? 50}
+							disabled={preview === null}
+							onChange={event => setPreview(Number(event.target.value))}
+						/>
+					</label>
+					<p>Shows this page revealed through the wave at that point. Every setting below updates it live.</p>
 					<label className={s.control}>
 						<span>Easing</span>
 						<select

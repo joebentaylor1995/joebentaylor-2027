@@ -7,13 +7,46 @@ import { lockProjectScroll } from '@utils/lockProjectScroll';
 import { releaseNavigationScene } from '@utils/navigationScene';
 import { gsap } from 'gsap';
 import { type ReactNode, use, useEffect, useMemo, useRef, ViewTransition } from 'react';
-import { readWaveSettings, WAVE_SETTINGS_CHANGED } from './settings';
+import { readWaveSettings, WAVE_SETTINGS_CHANGED, type WaveSettings, wavePreview } from './settings';
 import s from './styles.module.scss';
 import { waveTexture } from './texture';
 
 // NOTE • Phones swap the wave for a plain crossfade, animated in CSS (src/css/_page-transitions.scss).
 // Cleanup drops data-navigation-wave, which switches that CSS off, so keep the two durations in step.
 const CROSSFADE_DURATION = 600;
+
+// One frame of the wave: the reveal mask and the lens, for a point (0–1) through it.
+// The page transition and the settings panel's preview both draw with it.
+function paintWave(
+	settings: WaveSettings,
+	progress: number,
+	map: SVGFEImageElement | null,
+	displacement: SVGFEDisplacementMapElement | null
+) {
+	const width = innerWidth,
+		height = innerHeight;
+	const x = (width * settings.originX) / 100,
+		y = height * (1 - settings.originY / 100);
+	const feather = Math.max(1, height * 0.16 * settings.width * settings.softness);
+	const end = Math.hypot(Math.max(x, width - x), Math.max(y, height - y)) + feather;
+	// Grow from zero immediately; a negative radius hides the first part
+	// of the animation and feels like a delay after the click.
+	const radius = end * gsap.parseEase(settings.ease)(progress);
+	const edge = Math.min(feather, radius);
+	document.documentElement.style.setProperty(
+		'--navigation-wave-mask',
+		`radial-gradient(circle at ${x}px ${y}px, #000 ${Math.max(0, radius - edge)}px, transparent ${Math.max(0.01, radius + edge)}px)`
+	);
+	const size = Math.max(1, radius) / 0.65;
+	map?.setAttribute('x', String(x - size));
+	map?.setAttribute('y', String(y - size));
+	map?.setAttribute('width', String(size * 2));
+	map?.setAttribute('height', String(size * 2));
+	displacement?.setAttribute(
+		'scale',
+		String(height * 0.09 * settings.bend * settings.strength * Math.sin(Math.PI * progress))
+	);
+}
 
 // Native snapshots retain canvases, video and font rendering without DOM rasterisation.
 export default function NavigationWave({ children }: { children: ReactNode }) {
@@ -36,6 +69,28 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 		return () => {
 			window.removeEventListener(LOADER_SETTLED, prepare);
 			window.removeEventListener(WAVE_SETTINGS_CHANGED, prepare);
+		};
+	}, []);
+	useEffect(() => {
+		// The settings panel previews any point of the wave on the live page (CSS in
+		// _page-transitions.scss), so its controls stay visible while tuning
+		const root = document.documentElement;
+		wavePreview.paint = progress => {
+			const settings = readWaveSettings();
+			map.current?.setAttribute('href', waveTexture(settings));
+			root.dataset.navigationWavePreview = 'true';
+			root.dataset.navigationWaveLens = String(settings.bend > 0 && settings.strength > 0);
+			paintWave(settings, progress, map.current, displacement.current);
+		};
+		wavePreview.clear = () => {
+			delete root.dataset.navigationWavePreview;
+			delete root.dataset.navigationWaveLens;
+			root.style.removeProperty('--navigation-wave-mask');
+			displacement.current?.setAttribute('scale', '0');
+		};
+		return () => {
+			wavePreview.clear?.();
+			wavePreview.paint = wavePreview.clear = null;
 		};
 	}, []);
 	return (
@@ -78,15 +133,9 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 					if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 					const settings = readWaveSettings();
 					const crossfade = matchMedia(mq.down.m).matches;
-					const width = innerWidth,
-						height = innerHeight;
-					const x = (width * settings.originX) / 100,
-						y = height * (1 - settings.originY / 100);
-					const feather = Math.max(1, height * 0.16 * settings.width * settings.softness);
-					const end = Math.hypot(Math.max(x, width - x), Math.max(y, height - y)) + feather;
 					const duration = crossfade ? CROSSFADE_DURATION : settings.duration;
-					const ease = gsap.parseEase(settings.ease);
 					const root = document.documentElement;
+					wavePreview.clear?.();
 					root.dataset.navigationWave = 'running';
 					root.dataset.navigationWaveLens = String(!crossfade && settings.bend > 0 && settings.strength > 0);
 					root.dataset.navigationWaveProgress = '0';
@@ -118,23 +167,7 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 							if (progress < 1) raf = requestAnimationFrame(tick);
 							return;
 						}
-						// Grow from zero immediately; a negative radius hides the first part
-						// of the animation and feels like a delay after the click.
-						const radius = end * ease(progress);
-						const edge = Math.min(feather, radius);
-						root.style.setProperty(
-							'--navigation-wave-mask',
-							`radial-gradient(circle at ${x}px ${y}px, #000 ${Math.max(0, radius - edge)}px, transparent ${Math.max(0.01, radius + edge)}px)`
-						);
-						const size = Math.max(1, radius) / 0.65;
-						map.current?.setAttribute('x', String(x - size));
-						map.current?.setAttribute('y', String(y - size));
-						map.current?.setAttribute('width', String(size * 2));
-						map.current?.setAttribute('height', String(size * 2));
-						displacement.current?.setAttribute(
-							'scale',
-							String(height * 0.09 * settings.bend * settings.strength * Math.sin(Math.PI * progress))
-						);
+						paintWave(settings, progress, map.current, displacement.current);
 						if (progress < 1) raf = requestAnimationFrame(tick);
 					};
 					tick();
