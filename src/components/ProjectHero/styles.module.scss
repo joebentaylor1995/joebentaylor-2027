@@ -1,5 +1,4 @@
 .jacket {
-	--hero-copy-gap: var(--gap-l);
 	position: relative;
 	display: flex;
 	flex-direction: column;
@@ -7,23 +6,24 @@
 	color: var(--global-white);
 	background: var(--brand-c4);
 
+	// NOTE • Water redraws this shade in its shader — keep the stop and opacity
+	// in step with HERO_SHADE_START in ./framing.ts
 	&::after {
 		content: '';
 		position: absolute;
 		inset: 0;
 		z-index: 1;
 		pointer-events: none;
-		background: linear-gradient(to bottom, transparent, var(--global-black) 100svh);
-		opacity: 0.6;
+		background: linear-gradient(to bottom, transparent 59%, var(--global-black));
+		opacity: 0.4;
 	}
 
-	@include bp(l) {
-		--col-width: calc((100vw - var(--gap-xl) * 11 - var(--gap-xl)) / 12);
-		--hero-copy-gap: calc(var(--col-width) * 2 - var(--gap-xl));
-	}
-
+	// Water draws the settled copy into its canvas, so hide the DOM copy beneath it
 	&[data-water-text='true'] {
-		.title [data-wave-state='complete'], .description [data-wave-state='complete'] { -webkit-text-fill-color: transparent; }
+		.title [data-wave-state='complete'],
+		.label span { -webkit-text-fill-color: transparent; }
+
+		.label svg { fill-opacity: 0; }
 	}
 }
 
@@ -41,51 +41,20 @@
 	transform-origin: 50% 50svh;
 }
 
-.title, .description {
-	position: relative;
-	z-index: 3;
-	opacity: var(--project-text-opacity, 1);
-
-	waffl-grid {
-		padding-inline: var(--gap-l);
-
-		@include bp(l) { padding-inline: var(--gap-xl); }
-	}
-}
-
-.title {
+.copy {
 	position: relative;
 	// Keep the block reveal above the opaque water canvas until text hands over.
 	z-index: 3;
 	display: flex;
-	align-items: flex-end;
-	justify-content: flex-start;
-
-	min-height: 100svh;
-	padding-bottom: var(--hero-copy-gap);
-}
-
-.description { padding-bottom: var(--hero-copy-gap); }
-
-.copy {
-	position: relative;
-	z-index: 1;
-	display: flex;
 	flex-direction: column;
-	gap: var(--gap-l);
-	width: 100%;
+	justify-content: flex-end;
+	gap: var(--gap-s);
+	// Water reads this to size its shade to the viewport
+	min-height: 100svh;
 	padding: var(--gap-l);
-	background: linear-gradient(transparent, alpha(--global-black, 40));
+	opacity: var(--project-text-opacity, 1);
 
-	h1 { overflow-wrap: anywhere; }
-
-	p {
-		text-wrap: balance;
-		max-width: 77.6rem;
-	}
-
-	@include bp(l) {
-		gap: var(--gap-xl);
-		padding: var(--gap-xl);
-	}
+	@include bp(l) { padding: var(--gap-xl); }
 }
+
+.title { overflow-wrap: anywhere; }

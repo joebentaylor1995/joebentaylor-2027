@@ -5,6 +5,7 @@ import { createLiquidLayer, type LiquidLayer } from '../../Hero/Background/liqui
 import { liquidSettings } from '../../Hero/Background/liquid-settings';
 import { liquidVertex } from '../../Hero/Background/liquid-shaders';
 import { sceneIntros } from '../../Hero/Background/scene-intro';
+import { HERO_SHADE_START } from '../framing';
 
 // The shared water pass receives a covered project image instead of the homepage's depth portrait.
 export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageElement, host: HTMLElement) {
@@ -190,7 +191,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 				vec4 photo=texture2D(source,(imageUV-.5)*cover+.5);
 				float grey=dot(photo.rgb,vec3(.2126,.7152,.0722));
 				photo.rgb=mix(vec3(grey),photo.rgb,saturation);
-				photo.rgb*=1.-clamp((1.-uv.y)*shade.x,0.,1.)*shade.y;
+				photo.rgb*=1.-clamp(((1.-uv.y)*shade.x-${HERO_SHADE_START})/${1 - HERO_SHADE_START},0.,1.)*shade.y;
 				vec2 textUV=uv+vec2(0.,textOffset);
 				vec4 text=texture2D(textSource,textUV);
 				text.a*=step(0.,textUV.y)*step(textUV.y,1.);
@@ -206,6 +207,13 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			gl.deleteShader(shader);
 		}
 		gl.linkProgram(program);
+		// A cold shader cache compiles for ~200ms; reading LINK_STATUS straight
+		// away would block the page through the visitor's first scroll.
+		const parallel = gl.getExtension('KHR_parallel_shader_compile');
+		do {
+			await new Promise(resolve => setTimeout(resolve, 16));
+			if (disposed || gl.isContextLost()) return;
+		} while (parallel && !gl.getProgramParameter(program, parallel.COMPLETION_STATUS_KHR));
 		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('Project water shader failed');
 		position = gl.getAttribLocation(program, 'position');
 		cover = gl.getUniformLocation(program, 'cover');

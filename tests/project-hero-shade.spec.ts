@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 for (const width of [390, 1440]) {
-	test(`case-study shade reaches 60% at 100svh and stays there at ${width}px`, async ({ page }) => {
+	test(`case-study shade darkens the bottom 41% to 40% black at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
 		await page.route('**/_next/image/**', route =>
 			route.fulfill({
@@ -19,7 +19,7 @@ for (const width of [390, 1440]) {
 				if (!shade) return;
 				const [scale] = this.getUniform(program, shade) as Float32Array;
 				const viewport = this.getParameter(this.VIEWPORT) as Int32Array;
-				const pixels = [0.02, 0.5, 1, 1.1].map(depth => {
+				const pixels = [0.02, 0.5, 0.8, 1].map(depth => {
 					const pixel = new Uint8Array(4);
 					this.readPixels(
 						Math.floor(viewport[2] * 0.99),
@@ -40,7 +40,8 @@ for (const width of [390, 1440]) {
 		const pixels = await page.evaluate(
 			() => (window as unknown as { projectShadePixels: number[] }).projectShadePixels
 		);
-		for (const [index, expected] of [252, 179, 102, 102].entries())
+		// Untouched above 59% of the hero, then easing to 40% black at its foot
+		for (const [index, expected] of [255, 255, 203, 153].entries())
 			expect(Math.abs(pixels[index] - expected)).toBeLessThanOrEqual(2);
 
 		// Reduced motion uses the native image and must retain the same overlay.
@@ -50,8 +51,8 @@ for (const width of [390, 1440]) {
 			const style = getComputedStyle(element, '::after');
 			return { opacity: style.opacity, background: style.backgroundImage, height: style.height };
 		});
-		expect(native.opacity).toBe('0.6');
-		expect(native.background).toContain('100svh');
-		expect(Number.parseFloat(native.height)).toBeGreaterThan(900);
+		expect(native.opacity).toBe('0.4');
+		expect(native.background).toContain('59%');
+		expect(Number.parseFloat(native.height)).toBeCloseTo(900, 0);
 	});
 }

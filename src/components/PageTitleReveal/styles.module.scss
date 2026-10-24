@@ -33,6 +33,29 @@
 		&[data-wave-state='playing'] > span { opacity: var(--block-text); }
 		&[data-wave-state='complete']::after { display: none; }
 	}
+
+	&[data-reveal-variant='words'] {
+		// Mirrored by WORD_DURATION and WORD_STAGGER in index.tsx
+		--word-duration: 0.85s;
+		--word-stagger: 0.025s;
+
+		&[data-wave-state='waiting'] [data-reveal-word] {
+			opacity: 0;
+			transform: translateY(105%);
+		}
+
+		// Matches GSAP's power3.out
+		&[data-wave-state='playing'] [data-reveal-word] {
+			animation: word-reveal var(--word-duration) calc(var(--word-index) * var(--word-stagger)) cubic-bezier(0.215, 0.61, 0.355, 1) both;
+		}
+	}
+}
+
+@keyframes word-reveal {
+	from {
+		opacity: 0;
+		transform: translateY(105%);
+	}
 }
 
 .wordMask {
@@ -40,5 +63,10 @@
 	overflow: hidden;
 	vertical-align: bottom;
 
-	> span { display: inline-block; }
+	> span {
+		// Set per word inline; staggers the reveal
+		--word-index: 0;
+
+		display: inline-block;
+	}
 }

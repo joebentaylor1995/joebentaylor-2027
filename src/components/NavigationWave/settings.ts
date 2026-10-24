@@ -3,16 +3,16 @@ import { introEasings } from '@parts/Hero/Background/scene-intro';
 export const WAVE_STORAGE_KEY = 'jbt-navigation-wave-v1';
 export const WAVE_SETTINGS_CHANGED = 'navigation-wave:settings';
 export const waveDefaults = {
-	duration: 1250,
+	duration: 850,
 	originX: 50,
 	originY: 50,
-	width: 1,
-	softness: 1,
-	bend: 2.75,
-	strength: 1,
-	lensWidth: 1,
-	lensFalloff: 1,
-	ease: 'sine.out' as keyof typeof introEasings,
+	width: 0.75,
+	softness: 1.2,
+	bend: 2.2,
+	strength: 0.95,
+	lensWidth: 0.6,
+	lensFalloff: 1.45,
+	ease: 'sine.inOut' as keyof typeof introEasings,
 };
 export type WaveSettings = typeof waveDefaults;
 
@@ -46,3 +46,10 @@ export function readWaveSettings(): WaveSettings {
 	}
 	return settings;
 }
+
+// NOTE • The settings panel's midway preview: NavigationWave registers these to
+// draw (or clear) one point of the wave on the live page. Never saved.
+export const wavePreview: {
+	paint: ((progress: number) => void) | null;
+	clear: (() => void) | null;
+} = { paint: null, clear: null };

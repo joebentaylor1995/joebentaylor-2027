@@ -75,7 +75,8 @@ test('mobile project flows vertically, with a full-size hero and accessible cont
 	await expect(page.locator('[data-project-experience]')).not.toHaveAttribute('data-enhanced');
 	const hero = await page.locator('[data-project-hero]').boundingBox();
 	const panel = await page.locator('[data-project-panel]').boundingBox();
-	expect(hero?.height).toBeCloseTo(1060, 0);
+	// The hero is exactly one viewport; the overview follows straight after it
+	expect(hero?.height).toBeCloseTo(780, 0);
 	expect(panel?.y).toBeCloseTo((hero?.y ?? 0) + (hero?.height ?? 0), 0);
 	await expect(page.getByRole('button', { name: 'Return to the top of the project' })).toBeHidden();
 	await page

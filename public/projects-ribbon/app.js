@@ -10,7 +10,10 @@ const hostScene=window.frameElement?.closest('[data-profile-scene]');
 const scenePaused=()=>hostScene?.dataset.scenePaused==='true';
 // Phones keep drawing through the page crossfade, so the ribbon is already moving as it fades in
 const hostSuspended=()=>!hostActive||scenePaused()||document.hidden||(!mobile&&hostTransition());
-const canRender=()=>!scenePaused()&&!document.hidden&&(!hostPrepared||!hostSuspended());
+// One off-page frame repaints the gallery after a case study takes over, so the host's page wave
+// returns to the resting ribbon rather than replaying the project from its last expanded frame
+let restingFrame=false;
+const canRender=()=>!scenePaused()&&!document.hidden&&(!hostPrepared||restingFrame||!hostSuspended());
 function syncHostActivity(){
  clearTimeout(snapTimer);
  if(hostSuspended())idleMotion.reset(false);else idleMotion.drift();
@@ -31,6 +34,7 @@ window.addEventListener('message',event=>{
  hostActive=event.data.active===true;
  clearTimeout(snapTimer);target=position;scrollVelocity=0;
  syncHostActivity();
+ if(!hostActive&&(projectTransition.active||projectTransition.loading)){projectTransition.cancelReturn();projectTransition.close();restingFrame=true;requestRender();}
 });
 if(window.parent!==window)new MutationObserver(syncHostActivity).observe(window.parent.document.documentElement,{attributes:true,attributeFilter:['data-navigation-pending','data-navigation-wave']});
 if(hostScene)new MutationObserver(syncHostActivity).observe(hostScene,{attributes:true,attributeFilter:['data-scene-paused']});
@@ -399,6 +403,7 @@ function render(time){
  let wavePass=false;
  try{wavePass=!!loaderWave?.begin();}catch{gl.bindFramebuffer(gl.FRAMEBUFFER,null);loaderWave?.dispose();loaderWave=null;}
  renderScene(time);
+ restingFrame=false;
  if(wavePass)loaderWave.end();
  if(!hostPrepared){
   // Readiness follows an actual paint, which may have been deferred by Profile.

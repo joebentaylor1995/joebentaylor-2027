@@ -144,7 +144,11 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 					return heroTravel + revealTravel + contentTravel;
 				};
 				measure();
-				const update = (scroll: number) => {
+				const update = (raw: number) => {
+					// The hero has no scroll of its own, so the reveal starts at 0px. Sub-pixel
+					// ScrollTrigger rounding at the top must not open it: the return-to-top
+					// layer would then cover the hero and catch its clicks.
+					const scroll = raw < 1 ? 0 : raw;
 					const contentScroll = gsap.utils.clamp(0, contentTravel, scroll - heroTravel - revealTravel);
 					const reveal = gsap.utils.clamp(0, 1, (scroll - heroTravel) / revealTravel);
 					const textFade = gsap.utils.clamp(0, 1, reveal / 0.7);

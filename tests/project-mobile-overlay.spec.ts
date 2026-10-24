@@ -11,21 +11,21 @@ test('mobile overview scrolls over the settled hero and reverses', async ({ page
 	const height = await hero.evaluate(e => e.clientHeight);
 	await scroller.evaluate((e, top) => e.scrollTo({ top, behavior: 'instant' }), height - 796 + 199);
 	await expect.poll(async () => Math.round((await panel.boundingBox())?.y ?? 0)).toBe(597);
-	await expect(page.locator('[data-project-hero] p [data-wave-state]')).toHaveAttribute(
+	await expect(page.locator('[data-project-hero] h1 [data-wave-state]')).toHaveAttribute(
 		'data-wave-state',
 		'complete'
 	);
-	const descriptionBounds = await page.locator('[data-project-hero] p').boundingBox();
-	expect(descriptionBounds?.y).toBeGreaterThan(0);
-	expect((descriptionBounds?.y ?? 0) + (descriptionBounds?.height ?? 0)).toBeLessThan(796);
-	await page.screenshot({ path: 'test-results/mobile-description-reading.png' });
+	const titleBounds = await page.locator('[data-project-hero] h1').boundingBox();
+	expect(titleBounds?.y).toBeGreaterThan(0);
+	expect((titleBounds?.y ?? 0) + (titleBounds?.height ?? 0)).toBeLessThan(796);
+	await page.screenshot({ path: 'test-results/mobile-title-reading.png' });
 	for (const overlap of [100, 350]) {
 		await scroller.evaluate((e, top) => e.scrollTo({ top, behavior: 'instant' }), height - 796 + overlap);
 		await expect.poll(async () => Math.round((await panel.boundingBox())?.y ?? 0)).toBe(796 - overlap);
 		const bounds = await hero.boundingBox();
 		await expect
 			.poll(async () => {
-				const copy = await page.locator('[data-project-hero] p').boundingBox();
+				const copy = await page.locator('[data-project-hero] h1').boundingBox();
 				return (copy?.y ?? 0) + (copy?.height ?? 0);
 			})
 			.toBeLessThan(796 - overlap);

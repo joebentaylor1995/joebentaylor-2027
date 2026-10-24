@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test';
 for (const width of [440, 1440]) {
 	test(`header progressive blur follows scroll at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
-		await page.goto('/projects/pocketchange/');
+		// Case studies scroll under the header without the blur; other long pages keep it
+		await page.goto('/cookies/');
 		await page.getByRole('button', { name: 'Accept Necessary' }).click();
 		await expect(page.locator('[data-site-loader]')).toBeHidden({ timeout: 15000 });
 		const layers = page.locator('[data-header-blur] span');
@@ -25,3 +26,10 @@ for (const width of [440, 1440]) {
 		await expect(layers.first()).toHaveCSS('opacity', '0');
 	});
 }
+
+test('case studies render no header blur', async ({ page }) => {
+	await page.goto('/projects/pocketchange/');
+	await expect(page.locator('[data-site-loader]')).toBeHidden({ timeout: 15000 });
+	await expect(page.locator('header')).toBeVisible();
+	await expect(page.locator('[data-header-blur]')).toHaveCount(0);
+});
