@@ -37,6 +37,19 @@
 			}
 
 			.copy { grid-area: 1 / 1; }
+
+			// The held image drifts up at a third of the scroll while the panel rises over it.
+			// A scroll-driven animation runs off the main thread. Image, water and shade move
+			// together, so the water never redraws for it. Without support it simply holds still.
+			@supports (animation-timeline: scroll()) {
+				&::after,
+				.media,
+				> canvas {
+					animation: hero-parallax linear both;
+					animation-timeline: scroll(nearest block);
+					animation-range: 0 100svh;
+				}
+			}
 		}
 	}
 
@@ -80,3 +93,7 @@
 }
 
 .title { overflow-wrap: anywhere; }
+
+@keyframes hero-parallax {
+	to { translate: 0 calc(-100svh / 3); }
+}
