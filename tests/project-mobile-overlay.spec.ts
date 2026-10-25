@@ -31,7 +31,8 @@ test('mobile overview scrolls over the settled hero and reverses', async ({ page
 				return (copy?.y ?? 0) + (copy?.height ?? 0);
 			})
 			.toBeLessThan(796 - overlap);
-		expect(Math.round((bounds?.y ?? 0) + (bounds?.height ?? 0))).toBe(796);
+		// The held image drifts up at a third of the scroll (CSS scroll-driven parallax)
+		expect((bounds?.y ?? 0) + (bounds?.height ?? 0)).toBeCloseTo(796 - overlap / 3, 0);
 		expect(
 			await page.evaluate(() => document.elementFromPoint(220, 780)?.closest('[data-project-panel]') !== null)
 		).toBe(true);
