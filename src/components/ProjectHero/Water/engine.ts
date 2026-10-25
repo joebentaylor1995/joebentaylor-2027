@@ -57,6 +57,10 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 	const entrance = { portrait: 1, marqueeBoost: 0, waterReveal: 1, colour: 0 };
 	let previousReveal = Number.NaN;
 	const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
+	// NOTE • Only desktop bakes the title into the water. Phones run no fluid, and their title
+	// scrolls natively over the held image, so the DOM text stays visible above the canvas.
+	// Water remounts when the breakpoint changes, so this is read once.
+	const bakeText = matchMedia(mq.up.l).matches;
 	const draw = (_time: number, delta: number) => {
 		if (!layer || disposed || !visible || document.hidden || profileScene?.dataset.scenePaused === 'true') return;
 		if (!canvas.clientWidth || !canvas.clientHeight || gl.isContextLost()) return;
@@ -91,7 +95,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			gl.activeTexture(gl.TEXTURE1);
 			gl.bindTexture(gl.TEXTURE_2D, textTexture);
 			gl.uniform1i(textSource, 1);
-			gl.uniform1f(textOpacity, textAlpha);
+			gl.uniform1f(textOpacity, bakeText ? textAlpha : 0);
 			gl.uniform1f(textOffset, copyOffset / bounds.height);
 			gl.uniform1f(saturation, imageSaturation);
 			gl.uniform2f(shade, shadeScale, shadeOpacity);
@@ -107,7 +111,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		previousReveal = entrance.waterReveal;
 		framesRemaining -= dt;
 		canvas.dataset.ready = 'true';
-		host.dataset.waterText = 'true';
+		if (bakeText) host.dataset.waterText = 'true';
 		canvas.dataset.intro = entrance.waterReveal === 1 ? 'complete' : 'playing';
 	};
 	const destroy = () => {
@@ -155,7 +159,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			destroy();
 			return;
 		}
-		if (textTexture) {
+		if (textTexture && bakeText) {
 			// Keep the texture opaque on resize; the shader applies the live scroll fade.
 			const opacity = host.style.getPropertyValue('--project-text-opacity');
 			host.style.setProperty('--project-text-opacity', '1');

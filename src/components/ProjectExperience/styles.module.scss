@@ -5,21 +5,17 @@
 
 .stage { position: relative; }
 
-.hero {
-	position: relative;
-
-	@include bpd(l) {
-		@media (prefers-reduced-motion: no-preference) {
-			position: sticky;
-			top: var(--mobile-hero-top, 0);
-		}
-	}
-}
+.hero { position: relative; }
 
 .panel {
 	position: relative;
 	z-index: 2;
 	background: var(--brand-c4);
+
+	// Rise over the hero's held image (ProjectHero's second row) rather than after it
+	@include bpd(l) {
+		@media (prefers-reduced-motion: no-preference) { margin-top: -100svh; }
+	}
 }
 .returnToTop { display: none; }
 
