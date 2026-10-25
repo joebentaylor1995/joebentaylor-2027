@@ -39,49 +39,8 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 			if (!root || !lenis) return;
 			const media = gsap.matchMedia();
 			const outro = root.querySelector<HTMLElement>('[data-project-outro]');
-			media.add(`${mq.down.l} and (prefers-reduced-motion: no-preference)`, () => {
-				const heroLayer = root.querySelector<HTMLElement>('[data-project-hero-layer]');
-				if (!heroLayer) return;
-				const measureHero = () => {
-					root.style.setProperty(
-						'--mobile-hero-top',
-						`${Math.min(0, lenis.rootElement.clientHeight - heroLayer.offsetHeight)}px`
-					);
-				};
-				const resize = new ResizeObserver(measureHero);
-				resize.observe(heroLayer);
-				resize.observe(lenis.rootElement);
-				measureHero();
-				const panel = root.querySelector<HTMLElement>('[data-project-panel]');
-				const copy = heroLayer.querySelectorAll('[data-project-hero-copy]');
-				const hero = heroLayer.querySelector<HTMLElement>('[data-project-hero]');
-				if (panel) {
-					gsap.to(copy, {
-						y: () => -lenis.rootElement.clientHeight,
-						ease: 'none',
-						onUpdate: () => {
-							if (copy[0])
-								hero?.style.setProperty(
-									'--project-copy-offset',
-									String(gsap.getProperty(copy[0], 'y'))
-								);
-						},
-						scrollTrigger: {
-							trigger: panel,
-							scroller: lenis.rootElement,
-							start: 'top bottom',
-							end: 'top top',
-							scrub: true,
-							invalidateOnRefresh: true,
-						},
-					});
-				}
-				return () => {
-					resize.disconnect();
-					hero?.style.removeProperty('--project-copy-offset');
-					root.style.removeProperty('--mobile-hero-top');
-				};
-			});
+			// NOTE • Phones need no script for the hero: its image sticks in CSS and the title
+			// scrolls natively over it (ProjectHero styles)
 			media.add(`${mq.down.l} and (prefers-reduced-motion: no-preference)`, () => {
 				if (!outro) return;
 				gsap.fromTo(

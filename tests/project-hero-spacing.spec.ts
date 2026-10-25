@@ -19,14 +19,15 @@ for (const width of [375, 440, 768, 1440]) {
 		} else {
 			await expect(objectives).toBeVisible();
 		}
-		// The hero is one viewport tall, with the label and title set into its bottom-left corner
+		// The hero copy is one viewport tall, with the label and title set into its bottom-left corner
+		// (on phones the hero section runs a viewport longer, for the panel to rise over its held image)
 		const hero = page.locator('[data-project-hero]');
 		const layout = await hero.evaluate(e => {
-			const box = e.getBoundingClientRect();
 			const copy = e.querySelector('[data-project-hero-copy]');
 			const title = e.querySelector('h1')?.getBoundingClientRect();
 			const label = e.querySelector('h1')?.previousElementSibling?.getBoundingClientRect();
 			if (!copy || !title || !label) throw new Error('Hero copy, title or label missing');
+			const box = copy.getBoundingClientRect();
 			const style = getComputedStyle(copy);
 			return {
 				inset: Number.parseFloat(style.paddingLeft),

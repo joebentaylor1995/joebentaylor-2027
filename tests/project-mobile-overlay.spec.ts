@@ -5,10 +5,12 @@ test('mobile overview scrolls over the settled hero and reverses', async ({ page
 	await page.goto('/projects/pocketchange/');
 	await page.getByRole('button', { name: 'Accept Necessary' }).click();
 	await expect(page.locator('[data-site-loader]')).toBeHidden({ timeout: 15000 });
+	// The title block scrolls natively while the hero image holds behind the rising panel
 	const hero = page.locator('[data-project-hero-layer]');
+	const image = page.locator('[data-project-hero-media]');
 	const panel = page.locator('[data-project-panel]');
 	const scroller = page.locator('#page .lenis').first();
-	const height = await hero.evaluate(e => e.clientHeight);
+	const height = await page.locator('[data-project-hero-copy]').evaluate(e => e.clientHeight);
 	await scroller.evaluate((e, top) => e.scrollTo({ top, behavior: 'instant' }), height - 796 + 199);
 	await expect.poll(async () => Math.round((await panel.boundingBox())?.y ?? 0)).toBe(597);
 	await expect(page.locator('[data-project-hero] h1 [data-wave-state]')).toHaveAttribute(
@@ -22,7 +24,7 @@ test('mobile overview scrolls over the settled hero and reverses', async ({ page
 	for (const overlap of [100, 350]) {
 		await scroller.evaluate((e, top) => e.scrollTo({ top, behavior: 'instant' }), height - 796 + overlap);
 		await expect.poll(async () => Math.round((await panel.boundingBox())?.y ?? 0)).toBe(796 - overlap);
-		const bounds = await hero.boundingBox();
+		const bounds = await image.boundingBox();
 		await expect
 			.poll(async () => {
 				const copy = await page.locator('[data-project-hero] h1').boundingBox();
