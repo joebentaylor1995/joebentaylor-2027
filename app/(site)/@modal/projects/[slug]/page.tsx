@@ -7,6 +7,10 @@ import { getProject, getProjectSlugs, isModalCaseStudy } from '@/data/content';
 // ------------
 type Params = { params: Promise<{ slug: string }> };
 
+// NOTE • Same as projects/[slug]: this slot renders alongside that page, and a segment
+// still validated for instant navigation flags the whole route
+export const instant = false;
+
 // Static Params
 // ------------
 // NOTE • Mirrors projects/[slug] — slots at one segment level must render the same way
