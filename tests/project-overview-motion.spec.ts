@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('overview words, bottom heading and fitted cursor targets', async ({ page }) => {
 	await page.goto('/projects/pocketchange/');

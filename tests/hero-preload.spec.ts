@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const width of [390, 1440]) {
 	test(`hero preload reuses the displayed portrait at ${width}px`, async ({ page }) => {

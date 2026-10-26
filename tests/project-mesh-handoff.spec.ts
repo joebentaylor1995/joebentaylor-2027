@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
 import { readyProjects } from './helpers/ready-projects';
+import { expect, test } from './helpers/test';
 
 // These bindings live in the ribbon iframe. Function predicates avoid string
 // eval, which the production Content Security Policy deliberately blocks.

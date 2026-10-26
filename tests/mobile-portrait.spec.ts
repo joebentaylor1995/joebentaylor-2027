@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('mobile uses a static portrait and preserves controls across the breakpoint', async ({ page }) => {
 	await page.setViewportSize({ width: 768, height: 900 });

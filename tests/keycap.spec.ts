@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('keycap previews on hover and serves its matched click sounds', async ({ page, request }) => {
 	for (const direction of ['down', 'up']) {

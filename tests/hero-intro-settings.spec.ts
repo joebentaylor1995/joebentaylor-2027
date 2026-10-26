@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('desktop wave exposes optical and trailing ripple controls with replay', async ({ page }) => {
 	const errors: string[] = [];

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const width of [440, 1440]) {
 	test(`header progressive blur follows scroll at ${width}px`, async ({ page }) => {

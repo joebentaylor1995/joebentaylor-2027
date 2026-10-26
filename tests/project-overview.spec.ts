@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const width of [1440, 440]) {
 	test(`project overview matches its responsive layout at ${width}px`, async ({ page }) => {

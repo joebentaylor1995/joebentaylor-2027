@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('CSSDA Judge shares the external link cursor behaviour', async ({ page }) => {
 	await page.goto('/?modalSettings');

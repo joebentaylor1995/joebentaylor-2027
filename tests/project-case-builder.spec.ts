@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const width of [1440, 440]) {
 	test(`case study media layouts and scrolling at ${width}px`, async ({ page }) => {

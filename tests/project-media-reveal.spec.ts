@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const width of [440, 1440]) {
 	test(`media reveals once on entry and stays revealed at ${width}px`, async ({ page }) => {

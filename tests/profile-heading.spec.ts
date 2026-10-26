@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('modal headings reveal on open and on entering view, replaying each opening', async ({ page }) => {
 	await page.goto('/');

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('closing from the footer keeps content behind the retreating clip edge', async ({ page }) => {
 	await page.goto('/');

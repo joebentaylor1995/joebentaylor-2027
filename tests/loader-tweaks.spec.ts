@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('cinematic fade starts immediately after the logo while the hero settles slowly', async ({ page }) => {
 	await page.goto('/projects/pocketchange/?loaderTweaks');

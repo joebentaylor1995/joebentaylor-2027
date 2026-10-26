@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 for (const width of [1440, 440]) {
 	test(`services wave peaks and reverses at ${width}px`, async ({ page }) => {

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 
 test('direct projects entry uses the wave and settings require the projectSettings URL', async ({ page }) => {
 	const errors: string[] = [];
