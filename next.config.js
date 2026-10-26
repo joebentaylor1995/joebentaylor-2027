@@ -279,6 +279,15 @@ const nextConfig = {
 		return [{ source: '/((?!studio).*)', headers: securityHeaders }];
 	},
 
+	// Email signature images moved into /email/ — keep the old URLs working for
+	// signatures and already-sent emails that still point at the root
+	async redirects() {
+		return [
+			{ source: '/pp.jpg', destination: '/email/pp.jpg', permanent: true },
+			{ source: '/logo.jpg', destination: '/email/logo.jpg', permanent: true },
+		];
+	},
+
 	// The profile panel is an overlay, not a page — /profile/ is the address
 	// Sanity's Presentation tool uses for it (src/utils/profileRoute.ts). Loading
 	// it directly lands on the homepage with the panel open.
