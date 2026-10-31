@@ -1,115 +1,115 @@
 // Styles: Hero/Content
-// ---------------
+// ------------
 .content {
-    position: relative;
-    z-index: 2;
+	position: relative;
+	z-index: 2;
 
-    display: flex;
-    align-items: flex-end;
+	display: flex;
+	align-items: flex-end;
 
-    flex: none;
-    padding-bottom: var(--gap-l);
-    width: 100%;
-    height: auto;
+	flex: none;
+	padding-bottom: var(--gap-l);
+	width: 100%;
+	height: auto;
 
-    @include bp(m) {
-        justify-self: flex-start;
-        height: 100%;
-    }
+	@include bp(m) {
+		justify-self: flex-start;
+		height: 100%;
+	}
 
-    hgroup {
-        display: flex;
-        flex-direction: column;
-        gap: var(--gap-sm);
-        max-width: 50rem;
+	hgroup {
+		display: flex;
+		flex-direction: column;
+		gap: var(--gap-sm);
+		max-width: 50rem;
 
-        @include bp(m) { max-width: 40rem; }
-    }
+		@include bp(m) { max-width: 40rem; }
+	}
 
-    > * {
-        margin-inline: 0;
-        padding-inline: var(--gap-l);
-        width: 100%;
-    }
+	> * {
+		margin-inline: 0;
+		padding-inline: var(--gap-l);
+		width: 100%;
+	}
 
-    h1 {
-        --color: var(--global-white);
-        color: var(--global-white);
-    }
-    h1 span { color: var(--global-white); }
-    h1 svg { fill: var(--global-white); }
+	h1 {
+		--color: var(--global-white);
+		color: var(--global-white);
+	}
+	h1 span { color: var(--global-white); }
+	h1 svg { fill: var(--global-white); }
 
-    p {
-        color: var(--global-white);
-        text-wrap: pretty;
-    }
+	p {
+		color: var(--global-white);
+		text-wrap: pretty;
+	}
 
-    // Landscape tablets. The height check leaves landscape phones, which are also over 700px wide, alone.
-    @include bp(m) {
-        @media (orientation: landscape) and (height >= 600px) {
-            flex: 1;
-            align-items: center;
+	// Landscape tablets. The height check leaves landscape phones, which are also over 700px wide, alone.
+	@include bp(m) {
+		@media (orientation: landscape) and (height >= 600px) {
+			flex: 1;
+			align-items: center;
 
-            h1 {
-                --color: var(--brand-c4);
-                color: var(--brand-c4);
-            }
-            h1 span { color: var(--brand-c4); }
-            h1 svg { fill: var(--brand-c4); }
+			h1 {
+				--color: var(--brand-c4);
+				color: var(--brand-c4);
+			}
+			h1 span { color: var(--brand-c4); }
+			h1 svg { fill: var(--brand-c4); }
 
-            p {
-                color: alpha(var(--brand-c4), 60);
-                text-wrap: balance;
-            }
-        }
+			p {
+				color: alpha(var(--brand-c4), 60);
+				text-wrap: balance;
+			}
+		}
 
         
-    }
+	}
 
-    @include heroDesktop {
-        [data-liquid-ready="true"] & { opacity: 0; }
-        z-index: 1;
-        padding-bottom: var(--gap-xl);
-        height: 50vh;
-        height: 50svh;
+	@include heroDesktop {
+		[data-liquid-ready="true"] & { opacity: 0; }
+		z-index: 1;
+		padding-bottom: var(--gap-xl);
+		height: 50vh;
+		height: 50svh;
 
-        hgroup { max-width: min(28vw, 40rem); }
+		hgroup { max-width: min(28vw, 40rem); }
 
-        > * { padding-inline: revert-layer; }
+		> * { padding-inline: revert-layer; }
 
-        h1 {
-            --color: var(--brand-c4);
-            color: var(--brand-c4);
-        }
-        h1 span { color: var(--brand-c4); }
-        h1 svg { fill: var(--brand-c4); }
+		h1 {
+			--color: var(--brand-c4);
+			color: var(--brand-c4);
+		}
+		h1 span { color: var(--brand-c4); }
+		h1 svg { fill: var(--brand-c4); }
 
-        p {
-            color: alpha(var(--brand-c4), 60);
-            text-wrap: balance;
-        }
-    }
+		p {
+			color: alpha(var(--brand-c4), 60);
+			text-wrap: balance;
+		}
+	}
 }
 
 .heading {
-    position: relative;
-    width: fit-content;
+	position: relative;
+	width: fit-content;
 }
 
 .wipe {
-    position: absolute;
-    inset: 0;
-    background: var(--brand-c4);
-    transform: scaleX(0);
-    pointer-events: none;
+	position: absolute;
+	inset: 0;
+	background: var(--brand-c4);
+	transform: scaleX(0);
+	pointer-events: none;
 }
 
 .wordMask {
-    display: inline-block;
-    overflow: clip;
-    vertical-align: top;
+	display: inline-block;
+	overflow: clip;
+	vertical-align: top;
 }
 
 .word {
-    display: inline-block;
+	display: inline-block;
 }
