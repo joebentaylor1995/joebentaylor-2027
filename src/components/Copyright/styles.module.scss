@@ -1,78 +1,78 @@
 // Styles: Copyright
-// ---------------
+// ------------
 
 .copyright {
-    --offset: var(--gap-m);
-    --width: 100%;
+	--offset: var(--gap-m);
+	--width: 100%;
 
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--gap-s);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--gap-s);
 
-    position: relative;
-    z-index: 2;
-    width: auto;
-    margin: var(--gap-sm) var(--gap-l) 0;
-    text-align: center;
+	position: relative;
+	z-index: 2;
+	width: auto;
+	margin: var(--gap-sm) var(--gap-l) 0;
+	text-align: center;
 
-    pointer-events: none;
-    user-select: none;
+	pointer-events: none;
+	user-select: none;
 
-    @include heroDesktop {
-        --offset: var(--gap-l);
-        position: absolute;
-        inset: auto auto var(--offset) 50%;
-        transform: translateX(-50%);
-        width: var(--width);
-        margin: 0;
-    }
+	@include heroDesktop {
+		--offset: var(--gap-l);
+		position: absolute;
+		inset: auto auto var(--offset) 50%;
+		transform: translateX(-50%);
+		width: var(--width);
+		margin: 0;
+	}
 
-    @include heroDesktop {
-        --offset: var(--gap-xl);
-        --width: calc((100vw - 7 * var(--gap-xl)) / 6);
-    }
+	@include heroDesktop {
+		--offset: var(--gap-xl);
+		--width: calc((100vw - 7 * var(--gap-xl)) / 6);
+	}
 
-    em {
-        display: inline-block;
-        font-style: normal;
-        color: alpha(var(--global-white), 40);
+	em {
+		display: inline-block;
+		font-style: normal;
+		color: alpha(var(--global-white), 40);
 
-        @include heroDesktop {
-            color: alpha(var(--global-white), 60);
-        }
-    }
+		@include heroDesktop {
+			color: alpha(var(--global-white), 60);
+		}
+	}
 
-    .line {
-        flex: 1;
-        height: 1px;
-        background: alpha(var(--global-white), 20);
-    }
+	.line {
+		flex: 1;
+		height: 1px;
+		background: alpha(var(--global-white), 20);
+	}
 
-    .digitClip {
-        display: inline-block;
-        overflow: clip;
-        vertical-align: top;
-    }
+	.digitClip {
+		display: inline-block;
+		overflow: clip;
+		vertical-align: top;
+	}
 
-    .digit {
-        display: inline-block;
-    }
+	.digit {
+		display: inline-block;
+	}
 
-    @each $side in left, right {
-        @for $digit from 0 through 3 {
-            [data-copyright-year='#{$side}'] .digitClip:nth-child(#{$digit + 2}) .digit {
-                transform: translateY(var(--#{$side}-#{$digit}, 0%));
-            }
-        }
-    }
+	@each $side in left, right {
+		@for $digit from 0 through 3 {
+			[data-copyright-year='#{$side}'] .digitClip:nth-child(#{$digit + 2}) .digit {
+				transform: translateY(var(--#{$side}-#{$digit}, 0%));
+			}
+		}
+	}
 
-    .yearText {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip-path: inset(50%);
-        white-space: nowrap;
-    }
+	.yearText {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
 }
