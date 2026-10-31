@@ -2,7 +2,7 @@
 // ------------
 import type { Logo } from './LogoMarquee/interface';
 
-// Exports
+// Types
 // ------------
 export interface HeroProps {
 	heading: string;

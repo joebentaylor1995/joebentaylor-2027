@@ -1,10 +1,10 @@
 'use client';
 
+// Imports
+// ------------
 import { readIntroProfiles } from '@parts/Hero/Background/intro-storage';
 import { sceneIntros } from '@parts/Hero/Background/scene-intro';
 import { HERO_DESKTOP_QUERY } from '@parts/Hero/layout';
-// Imports
-// ------------
 import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -14,7 +14,7 @@ import { BAR_SLOTS, CUT_SLOTS, createIntro, INTRO_FPS, INTRO_FRAMES, INTRO_LAST_
 import { BEN, JOE, LOGO, LOGO_BOX } from './logoPaths';
 import { MOBILE_SCALE_DURATION, MOBILE_SCALE_EASE } from './mobile-intro';
 import { LOADER_REPLAY, loaderControl, loaderSettings } from './settings';
-// Styles
+// Styles + Interfaces
 // ------------
 import s from './styles.module.scss';
 import { renderRevealWindow } from './window-reveal';
@@ -28,11 +28,16 @@ const WASH_BLUR = 1.2 * ARTBOARD_SCALE;
 
 // Component
 // ------------
+// NOTE • The full-screen intro: a glitch-style wordmark animation that plays frame by
+// frame, then a reveal (fade, window or circular wave, depending on the page) that
+// uncovers the site. One GSAP timeline drives it all; it starts paused and is played
+// once first-view assets are ready.
 const SiteLoader = () => {
 	// Refs
 	const ref = useRef<HTMLDivElement>(null);
 	const finished = useRef(false);
 	const id = useId().replaceAll(':', '');
+	// SVG ids must be unique per instance, so they hang off a React id
 	const ids: IntroIds = {
 		joe: `${id}-joe`,
 		ben: `${id}-ben`,
@@ -70,11 +75,15 @@ const SiteLoader = () => {
 		({ reduced }) => {
 			const root = ref.current;
 			if (!root) return;
+
+			// Already finished (the animation re-ran after completing): keep the loader hidden
 			if (finished.current) {
 				document.documentElement.removeAttribute('data-loader-boot');
 				gsap.set(root, { autoAlpha: 0, pointerEvents: 'none' });
 				return;
 			}
+
+			// Elements the timeline drives
 			const circle = root.querySelector('[data-circle-aperture]');
 			const revealWindow = root.querySelector('[data-window-aperture]');
 			const wash = root.querySelector('[data-logo-wash]');
@@ -83,6 +92,8 @@ const SiteLoader = () => {
 			const svg = root.querySelector<SVGSVGElement>('[data-loader-svg]');
 			const intro = root.querySelector('[data-intro]');
 			const final = root.querySelector('[data-final]');
+
+			// Measurements and page context; together they decide which reveal plays
 			const logoWidth = mark?.getBoundingClientRect().width || 120;
 			const width = window.innerWidth;
 			const height = window.innerHeight;
@@ -96,6 +107,7 @@ const SiteLoader = () => {
 			// over the ready scene, exactly as on the homepage
 			const windowReveal = !mobile && !homepage && !projectsListing && loaderSettings.revealEffect === 'window';
 			const fadeReveal = !mobile && !homepage && !projectsListing && loaderSettings.revealEffect === 'fade';
+
 			const entrancePath = window.location.pathname;
 			// The slow zoom can outlive the loader. Never apply it to a project
 			// reached through a subsequent, already-framed ribbon transition.
@@ -103,8 +115,11 @@ const SiteLoader = () => {
 				window.location.pathname === entrancePath
 					? document.querySelector<HTMLElement>('[data-project-hero]')
 					: null;
+
 			const projectHero =
 				!homepage && !windowReveal ? document.querySelector<HTMLElement>('[data-project-hero]') : null;
+
+			// Mirrors the reveal's progress (0 to 1) onto the projects iframe or the project hero's water shader
 			const setProjectWave = (progress: number) => {
 				if (projectsListing) {
 					document
@@ -117,6 +132,8 @@ const SiteLoader = () => {
 				const entrance = projectHero && sceneIntros.get(projectHero);
 				if (entrance) entrance.waterReveal = fadeReveal ? 1 : progress;
 			};
+
+			// Reset to the starting state: loader opaque, apertures closed, intro frames visible
 			root.dataset.outro = fadeReveal ? 'fade' : windowReveal ? 'window' : 'wave';
 			root.dataset.revealOrigin = loaderSettings.revealOrigin;
 			delete root.dataset.webglReveal;
@@ -130,8 +147,11 @@ const SiteLoader = () => {
 			gsap.set(final, { visibility: 'hidden' });
 			gsap.set(mark, { opacity: 1 });
 			renderRevealWindow(revealWindow, width, height, loaderSettings.revealOrigin, 0);
+
 			const { revealGap, speed } = loaderSettings;
 			if (fadeReveal && !reduced) renderFade(root, mark, zoomHero(), 0);
+
+			// Timeline: built paused, played by `start` below
 			let stopWaitingForScene = () => {};
 			const tl = gsap.timeline({
 				paused: true,
@@ -143,6 +163,8 @@ const SiteLoader = () => {
 					settleLoader();
 				},
 			});
+
+			// Reduced motion (or no SVG) skips the intro and just shows the final mark then fades
 			if (reduced || !svg) {
 				gsap.set(final, { visibility: 'visible' });
 				tl.call(revealScene).to(root, { autoAlpha: 0, pointerEvents: 'none', duration: 0.15 });
@@ -150,8 +172,11 @@ const SiteLoader = () => {
 				// The glitch intro: one discrete state per source frame.
 				const render = createIntro(svg, ids);
 				render({});
+				// cutAt is when the reveal begins on non-homepage routes: after the last frame, but never before pageRevealAt
 				const cutAt = Math.max(INTRO_LAST_FRAME / INTRO_FPS, loaderSettings.pageRevealAt);
 				const { revealDuration, revealOrigin } = loaderSettings;
+
+				// Scrubs the loader to an arbitrary time for the tweak panel's preview
 				loaderControl.preview = time => {
 					tl.pause();
 					loaderControl.previewTime = time;
@@ -161,6 +186,7 @@ const SiteLoader = () => {
 					gsap.set(circle, { attr: { r: 0 } });
 					gsap.set(wash, { attr: { r: 0 } });
 					gsap.set(ring, { opacity: 0 });
+
 					const progress = Math.max(0, Math.min(1, (time - cutAt) / (windowReveal ? revealDuration : 1.35)));
 					root.dataset.revealing = String(progress > 0);
 					if (fadeReveal) {
@@ -180,6 +206,7 @@ const SiteLoader = () => {
 						});
 						gsap.set(mark, { opacity: 1 });
 					}
+
 					const landed = time >= INTRO_LAST_FRAME / INTRO_FPS;
 					gsap.set(intro, { visibility: landed ? 'hidden' : 'visible' });
 					gsap.set(final, { visibility: landed ? 'visible' : 'hidden' });
@@ -187,6 +214,7 @@ const SiteLoader = () => {
 						if (Number(frame) / INTRO_FPS <= time) render(state);
 					}
 				};
+				// Each source frame becomes a timeline call at its timestamp
 				for (const [frame, state] of Object.entries(INTRO_FRAMES)) {
 					tl.call(render, [state], Number(frame) / INTRO_FPS);
 				}
@@ -198,12 +226,13 @@ const SiteLoader = () => {
 					.call(landLoader, [], landedAt);
 
 				// One wavefront removes the stationary logo and opens the scene.
+				// Timestamp the reveal starts: phones go on landing, the homepage waits revealGap after it, other pages wait for cutAt
 				const revealAt = fadeReveal ? cutAt : mobile ? landedAt : homepage ? landedAt + revealGap : cutAt;
 				const wave = { radius: 0 };
 				// quickSetter does not expand the CSSPlugin's multi-property "scale" alias.
 				const setRingScaleX = gsap.quickSetter(ring, 'scaleX');
 				const setRingScaleY = gsap.quickSetter(ring, 'scaleY');
-				// Wave reveals need the first GPU frame. A project fade can reveal
+				// NOTE • Wave reveals need the first GPU frame. A project fade can reveal
 				// the existing hero image immediately while its water shader warms up.
 				if (homepage || projectsListing || (projectHero && !fadeReveal))
 					tl.addPause(revealAt, () => {
@@ -245,8 +274,11 @@ const SiteLoader = () => {
 							window.clearTimeout(timeout);
 						};
 					});
+
 				tl.set(root, { attr: { 'data-revealing': 'true' } }, revealAt);
 				if (!homepage && !fadeReveal) tl.call(revealScene, [], revealAt);
+
+				// Reveal variants: fade, window, phone fade-out, or circular wave
 				if (fadeReveal) {
 					const fade = { elapsed: 0 };
 					tl.call(revealScene, [], revealAt)
@@ -319,6 +351,7 @@ const SiteLoader = () => {
 						.to(ring, { opacity: 0, duration: 0.45 }, revealAt + 0.9)
 						.set(root, { autoAlpha: 0, pointerEvents: 'none' }, revealAt + waveDuration);
 			}
+
 			// Wait for first-view assets, with a deadline for slow or failed requests.
 			let active = true;
 			let started = false;
@@ -333,6 +366,7 @@ const SiteLoader = () => {
 			tl.timeScale(speed);
 			loaderControl.timeline = tl;
 			const deadline = window.setTimeout(start, 1500);
+			// Fonts and eager images must be ready before the timeline plays
 			const images = Array.from(document.images).filter(
 				image => image.loading === 'eager' || image.fetchPriority === 'high'
 			);
@@ -340,6 +374,7 @@ const SiteLoader = () => {
 				document.fonts.ready,
 				...images.map(image => image.decode().catch(() => undefined)),
 			]).then(start, start);
+
 			return () => {
 				active = false;
 				setProjectWave(1);
@@ -353,13 +388,16 @@ const SiteLoader = () => {
 		{ reduced: '(prefers-reduced-motion: reduce)' }
 	);
 
-	// Render
+	// Derived
+	// Oversized mask area so the wash circle can grow past the logo's edges
 	const maskBox = {
 		x: -LOGO_BOX.width,
 		y: -LOGO_BOX.width,
 		width: LOGO_BOX.width * 3,
 		height: LOGO_BOX.width * 2 + LOGO_BOX.height,
 	};
+
+	// Render
 	return (
 		<div ref={ref} className={s.jacket} data-site-loader data-loader-overlay aria-hidden='true'>
 			<svg className={s.veil} width='100%' height='100%' aria-hidden='true'>
@@ -457,4 +495,6 @@ const SiteLoader = () => {
 	);
 };
 
+// Exports
+// ------------
 export default SiteLoader;

@@ -1,7 +1,12 @@
+// Imports
+// ------------
 import type { ReactNode } from 'react';
 import type { DepthSettings } from '../effect-settings';
 import type { LiquidSettings } from '../liquid-settings';
 import type { IntroSettings } from '../scene-intro';
+
+// Types
+// ------------
 export interface SettingsProps {
 	intro: IntroSettings;
 	introTarget: 'mobile' | 'desktop';

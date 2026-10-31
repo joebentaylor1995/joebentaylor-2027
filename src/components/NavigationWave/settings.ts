@@ -1,7 +1,13 @@
+// Imports
+// ------------
 import { introEasings } from '@parts/Hero/Background/scene-intro';
 
+// Constants
+// ------------
 export const WAVE_STORAGE_KEY = 'jbt-navigation-wave-v1';
 export const WAVE_SETTINGS_CHANGED = 'navigation-wave:settings';
+
+// Defaults: duration in ms, origin as a percent of the viewport, the rest tune the wave's shape
 export const waveDefaults = {
 	duration: 850,
 	originX: 50,
@@ -14,8 +20,12 @@ export const waveDefaults = {
 	lensFalloff: 1.45,
 	ease: 'sine.inOut' as keyof typeof introEasings,
 };
+
+// Types
+// ------------
 export type WaveSettings = typeof waveDefaults;
 
+// [key, label, min, max, step] for each numeric setting; saved values are clamped to these
 export const waveRanges = [
 	['duration', 'Duration (ms)', 250, 3000, 50],
 	['originX', 'Origin X (%)', 0, 100, 1],
@@ -28,6 +38,9 @@ export const waveRanges = [
 	['lensFalloff', 'Lens falloff', 0.1, 4, 0.05],
 ] as const;
 
+// Helpers
+// ------------
+// Defaults overlaid with any valid saved values; storage problems never block navigation
 export function readWaveSettings(): WaveSettings {
 	const settings = { ...waveDefaults };
 	if (typeof window === 'undefined') return settings;
@@ -47,6 +60,8 @@ export function readWaveSettings(): WaveSettings {
 	return settings;
 }
 
+// Store
+// ------------
 // NOTE • The settings panel's midway preview: NavigationWave registers these to
 // draw (or clear) one point of the wave on the live page. Never saved.
 export const wavePreview: {

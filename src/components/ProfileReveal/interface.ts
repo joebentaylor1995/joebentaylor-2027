@@ -1,5 +1,9 @@
+// Imports
+// ------------
 import type { ReactNode } from 'react';
 
+// Types
+// ------------
 export interface ProfileRevealProps {
 	children: ReactNode;
 	profile?: ReactNode;

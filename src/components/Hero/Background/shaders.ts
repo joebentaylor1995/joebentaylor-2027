@@ -1,3 +1,6 @@
+// Shaders
+// ------------
+// The hero portrait: a depth-mapped photo whose layers shift with the pointer and scroll.
 export const vertex = `
 	attribute vec2 position;
 	varying vec2 v;
@@ -7,6 +10,9 @@ export const vertex = `
 	}
 `;
 
+// Reads the photo, a depth mask and a colour pass. Shifts the image along a ray through the
+// depth map for parallax, blurs and ghosts it with scroll speed, and lights the fingertips
+// near the cursor.
 export const fragment = `
 	precision highp float;
 	varying vec2 v;

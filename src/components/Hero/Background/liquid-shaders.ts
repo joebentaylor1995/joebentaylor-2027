@@ -1,5 +1,10 @@
-// Full-screen passes, compatible with the existing WebGL 1 portrait renderer.
+// Shaders
 // ------------
+// Full-screen passes, compatible with the existing WebGL 1 portrait renderer.
+// Each fragment body is appended to `header`, so `uv`, `px` (one texel of the sim grid)
+// and `source` (the input texture) are always available.
+// Passes run in the order the fluid sim needs: curl, vorticity, divergence, pressure,
+// gradient and advect, then composite and display.
 export const liquidVertex = `
 	attribute vec2 position;
 	varying vec2 uv;
@@ -8,12 +13,15 @@ export const liquidVertex = `
 		gl_Position = vec4(position, 0., 1.);
 	}
 `;
+
 export const header = `
 	precision highp float;
 	varying vec2 uv;
 	uniform vec2 px;
 	uniform sampler2D source;
 `;
+
+// Moves `source` along the `flow` velocity field, fading by `decay`
 export const advect = `
 	uniform sampler2D flow;
 	uniform float dt, decay;
@@ -21,6 +29,8 @@ export const advect = `
 		gl_FragColor = texture2D(source, uv - dt * texture2D(flow, uv).xy * px) * decay;
 	}
 `;
+
+// Adds a Gaussian blob along the pointer segment from `previous` to `point`
 export const splat = `
 	uniform vec2 point, previous, aspect;
 	uniform vec3 amount;
@@ -32,6 +42,8 @@ export const splat = `
 		gl_FragColor = texture2D(source, uv) + vec4(amount * exp(-r * r / radius), 0.);
 	}
 `;
+
+// How much the velocity field spreads out from each cell
 export const divergence = `
 	void main() {
 		float l = texture2D(source, uv - vec2(px.x, 0.)).x, r = texture2D(source, uv + vec2(px.x, 0.)).x;
@@ -39,6 +51,8 @@ export const divergence = `
 		gl_FragColor = vec4(.5 * (r - l + t - b), 0., 0., 1.);
 	}
 `;
+
+// How much the velocity field rotates at each cell
 export const curl = `
 	void main() {
 		float l = texture2D(source, uv - vec2(px.x, 0.)).y, r = texture2D(source, uv + vec2(px.x, 0.)).y;
@@ -46,6 +60,8 @@ export const curl = `
 		gl_FragColor = vec4(.5 * (r - l - t + b), 0., 0., 1.);
 	}
 `;
+
+// Pushes velocity to keep swirls alive, scaled by `swirl`
 export const vorticity = `
 	uniform sampler2D rotation;
 	uniform float dt, swirl;
@@ -59,6 +75,8 @@ export const vorticity = `
 		gl_FragColor = vec4(clamp(texture2D(source, uv).xy + f * dt, vec2(-700.), vec2(700.)), 0., 1.);
 	}
 `;
+
+// One Jacobi iteration of the pressure solve
 export const pressure = `
 	uniform sampler2D divergence;
 	void main() {
@@ -67,6 +85,8 @@ export const pressure = `
 		gl_FragColor = vec4((l + r + b + t - texture2D(divergence, uv).x) * .25, 0., 0., 1.);
 	}
 `;
+
+// Subtracts the pressure gradient so the velocity stays divergence-free
 export const gradient = `
 	uniform sampler2D pressure;
 	void main() {
@@ -75,7 +95,8 @@ export const gradient = `
 		gl_FragColor = vec4(texture2D(source, uv).xy - vec2(r - l, t - b) * .5, 0., 1.);
 	}
 `;
-// In front mode the portrait joins the scene before refraction.
+
+// Phone composite: just the portrait over the background, with a dark scrim toward the bottom
 export const mobileComposite = `
 	uniform vec3 background;
 	void main() {
@@ -85,6 +106,10 @@ export const mobileComposite = `
 		gl_FragColor = vec4(col, 1.);
 	}
 `;
+
+// Builds the `scene` texture: scrolling logo strip, marquee label, then (in front mode)
+// the portrait and hero text on top.
+// In front mode the portrait joins the scene before refraction.
 export const composite = `
 	uniform sampler2D logos, decoration, content;
 	uniform vec3 background;
@@ -125,6 +150,9 @@ export const composite = `
 		gl_FragColor = vec4(col, 1.);
 	}
 `;
+
+// Final screen pass. The intro wave is an analytic ring (meniscus) that bends the scene and
+// reveals it from `revealDark`; the pointer fluid adds a height field that refracts it.
 // Behind mode composites the premultiplied portrait after water shading,
 // retaining its translucent scroll trails and soft edges.
 export const display = `
@@ -174,10 +202,13 @@ export const display = `
 		vec2 revealBend = lensNormal / vec2(revealAspect, 1.) * .095;
 		vec2 slope = vec2(r - l, t - b) * 3.4 + lensNormal * .35, bend = (slope - lensNormal * .35) * refraction + revealBend;
 		vec3 n = normalize(vec3(-slope, 1.));
+		// Sample the scene through the combined bend, splitting red and blue for dispersion
 		vec3 col = texture2D(scene, uv + bend).rgb;
 		vec2 chromaticBend = (bend - revealBend) * dispersion + revealBend * dispersion * waveLensChroma;
 		col.r = texture2D(scene, uv + bend + chromaticBend).r;
 		col.b = texture2D(scene, uv + bend - chromaticBend).b;
+
+		// Lighting on the water surface: pearl tint, highlights and a slight darkening
 		float ridge = clamp(length(slope) * 2.6, 0., 1.), light = dot(n, normalize(vec3(-.45, .65, .7)));
 		float shine = pow(max(0., dot(n, normalize(vec3(-.35, .5, 1.)))), 28.);
 		float opposite = pow(max(0., dot(n, normalize(vec3(.5, -.35, 1.)))), 22.);
@@ -197,6 +228,8 @@ export const display = `
 		float revealed = 1. - smoothstep(-feather, feather, distanceFromCentre - radius);
 		if (waterReveal >= 1.) revealed = 1.;
 		col = mix(revealDark, col, revealed);
+
+		// Extra shading on the wave itself: shadow, reflection and a faint caustic
 		vec3 waveNormal = normalize(vec3(-lensNormal * 1.8, 1.));
 		float fresnel = pow(1. - waveNormal.z, 3.);
 		float reflection = pow(max(0., dot(waveNormal, normalize(vec3(-.45, .65, 1.)))), 32.);

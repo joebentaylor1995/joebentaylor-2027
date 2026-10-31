@@ -1,5 +1,8 @@
+// Constants
+// ------------
 // Rasterise the stationary marquee decoration from its rendered CSS layout.
 // The scrolling logo texture remains separate so the heading and rule stay fixed.
+// The desktop label cycles through these, one per scroll gesture (see liquid.ts).
 export const marqueePhrases = [
 	'Trusted by',
 	'Loved by',
@@ -10,6 +13,10 @@ export const marqueePhrases = [
 	'Chosen by',
 ];
 
+// Helpers
+// ------------
+// Draws the marquee's top rule and label into a fresh canvas the size of `canvas`.
+// `phrase` replaces the desktop label text; the mobile label is drawn as it is in the DOM.
 export function drawMarqueeDecoration(
 	canvas: HTMLCanvasElement,
 	host: HTMLElement,
@@ -24,6 +31,8 @@ export function drawMarqueeDecoration(
 	const ctx = raster.getContext('2d');
 	if (!ctx) throw new Error('Marquee decoration canvas unavailable');
 	ctx.scale(raster.width / bounds.width, raster.height / bounds.height);
+
+	// Top rule: the marquee's CSS top border
 	const marquee = host.querySelector<HTMLElement>('[data-logo-marquee]');
 	if (!marquee) return raster;
 	const box = marquee.getBoundingClientRect();
@@ -33,6 +42,8 @@ export function drawMarqueeDecoration(
 		ctx.fillStyle = style.borderTopColor;
 		ctx.fillRect(box.left - bounds.left, box.top - bounds.top, box.width, border);
 	}
+
+	// Label: copy the heading's font, colour and spacing
 	const heading = marquee.querySelector('h2');
 	if (!heading) return raster;
 	const h = heading.getBoundingClientRect();
@@ -43,15 +54,18 @@ export function drawMarqueeDecoration(
 	ctx.letterSpacing = css.letterSpacing === 'normal' ? '0px' : css.letterSpacing;
 	ctx.fillStyle = css.color;
 	ctx.textBaseline = 'alphabetic';
+
 	// Only measure the visible responsive label, not its hidden mobile sibling.
 	const original = heading.innerText.trim();
 	const isMobile = css.display === 'flex';
 	let text = isMobile ? original : (phrase ?? original);
 	if (css.textTransform === 'uppercase') text = text.toUpperCase();
 	else if (css.textTransform === 'lowercase') text = text.toLowerCase();
+
 	const left = parseFloat(css.paddingLeft) + (parseFloat(css.borderLeftWidth) || 0);
 	const top = parseFloat(css.paddingTop) + (parseFloat(css.borderTopWidth) || 0);
 	const metrics = ctx.measureText(text);
+
 	if (isMobile) {
 		// Match the centred mobile label and its two flex rules.
 		const x = h.left - bounds.left + (h.width - metrics.width) / 2;
@@ -72,6 +86,7 @@ export function drawMarqueeDecoration(
 		);
 		return raster;
 	}
+
 	// Preserve the HTML's padding and responsive position as the label gets longer.
 	const originalText =
 		css.textTransform === 'uppercase'

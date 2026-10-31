@@ -17,15 +17,21 @@ import { ProfilePresenceContext } from './context';
 import type * as I from './interface';
 import s from './styles.module.scss';
 
-// Cursor motion
+// Constants
 // ------------
+// Cursor follower: seconds to catch the pointer, and seconds to snap onto a sticky
+// target. Stretch grows with its lag (px) up to a maximum.
 const CURSOR_SPEED = 0.25;
 const CURSOR_SNAP_DURATION = 0.4;
 const CURSOR_STRETCH_DISTANCE = 400;
+// Applied as scale 1 + x along the motion and 1 - x across it
 const CURSOR_MAX_STRETCH = 0.25;
 
 // Component
 // ------------
+// NOTE • The slide-in panel that holds the profile (or a mini case study), plus the
+// custom cursor that follows the pointer while it's open. The page stays mounted
+// as `scene` behind it, frozen while the panel is up.
 const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => {
 	// Context
 	const { profileOpen, setProfileOpen, projectModalOpen, closeProjectModal, leaveProjectModal, lenisRef } =
@@ -58,6 +64,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 
 	// Effects
 	useEffect(() => {
+		// Remember which content to show, so it survives the closing slide
 		if (profileOpen) setShown('profile');
 		else if (projectModalOpen) setShown('project');
 	}, [profileOpen, projectModalOpen]);
@@ -68,6 +75,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 	}, [isOpen, shown]);
 
 	useEffect(() => {
+		// Dev only: ?modalSettings loads the tweak panel on demand
 		if (!new URLSearchParams(window.location.search).has('modalSettings')) return;
 		let disposed = false;
 		void import('./Settings').then(module => {
@@ -79,6 +87,8 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 	}, []);
 
 	useEffect(() => {
+		// Custom cursor: a follower that eases toward the pointer, stretches with its lag,
+		// and changes look (data-cursor) depending on what's under it
 		const cursor = cursorRef.current;
 		const jacket = jacketRef.current;
 		if (!cursor || !jacket) return;
@@ -90,6 +100,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 		let visible = false;
 		let targetX = 0;
 		let targetY = 0;
+		// Clears the stretch so the cursor returns to a plain circle
 		const resetShape = () => {
 			cursor.style.removeProperty('--cursor-angle');
 			cursor.style.removeProperty('--cursor-stretch');
@@ -115,6 +126,8 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 			delete jacket.dataset.cursor;
 			resetShape();
 		};
+
+		// Works out which cursor look applies under the pointer, then glides it there
 		const move = (event: PointerEvent) => {
 			lastPointer = event;
 			const target = document.elementFromPoint(event.clientX, event.clientY);
@@ -127,6 +140,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 				hide();
 				return;
 			}
+			// Sticky targets pull the cursor to their centre, and can ask it to fit their box
 			const stickyTarget = target.closest<HTMLElement>('[data-cursor-sticky]');
 			// Independent positioning keeps the glyph off the circle's eased animation path.
 			gsap.set(closeCursorRef.current, { x: event.clientX, y: event.clientY });
@@ -151,14 +165,19 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 				cursor.style.removeProperty('--cursor-fit-height');
 				cursor.style.removeProperty('--cursor-fit-radius');
 			}
+
 			const overLink = target.closest('[data-cursor-link]');
 			const overSoft = target.closest('[data-cursor-soft]');
 			const overCta = target.closest('[data-cursor-cta]');
+
+			// CTAs nudge the cursor slightly toward their centre, capped at 18px
 			if (overCta && !reduced.matches) {
 				const bounds = overCta.getBoundingClientRect();
 				x += Math.max(-18, Math.min(18, (bounds.left + bounds.width / 2 - x) * 0.12));
 				y += Math.max(-18, Math.min(18, (bounds.top + bounds.height / 2 - y) * 0.12));
 			}
+
+			// Look priority: sticky, cta, soft, link, then follow (inside the panel) or close (outside it)
 			jacket.dataset.cursor = stickyTarget
 				? 'sticky'
 				: overCta
@@ -170,6 +189,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 							: inside
 								? 'follow'
 								: 'close';
+
 			targetX = x;
 			targetY = y;
 			movement?.kill();
@@ -189,6 +209,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 			visible = true;
 			deform();
 		};
+
 		window.addEventListener('pointermove', move);
 		const refresh = () => {
 			if (lastPointer) move(lastPointer);
@@ -245,6 +266,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 		wrapper.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 		if (isReducedMotion) return;
 
+		// The panel gets its own Lenis, since the page's is stopped while it's open
 		const modalLenis = new Lenis({ wrapper, content, autoRaf: false, syncTouch: false });
 		modalLenis.scrollTo(0, { immediate: true, force: true });
 		const update = (time: number) => modalLenis.raf(time * 1000);
@@ -260,6 +282,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 		if (!active) return;
 		const scene = sceneRef.current;
 		if (!scene) return;
+		// Pause everything animating on the page behind the panel, and resume it on close
 		const animations = new Set<Animation>();
 		const timelines = new Set<gsap.core.Animation>();
 		const pause = () => {
@@ -295,6 +318,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 
 	useEffect(() => {
 		if (!active) return;
+		// Lock page scroll, move focus into the panel and trap Tab inside it; all undone on close
 		const previousFocus = document.activeElement;
 		const page = document.getElementById('page');
 		const overflow = page?.style.overflow;
@@ -308,6 +332,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 		lenis?.stop();
 		if (page) page.style.overflow = 'hidden';
 		closeRef.current?.focus({ preventScroll: true });
+
 		const onKeyDown = (event: KeyboardEvent) => {
 			if (document.querySelector('dialog[open]')) return;
 			if (event.key === 'Escape') {
@@ -333,6 +358,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 				first?.focus();
 			}
 		};
+
 		window.addEventListener('keydown', onKeyDown);
 		return () => {
 			window.removeEventListener('keydown', onKeyDown);
@@ -344,6 +370,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 	}, [active, lenisRef]);
 
 	// Render
+	// Both contents stay mounted; only the active one is shown
 	return (
 		<div ref={jacketRef} className={s.jacket} data-state={isOpen ? 'open' : active ? 'closing' : 'closed'}>
 			{Settings && <Settings />}

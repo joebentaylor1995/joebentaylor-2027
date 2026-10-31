@@ -1,13 +1,14 @@
 'use client';
 
+// Imports
+// ------------
 import AnimatedGallery from '@parts/AnimatedGallery';
 import ModelViewer from '@parts/ModelViewer';
 import { preloadNearbyMedia } from '@utils/preloadNearbyMedia';
 import { YOUTUBE_ASPECT } from '@utils/youtube';
-// Imports
-// ------------
 import Image from 'next/image';
 import { type ComponentType, type CSSProperties, useEffect, useRef, useState } from 'react';
+
 // Styles + Interfaces
 // ------------
 import type {
@@ -24,8 +25,10 @@ import s from './styles.module.scss';
 import Video from './Video';
 import YouTube from './YouTube';
 
-// Component
+// Media tiles
 // ------------
+// One tile: a figure that holds a video, YouTube embed or image. The `sizes` strings
+// are the responsive image widths for the layout the tile sits in.
 const Media = ({ media, sizes }: MediaProps) => {
 	// Derived
 	// NOTE • Only full-width tiles read this; two-up tiles keep their fixed shape
@@ -48,6 +51,7 @@ const Media = ({ media, sizes }: MediaProps) => {
 	);
 };
 
+// Layouts: one full-width tile
 export const SingleMedia = ({ media }: SingleMediaProps) => (
 	<div className={s.jacket} data-media-layout='single'>
 		<Media
@@ -57,6 +61,7 @@ export const SingleMedia = ({ media }: SingleMediaProps) => (
 	</div>
 );
 
+// Two tiles side by side
 export const DualMedia = ({ media }: DualMediaProps) => (
 	<div className={s.jacket} data-media-layout='dual'>
 		{media.map(item => (
@@ -69,6 +74,7 @@ export const DualMedia = ({ media }: DualMediaProps) => (
 	</div>
 );
 
+// An animated image gallery in a single tile
 export const GalleryMedia = ({ animation, images, background }: GalleryMediaProps) => (
 	<div className={s.jacket} data-media-layout='gallery'>
 		<div className={s.mediaSlot} data-media-tile>
@@ -101,10 +107,20 @@ export const ModelMedia = ({ src, poster, alt, aspect, background }: ModelMediaP
 	</div>
 );
 
+// Component
+// ------------
+// NOTE • Renders a case study's media blocks and plays a clip-path reveal on each tile as
+// it scrolls into view (see ./reveal). ?mediaSettings loads a tweak panel for the reveal.
 const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
+	// Refs
 	const root = useRef<HTMLElement>(null);
+
+	// State
 	const [Settings, setSettings] = useState<ComponentType | null>(null);
+
+	// Effects
 	useEffect(() => {
+		// Dev only: ?mediaSettings loads the reveal tweak panel on demand
 		if (!new URLSearchParams(location.search).has('mediaSettings')) return;
 		let disposed = false;
 		void import('./Settings/index').then(module => {
@@ -116,14 +132,17 @@ const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
 	}, []);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: CMS replacement installs new media elements.
 	useEffect(() => {
+		// Warm up media near the viewport
 		if (root.current) return preloadNearbyMedia(root.current);
 	}, [blocks]);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: observe new media elements when CMS blocks change.
 	useEffect(() => {
+		// Reveal lifecycle: (re)mount the reveal whenever the layout, settings or motion preference change
 		const host = root.current;
 		if (!host) return;
 		const motion = matchMedia('(prefers-reduced-motion: no-preference)');
 		let dispose: (() => void) | undefined;
+		// Tears down any running reveal, then starts a fresh one unless motion is reduced
 		const setup = () => {
 			dispose?.();
 			dispose = undefined;
@@ -138,6 +157,7 @@ const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
 			for (const tile of host.querySelectorAll<HTMLElement>('[data-media-tile]'))
 				delete tile.dataset.revealComplete;
 		void setup();
+
 		const replay = () => {
 			dispose?.();
 			dispose = undefined;
@@ -145,6 +165,8 @@ const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
 				delete tile.dataset.revealComplete;
 			setup();
 		};
+
+		// The reveal depends on layout, so rebuild it on resize and when the project layout switches mode
 		window.addEventListener(MEDIA_SETTINGS_CHANGED, setup);
 		window.addEventListener(MEDIA_REPLAY, replay);
 		window.addEventListener('resize', setup);
@@ -161,6 +183,8 @@ const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
 			dispose?.();
 		};
 	}, [blocks]);
+
+	// Render
 	return (
 		<section ref={root} className={s.jacket} data-project-case-builder aria-label='Project case study media'>
 			{Settings && <Settings />}

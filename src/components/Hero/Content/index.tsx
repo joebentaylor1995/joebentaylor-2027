@@ -2,7 +2,6 @@
 
 // Imports
 // ------------
-
 import { isLoaderPending, LOADER_REVEAL } from '@parts/SiteLoader/events';
 import { MOBILE_COLOUR_DURATION } from '@parts/SiteLoader/mobile-intro';
 import SpecialHeading from '@parts/SpecialHeading';
@@ -22,11 +21,20 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
+// NOTE • The hero's text: heading, star, intro paragraph and the copyright line. Its
+// entrance is one GSAP timeline that plays when the site loader reveals the scene (or at
+// once if navigating in, on mobile or with reduced motion). The timings come from the
+// scene's intro settings so the tweak panel can replay it live.
 const Content = ({ heading, description }: I.ContentProps) => {
+	// Context
 	const router = useRouter();
+
+	// Refs
 	const ref = useRef<HTMLElement>(null);
 	const entered = useRef(false);
 	const projectsPrefetched = useRef(false);
+
+	// Effects
 	// Cached routes retain refs, but their entrance must replay when reactivated.
 	useLayoutEffect(
 		() => () => {
@@ -34,17 +42,22 @@ const Content = ({ heading, description }: I.ContentProps) => {
 		},
 		[]
 	);
+
+	// Animations
 	useAnimation(
 		({ reduced, heroDesktop }) => {
 			const root = ref.current;
 			if (!root) return;
 			const host = root.parentElement;
 			if (!host) return;
+			// The scene cover is the mask the water reveal opens (grown by --reveal-radius)
 			const cover = host.querySelector<HTMLElement>('[data-scene-cover]');
 			const config = () => introSettings.get(host) ?? introDefaults;
+			// Reduced motion and mobile skip the water wave and portrait zoom (their values start at the end state)
 			const simpleIntro = reduced || !heroDesktop;
 			// Navigation has its own whole-page lens; first load and replay keep this wave.
 			let navigationIntro = !isLoaderPending();
+			// Shared with the renderer through sceneIntros; the timeline tweens each value to its final state
 			const intro = {
 				portrait: simpleIntro || navigationIntro ? 1 : 0,
 				marqueeBoost: simpleIntro || navigationIntro ? 0 : 5,
@@ -52,12 +65,16 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				colour: !reduced && !heroDesktop ? 1 : 0,
 			};
 			sceneIntros.set(host, intro);
+
+			// Per frame: bumps data-text-frame and sizes the cover circle (--reveal-radius) to reach the viewport corners as the wave grows
 			const tick = () => {
 				root.dataset.textFrame = String(Number(root.dataset.textFrame || 0) + 1);
 				const radius =
 					Math.hypot(window.innerWidth * 0.5, window.innerHeight * 0.52) * 1.05 * intro.waterReveal;
 				cover?.style.setProperty('--reveal-radius', `${radius}px`);
 			};
+
+			// Elements the entrance animates
 			const title = root.querySelector('h1 span');
 			const star = root.querySelector('svg');
 			const wipe = root.querySelector('[data-heading-wipe]');
@@ -65,6 +82,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 			const copyrightIcon = host.querySelector('[data-copyright-icon]');
 			const copyrightLines = host.querySelectorAll('[data-copyright-line]');
 			const copyright = host.querySelector('[data-copyright]');
+			// Copyright: icon fades in, rule lines draw outward, and the year's digits slide in
 			const resetCopyright = () => {
 				gsap.set(copyrightIcon, { opacity: 0 });
 				gsap.set(copyrightLines, {
@@ -75,12 +93,15 @@ const Content = ({ heading, description }: I.ContentProps) => {
 					for (let digit = 0; digit < 4; digit++) gsap.set(copyright, { [`--${side}-${digit}`]: '110%' });
 				}
 			};
+
 			const prefetchProjects = () => {
 				if (projectsPrefetched.current) return;
 				projectsPrefetched.current = true;
 				// Give the homepage entrance priority before warming the next route.
 				router.prefetch('/projects');
 			};
+
+			// Reduced motion: show everything in its final state
 			if (reduced) {
 				entered.current = true;
 				gsap.set(cover, { opacity: 0 });
@@ -90,6 +111,8 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				prefetchProjects();
 				return;
 			}
+
+			// Set the starting state, then build the timeline paused or running (see below)
 			root.dataset.entrance = 'running';
 			if (cover) {
 				if (heroDesktop && !navigationIntro) delete cover.dataset.complete;
@@ -102,6 +125,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 			gsap.set(words, { y: 0, yPercent: 105, opacity: 0 });
 			gsap.set(wipe, { scaleX: 0, transformOrigin: 'left center' });
 			resetCopyright();
+
 			const tl = gsap.timeline({
 				delay: heroDesktop ? 0.15 : 0,
 				onUpdate: tick,
@@ -112,6 +136,8 @@ const Content = ({ heading, description }: I.ContentProps) => {
 					prefetchProjects();
 				},
 			});
+
+			// Adds every tween, reading the live timings so the settings panel can rebuild it
 			const buildTimeline = () => {
 				const timing = config();
 				const uncoverAt = timing.headingStart + timing.headingCoverDuration;
@@ -164,6 +190,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 						{ scaleX: 1, duration: timing.copyrightLineDuration, ease: 'power3.inOut' },
 						copyrightStart + 0.12
 					);
+
 				// Inherited variables avoid mutating the streamed year before it hydrates.
 				for (let digit = 0; digit < 4; digit++) {
 					tl.to(
@@ -179,9 +206,12 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				}
 			};
 			buildTimeline();
+
 			// Responsive contexts rebuild their tweens; retain the revealed scene.
 			if (entered.current) tl.progress(1).pause();
 			else if (isLoaderPending()) tl.pause(0);
+
+			// Resets everything to the start and plays again; used by the loader reveal and the tweak panel
 			const replayIntro = () => {
 				navigationIntro = false;
 				tl.pause(0);
@@ -201,6 +231,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				tick();
 				tl.restart();
 			};
+
 			introReplays.set(host, () => {
 				tl.timeScale(1);
 				replayIntro();
@@ -216,8 +247,11 @@ const Content = ({ heading, description }: I.ContentProps) => {
 		{ scope: ref, dependencies: [heading, description, router], revertOnUpdate: true },
 		{ reduced: '(prefers-reduced-motion: reduce)', heroDesktop: HERO_DESKTOP_QUERY }
 	);
+
+	// Derived
 	const descriptionParts = splitStega(description || '');
 
+	// Render
 	return (
 		<section ref={ref} className={s.content} data-hero-content>
 			<Grid>

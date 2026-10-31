@@ -1,5 +1,9 @@
+// Helpers
+// ------------
+// Paints the hero's text into a 2D canvas that the WebGL scene uses as a texture.
 // Measure text runs in the DOM so CSS wrapping, grid placement and fonts remain authoritative.
 // Targets the hero's text and SVG paths; this is not a general HTML/CSS rasteriser.
+// Pass `raster` to reuse a canvas between redraws. Returns the canvas.
 export function drawHeroContent(
 	canvas: HTMLCanvasElement,
 	host: HTMLElement,
@@ -7,6 +11,7 @@ export function drawHeroContent(
 	raster = document.createElement('canvas'),
 	content = host.querySelector<HTMLElement>('[data-hero-content]')
 ) {
+	// Size the raster to the target canvas, capped at 2x pixel density and the GPU's max texture size
 	const bounds = canvas.getBoundingClientRect();
 	const ratio = Math.min(window.devicePixelRatio || 1, 2, maxTexture / Math.max(bounds.width, bounds.height));
 	const width = Math.max(1, Math.round(bounds.width * ratio));
@@ -19,12 +24,16 @@ export function drawHeroContent(
 	ctx.clearRect(0, 0, width, height);
 	ctx.setTransform(width / bounds.width, 0, 0, height / bounds.height, 0, 0);
 	if (!content) return raster;
+
+	// Effective opacity: the product of every ancestor's opacity up to the content root
 	const opacity = (element: Element) => {
 		let alpha = 1;
 		for (let current: Element | null = element; current && current !== content; current = current.parentElement)
 			alpha *= Number(getComputedStyle(current).opacity);
 		return alpha;
 	};
+
+	// Text: walk every text node and draw it where the DOM laid it out
 	const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
 	let node = walker.nextNode();
 	while (node) {
@@ -35,6 +44,7 @@ export function drawHeroContent(
 			node = walker.nextNode();
 			continue;
 		}
+
 		if (parent && !parent.closest('svg') && node.textContent?.trim()) {
 			const css = getComputedStyle(parent);
 			const alpha = opacity(parent);
@@ -44,12 +54,14 @@ export function drawHeroContent(
 				ctx.letterSpacing = css.letterSpacing === 'normal' ? '0px' : css.letterSpacing;
 				ctx.fillStyle = css.color;
 				ctx.globalAlpha = alpha;
+				// Words inside a reveal mask are clipped to the mask's box
 				const mask = parent.closest('[data-word-mask]')?.getBoundingClientRect();
 				if (mask) {
 					ctx.beginPath();
 					ctx.rect(mask.left - bounds.left, mask.top - bounds.top, mask.width, mask.height);
 					ctx.clip();
 				}
+
 				ctx.textBaseline = 'alphabetic';
 				const range = document.createRange();
 				const lines: { text: string; left: number; top: number; height: number }[] = [];
@@ -72,6 +84,8 @@ export function drawHeroContent(
 						}
 						line.text += node.textContent[i];
 					}
+
+				// Draw each line, vertically centred in its DOM line box
 				for (const line of lines) {
 					let text = line.text;
 					if (css.textTransform === 'uppercase') text = text.toUpperCase();
@@ -90,6 +104,7 @@ export function drawHeroContent(
 		}
 		node = walker.nextNode();
 	}
+
 	// Reuse the actual heading icon paths, including their SVG transforms and CSS fill.
 	for (const path of content.querySelectorAll<SVGPathElement>('svg path')) {
 		const matrix = path.getScreenCTM();
@@ -102,6 +117,8 @@ export function drawHeroContent(
 		ctx.fill(new Path2D(path.getAttribute('d') || ''));
 		ctx.restore();
 	}
+
+	// The heading's wipe bar is drawn as a plain filled rectangle
 	const wipe = content.querySelector<HTMLElement>('[data-heading-wipe]');
 	if (wipe) {
 		const box = wipe.getBoundingClientRect();

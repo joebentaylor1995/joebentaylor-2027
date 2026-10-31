@@ -1,5 +1,6 @@
-// Saved from the live liquid controls, including the foreground layer.
+// Settings
 // ------------
+// Saved from the live liquid controls, including the foreground layer.
 export const liquidSettings = {
 	inFront: true,
 	marqueeSpeed: 3.15,
@@ -22,4 +23,6 @@ export const liquidSettings = {
 	pressureIterations: 16,
 };
 
+// Types
+// ------------
 export type LiquidSettings = typeof liquidSettings;

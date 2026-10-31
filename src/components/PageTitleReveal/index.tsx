@@ -24,6 +24,10 @@ const WORD_STAGGER = 0.025;
 
 // Component
 // ------------
+// NOTE • Reveals a title once something lets it: the site loader settling, the
+// title scrolling into view, or a project handoff finishing. data-wave-state
+// moves from waiting to playing to complete, which the SCSS reads. Three variants: a wave fill, a
+// sliding block, or word-by-word in CSS.
 const PageTitleReveal = ({
 	children,
 	variant = 'wave',
@@ -46,17 +50,22 @@ const PageTitleReveal = ({
 			// Activity restores project pages with their refs intact. Each entrance
 			// gets a fresh reveal, even if this title completed on an earlier visit.
 			if (trigger === 'project') finished.current = false;
+
+			// Marks the reveal done and tells listeners (bubbles) that the title is ready
 			const complete = () => {
 				finished.current = true;
 				title.dataset.waveState = 'complete';
 				title.dispatchEvent(new Event('page-title:revealed', { bubbles: true }));
 			};
+
+			// Reduced motion, or already revealed: show the final state straight away
 			if (reduced || finished.current) {
 				complete();
 				return;
 			}
 			title.dataset.waveState = 'waiting';
 			const wordCount = title.querySelectorAll('[data-reveal-word]').length;
+			// Built paused; `start` below plays it
 			const tween =
 				variant === 'words'
 					? // A plain timer tween, not delayedCall: a paused delay doesn't survive replays
@@ -93,12 +102,16 @@ const PageTitleReveal = ({
 								},
 								waveDelay
 							);
+
+			// Plays once, and not at all while a project handoff is still covering the page
 			const start = () => {
 				if (finished.current || title.dataset.waveState === 'playing') return;
 				if (trigger === 'project' && isProjectHandoffPending()) return;
 				title.dataset.waveState = 'playing';
 				tween.play();
 			};
+
+			// Scroll trigger: play when 30% visible; with `replay` it rewinds once it leaves view
 			if (trigger === 'view') {
 				const observer = new IntersectionObserver(
 					entries => {
@@ -119,6 +132,8 @@ const PageTitleReveal = ({
 				observer.observe(title);
 				return () => observer.disconnect();
 			}
+
+			// Loader and handoff triggers: play now if the loader is done, else wait for its events
 			if (isLoaderSettled()) start();
 			const reset = () => {
 				finished.current = false;
@@ -126,6 +141,7 @@ const PageTitleReveal = ({
 				title.dataset.waveState = 'waiting';
 				title.dispatchEvent(new Event('page-title:revealed', { bubbles: true }));
 			};
+
 			window.addEventListener(LOADER_SETTLED, start);
 			if (trigger === 'project') window.addEventListener(PROJECT_HANDOFF_SETTLED, start);
 			window.addEventListener(LOADER_RESET, reset);

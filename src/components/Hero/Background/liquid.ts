@@ -1,6 +1,5 @@
 // Imports
 // ------------
-
 import { MOBILE_COLOUR_DURATION, MOBILE_SCALE_DURATION, MOBILE_SCALE_EASE } from '@parts/SiteLoader/mobile-intro';
 import { gsap } from 'gsap';
 import { HERO_DESKTOP_QUERY } from '../layout';
@@ -35,6 +34,10 @@ export interface LiquidLayer {
 
 // Renderer
 // ------------
+// NOTE • The hero's WebGL layer: a portrait, the logo marquee and the hero text are
+// composited into a `scene` texture, then a display pass adds the intro water wave and,
+// on desktop, a pointer-driven fluid sim (velocity, height, pressure) that refracts it.
+// Phones skip the sim and float textures. Throws if the GPU can't do what's needed.
 export async function createLiquidLayer(
 	gl: WebGLRenderingContext,
 	canvas: HTMLCanvasElement,
@@ -44,6 +47,7 @@ export async function createLiquidLayer(
 	portraitOnly = false,
 	desktopQuery = HERO_DESKTOP_QUERY
 ): Promise<LiquidLayer> {
+	// Capability checks: desktop needs filtered float textures for the sim
 	const bindProgram = gl.useProgram.bind(gl);
 	const desktopLayout = window.matchMedia(desktopQuery);
 	const mobile = !desktopLayout.matches;
@@ -58,17 +62,24 @@ export async function createLiquidLayer(
 	const images = Array.from(track?.querySelectorAll('img') ?? []);
 	if (!mobile && images.some(image => !image.complete || !image.naturalWidth))
 		throw new Error('Logo textures not ready');
+
+	// GPU resources are tracked here so destroy() can free every one
 	const textures = new Set<WebGLTexture>();
 	const targets = new Set<Target>();
 	const programs: WebGLProgram[] = [];
 	const buffer = gl.createBuffer();
 	if (!buffer) throw new Error('Unable to allocate liquid quad');
+
+	// Pointer segments waiting for the next draw, and the sim's activity timer
 	let previous: [number, number] | null = null;
 	let queued: [number, number, number, number][] = [];
 	let activeTime = 0;
+	// Marquee scroll position (0 to 1 around one loop) and its direction
 	let phase = 0;
 	let direction = 1;
 	let phaseInitialized = false;
+
+	// Marquee strip metrics in CSS px, measured from the DOM in resize()
 	let stripWidth = 1,
 		stripHeight = 1,
 		bottom = 0,
@@ -77,6 +88,8 @@ export async function createLiquidLayer(
 		cssHeight = canvas.clientHeight;
 	let background = [0, 0, 0];
 	let revealDark = [0, 0, 0];
+
+	// Render targets: the portrait and composited scene, then the sim's velocity / height / pressure pairs
 	let portrait: Target,
 		scene: Target,
 		velocity: ReturnType<typeof pair>,
@@ -101,6 +114,7 @@ export async function createLiquidLayer(
 			.map(n => n / 255);
 	};
 
+	// Frees every GPU resource this layer created
 	function destroy() {
 		for (const target of targets) gl.deleteFramebuffer(target.fbo);
 		for (const texture of textures) gl.deleteTexture(texture);
@@ -109,6 +123,8 @@ export async function createLiquidLayer(
 		targets.clear();
 		textures.clear();
 	}
+
+	// Compiles and links a fragment body with the shared vertex shader, yielding between steps so the page never blocks
 	async function makeProgram(body: string): Promise<Program> {
 		const program = gl.createProgram();
 		if (!program) throw new Error('Unable to allocate liquid program');
@@ -139,6 +155,8 @@ export async function createLiquidLayer(
 		}
 		return { program, uniforms, position: gl.getAttribLocation(program, 'position') };
 	}
+
+	// A linear-filtered, edge-clamped texture, tracked for cleanup
 	function texture() {
 		const result = gl.createTexture();
 		if (!result) throw new Error('Unable to allocate liquid texture');
@@ -150,6 +168,8 @@ export async function createLiquidLayer(
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 		return result;
 	}
+
+	// A texture plus the framebuffer that renders into it
 	function target(width: number, height: number, type: number): Target {
 		const tex = texture(),
 			fbo = gl.createFramebuffer();
@@ -165,6 +185,8 @@ export async function createLiquidLayer(
 		gl.clear(gl.COLOR_BUFFER_BIT);
 		return result;
 	}
+
+	// Ping-pong buffers: read from one, write to the other, then swap()
 	function pair() {
 		return {
 			read: target(simWidth, simHeight, gl.FLOAT),
@@ -174,6 +196,8 @@ export async function createLiquidLayer(
 			},
 		};
 	}
+
+	// Runs a program over the full screen into `dest` (null is the canvas). Uniforms are bound by name: numbers, 2 to 4 component vectors, or textures.
 	function draw(p: Program, dest: Target | null, values: Record<string, Value>) {
 		bindProgram(p.program);
 		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -200,9 +224,12 @@ export async function createLiquidLayer(
 		gl.drawArrays(gl.TRIANGLES, 0, 6);
 	}
 
+	// Setup: compile the programs, allocate the textures and targets, then hand back the layer. Any failure frees the partial layer.
 	try {
 		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+		// Passes: the fluid sim steps, then composite (builds `scene`) and display (to screen).
+		// Mobile compiles only the last two.
 		const names = [
 			'advect',
 			'splat',
@@ -238,9 +265,12 @@ export async function createLiquidLayer(
 			(typeof names)[number],
 			Program
 		>;
+
+		// Textures fed from DOM rasters: the logo strip, the marquee label and the hero text
 		const logos = { texture: texture() };
 		const decoration = { texture: texture() };
 		let labelGesture = 0;
+		// Redraws the marquee label (cycling the phrase per scroll gesture) and uploads it
 		const uploadDecoration = () => {
 			if (mobile || portraitOnly) return;
 			gl.bindTexture(gl.TEXTURE_2D, decoration.texture);
@@ -272,12 +302,15 @@ export async function createLiquidLayer(
 		let allocatedResolution = settings.resolution;
 		let allocatedWidth = 0;
 		let allocatedHeight = 0;
+
+		// Reallocates targets only when a size changed, then re-rasterises the DOM textures
 		function resize() {
 			// Cached routes can briefly have no layout. Zero dimensions produce NaN
 			// simulation sizes and incomplete framebuffers; keep the existing targets.
 			if (gl.isContextLost() || canvas.clientWidth <= 0 || canvas.clientHeight <= 0) return;
 			cssWidth = canvas.clientWidth;
 			cssHeight = canvas.clientHeight;
+			// Sim grid size: settings.resolution on the short side, capped at 768 on the long side
 			const scale = Math.min(
 				settings.resolution / Math.min(cssWidth, cssHeight),
 				768 / Math.max(cssWidth, cssHeight)
@@ -380,6 +413,8 @@ export async function createLiquidLayer(
 			textFrame = textElement?.dataset.textFrame;
 		}
 		resize();
+
+		// The layer's handle, driven frame by frame by the renderer
 		return {
 			resize,
 			beginPortrait() {
@@ -387,6 +422,8 @@ export async function createLiquidLayer(
 				gl.bindFramebuffer(gl.FRAMEBUFFER, portrait.fbo);
 				gl.viewport(0, 0, portrait.width, portrait.height);
 			},
+
+			// Queues a pointer segment (current and previous position) for the next draw; keeps the latest 24
 			move(x, y) {
 				if (mobile) return;
 				const p: [number, number] = [x, 1 - y];
@@ -400,11 +437,16 @@ export async function createLiquidLayer(
 				previous = null;
 				queued = [];
 			},
+
+			// ANCHOR • Renders one frame
 			draw(dt, scrollVelocity, gesture) {
+				// A new scroll gesture changes the marquee phrase
 				if (gesture !== labelGesture) {
 					labelGesture = gesture;
 					uploadDecoration();
 				}
+
+				// Re-rasterise the hero text only when the entrance bumps data-text-frame
 				if (!portraitOnly && desktopLayout.matches && textFrame !== textElement?.dataset.textFrame) {
 					textFrame = textElement?.dataset.textFrame;
 					gl.bindTexture(gl.TEXTURE_2D, content.texture);
@@ -432,6 +474,8 @@ export async function createLiquidLayer(
 								(1 - settings.marqueeBlurThreshold)
 						)
 					) ** settings.marqueeBlurCurve;
+
+				// Marquee phase: base speed plus the intro boost plus a scroll-speed boost, running the way the page last scrolled
 				if (!settings.marqueeReverse) direction = 1;
 				else if (Math.abs(scrollVelocity) > 0.005) direction = Math.sign(scrollVelocity);
 				phase =
@@ -444,11 +488,15 @@ export async function createLiquidLayer(
 							duration +
 						1) %
 					1;
+
+				// Cap the step so a long frame can't destabilise the sim
 				dt = Math.min(dt, 0.025);
+				// The sim runs for 12s after the last pointer movement, then idles
 				if (queued.length) activeTime = 12;
 				if (activeTime > 0) {
 					activeTime -= dt;
 					for (const [x, y, ox, oy] of queued.splice(0)) {
+						// Skip sub-pixel movement
 						const distance = Math.hypot((x - ox) * cssWidth, (y - oy) * cssHeight);
 						if (distance < 0.2) continue;
 						const common = {
@@ -470,6 +518,8 @@ export async function createLiquidLayer(
 						});
 						height.swap();
 					}
+
+					// Fluid step: curl and vorticity, pressure solve, subtract the gradient, then advect velocity and height
 					draw(passes.curl, curl, { source: velocity.read });
 					draw(passes.vorticity, velocity.write, {
 						source: velocity.read,
@@ -500,6 +550,8 @@ export async function createLiquidLayer(
 					});
 					height.swap();
 				}
+
+				// Composite the portrait, logo strip, label and hero text into `scene`
 				draw(passes.composite, scene, {
 					source: portrait,
 					inFront: Number(!desktopLayout.matches || settings.inFront),
@@ -521,6 +573,8 @@ export async function createLiquidLayer(
 				const zoomProgress = Math.min(1, (introTime * MOBILE_COLOUR_DURATION) / MOBILE_SCALE_DURATION);
 				const zoomRemaining = 1 - gsap.parseEase(MOBILE_SCALE_EASE)(zoomProgress);
 				const waveConfig = introSettings.get(host) ?? introDefaults;
+
+				// Final pass to the canvas: the intro water wave and lens, plus the liquid refraction
 				draw(passes.display, null, {
 					source: height.read,
 					scene,
@@ -552,6 +606,8 @@ export async function createLiquidLayer(
 					dispersion: settings.dispersion,
 					iridescence: settings.iridescence,
 				});
+
+				// Tells the site loader the first frame is ready
 				if (host.dataset.liquidReady !== 'true') host.dataset.liquidReady = 'true';
 			},
 			destroy,
