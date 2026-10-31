@@ -30,8 +30,10 @@ for (const mobile of [false, true]) {
 				return {
 					mask: getComputedStyle(document.documentElement, '::view-transition-new(navigation-surface)')
 						.maskImage,
-					filter: getComputedStyle(document.documentElement, '::view-transition-new(navigation-surface)')
-						.filter,
+					filter: getComputedStyle(
+						document.documentElement,
+						'::view-transition-image-pair(navigation-surface)'
+					).filter,
 					fade: animations.some(
 						animation =>
 							animation instanceof CSSAnimation &&

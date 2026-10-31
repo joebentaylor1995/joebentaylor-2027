@@ -19,7 +19,7 @@ test('navigation reveals the destination and header together through the lens', 
 	await page.waitForFunction(() => document.documentElement.dataset.navigationWave === 'running');
 	const captured = await page.evaluate(() => ({
 		mask: getComputedStyle(document.documentElement, '::view-transition-new(navigation-surface)').maskImage,
-		filter: getComputedStyle(document.documentElement, '::view-transition-new(navigation-surface)').filter,
+		filter: getComputedStyle(document.documentElement, '::view-transition-image-pair(navigation-surface)').filter,
 		header: document.querySelector('header')?.style.viewTransitionName,
 		fades: document.getAnimations().filter(a => a instanceof CSSAnimation && a.animationName === 'vt-fade').length,
 	}));

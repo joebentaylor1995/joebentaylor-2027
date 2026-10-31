@@ -12,11 +12,18 @@
     width: 100%;
     height: auto;
 
+    @include bp(m) {
+        justify-self: flex-start;
+        height: 100%;
+    }
+
     hgroup {
         display: flex;
         flex-direction: column;
         gap: var(--gap-sm);
         max-width: 50rem;
+
+        @include bp(m) { max-width: 40rem; }
     }
 
     > * {
@@ -35,6 +42,28 @@
     p {
         color: var(--global-white);
         text-wrap: pretty;
+    }
+
+    // Landscape tablets. The height check leaves landscape phones, which are also over 700px wide, alone.
+    @include bp(m) {
+        @media (orientation: landscape) and (height >= 600px) {
+            flex: 1;
+            align-items: center;
+
+            h1 {
+                --color: var(--brand-c4);
+                color: var(--brand-c4);
+            }
+            h1 span { color: var(--brand-c4); }
+            h1 svg { fill: var(--brand-c4); }
+
+            p {
+                color: alpha(var(--brand-c4), 60);
+                text-wrap: balance;
+            }
+        }
+
+        
     }
 
     @include heroDesktop {

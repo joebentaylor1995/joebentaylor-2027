@@ -69,7 +69,7 @@
 // SECTION • Base
 @layer base {
 	html {
-		--tablet-font-scale: 100%;
+		--tablet-font-scale: 75%;
 
 		font-size: 62.5%; // 10px base font size for easier rem calculations
 		interpolate-size: allow-keywords;
@@ -79,7 +79,7 @@
 		@include bp(l) { font-size: 62.5%; }
 
 		// Scale laptop layouts against the 1440px design, capped at the existing 10px base.
-		@include bp(xl) { font-size: min(calc(100vw / 144), 62.5%); }
+		@include bp(xxl) { font-size: min(calc(100vw / 144), 62.5%); }
 
 		@include bp(huge) {
 			font-size: 0.625vw; // 10px at 1600px; scale all rem-based dimensions together.

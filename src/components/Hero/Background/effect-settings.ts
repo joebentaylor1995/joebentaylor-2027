@@ -26,6 +26,11 @@ export const defaultSettings = {
 	mobilePositionY: 24.87,
 	mobileZoom: 1.22,
 	mobileRotation: 0,
+	// Tablets, from the m breakpoint up to the desktop layout. Same offset rules as mobile.
+	tabletPositionX: 8,
+	tabletPositionY: 24,
+	tabletZoom: 1.22,
+	tabletRotation: 0,
 	chroma: 0.65,
 	glow: 0.65,
 	chromaOn: true,

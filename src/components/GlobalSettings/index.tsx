@@ -12,10 +12,21 @@ import {
 	wavePreview,
 	waveRanges,
 } from '@parts/NavigationWave/settings';
+import {
+	FILL_PREVIEW,
+	FILL_SCRUB,
+	FILL_STORAGE_KEY,
+	type FillSettings,
+	fillDefaults,
+	fillEasings,
+	fillRanges,
+	readFillSettings,
+} from '@parts/ProjectsRibbon/fillSettings';
 import { grid } from '@theme/grid';
 import { prepareNavigationScene } from '@utils/navigationScene';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 // Styles
@@ -31,7 +42,21 @@ export default function GlobalSettings() {
 
 	const [preview, setPreview] = useState<number | null>(null);
 
+	const [fill, setFill] = useState<FillSettings>(fillDefaults);
+	const [scrub, setScrub] = useState<number | null>(null);
+	const [fillStatus, setFillStatus] = useState('Changes apply to the next fill and are saved in this browser.');
+	const isOnProjects = /^\/projects\/?$/.test(usePathname());
+
 	useEffect(() => setWave(readWaveSettings()), []);
+	useEffect(() => setFill(readFillSettings()), []);
+
+	// Hold the fill at the chosen point, redrawn as any setting changes
+	// biome-ignore lint/correctness/useExhaustiveDependencies: fill changes repaint the stored settings.
+	useEffect(() => {
+		window.dispatchEvent(new CustomEvent(FILL_SCRUB, { detail: scrub === null ? null : scrub / 100 }));
+	}, [scrub, fill]);
+
+	useEffect(() => () => void window.dispatchEvent(new CustomEvent(FILL_SCRUB, { detail: null })), []);
 
 	// Draw the chosen point of the wave on this page, redrawn as any setting changes
 	// biome-ignore lint/correctness/useExhaustiveDependencies: wave changes repaint the stored settings.
@@ -50,6 +75,16 @@ export default function GlobalSettings() {
 			setWaveStatus('Saved. Navigate between Home and Projects to preview.');
 		} catch {
 			setWaveStatus('Browser storage is unavailable; settings could not be saved.');
+		}
+	};
+
+	const updateFill = (settings: FillSettings) => {
+		try {
+			localStorage.setItem(FILL_STORAGE_KEY, JSON.stringify(settings));
+			setFill(settings);
+			setFillStatus('Saved. Play the fill to preview.');
+		} catch {
+			setFillStatus('Browser storage is unavailable; settings could not be saved.');
 		}
 	};
 
@@ -141,6 +176,92 @@ export default function GlobalSettings() {
 						</Link>
 						<button type='button' onClick={() => updateWave({ ...waveDefaults })}>
 							Reset wave
+						</button>
+					</div>
+				</details>
+				<details open>
+					<summary>Project fill</summary>
+					<p>The featured ribbon's expansion into a case study.</p>
+					<label className={s.control}>
+						<span>
+							<span>
+								<input
+									type='checkbox'
+									aria-label='Hold the fill on its timeline'
+									checked={scrub !== null}
+									disabled={!isOnProjects}
+									onChange={event => setScrub(event.target.checked ? 50 : null)}
+								/>{' '}
+								Timeline
+							</span>
+							<output>{scrub === null ? 'off' : `${scrub}%`}</output>
+						</span>
+						<input
+							type='range'
+							aria-label='Timeline'
+							min={0}
+							max={100}
+							step={1}
+							value={scrub ?? 50}
+							disabled={scrub === null}
+							onChange={event => setScrub(Number(event.target.value))}
+						/>
+					</label>
+					<p>Holds the fill at that point on the centred project. Every setting below updates it live.</p>
+					<label className={s.control}>
+						<span>Easing</span>
+						<select
+							aria-label='Fill easing'
+							value={fill.easing}
+							onChange={event =>
+								updateFill({ ...fill, easing: event.target.value as FillSettings['easing'] })
+							}
+						>
+							{Object.entries(fillEasings).map(([value, label]) => (
+								<option key={value} value={value}>
+									{label}
+								</option>
+							))}
+						</select>
+					</label>
+					{fillRanges.map(([key, label, min, max, step]) => (
+						<label key={key} className={s.control}>
+							<span>
+								{label}
+								<output>{fill[key]}</output>
+							</span>
+							<input
+								type='range'
+								aria-label={label}
+								min={min}
+								max={max}
+								step={step}
+								value={fill[key]}
+								disabled={key === 'softness' && fill.easing !== 'custom'}
+								onChange={event => updateFill({ ...fill, [key]: Number(event.target.value) })}
+							/>
+						</label>
+					))}
+					<p role='status'>{fillStatus}</p>
+					<div className={s.actions}>
+						{isOnProjects ? (
+							<button
+								type='button'
+								disabled={scrub !== null}
+								onClick={() => window.dispatchEvent(new Event(FILL_PREVIEW))}
+							>
+								Play fill
+							</button>
+						) : (
+							<Link
+								href='/projects/?globalSettings'
+								onNavigate={() => prepareNavigationScene('/projects')}
+							>
+								Go to Projects to preview
+							</Link>
+						)}
+						<button type='button' onClick={() => updateFill({ ...fillDefaults })}>
+							Reset fill
 						</button>
 					</div>
 				</details>

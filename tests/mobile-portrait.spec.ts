@@ -24,6 +24,11 @@ test('mobile uses a static portrait and preserves controls across the breakpoint
 	await page.getByLabel('Mobile bottom offset (%) value', { exact: true }).fill('-8');
 	await page.getByLabel('Mobile scale value', { exact: true }).fill('0.8');
 	await page.getByLabel('Mobile rotation value', { exact: true }).fill('0');
+	// Tablets keep their own crop, so phones and tablets can't move each other
+	await page.getByLabel('Tablet X position (%) value', { exact: true }).fill('20');
+	await page.getByLabel('Tablet bottom offset (%) value', { exact: true }).fill('-5');
+	await page.getByLabel('Tablet scale value', { exact: true }).fill('0.9');
+	await page.getByLabel('Tablet rotation value', { exact: true }).fill('0');
 	for (const [width, height] of [
 		[390, 900],
 		[768, 900],
@@ -45,7 +50,11 @@ test('mobile uses a static portrait and preserves controls across the breakpoint
 						return { scale: matrix.a, x: Math.round(matrix.e), y: Math.round(matrix.f) };
 					})
 				)
-				.toEqual({ scale: 0.8, x: Math.round(width * 0.12), y: Math.round(height * -0.08) });
+				.toEqual(
+					width < 700
+						? { scale: 0.8, x: Math.round(width * 0.12), y: Math.round(height * -0.08) }
+						: { scale: 0.9, x: Math.round(width * 0.2), y: Math.round(height * -0.05) }
+				);
 		} else {
 			await expect(scene).toHaveAttribute('data-ready', 'true');
 			await expect(photo).toBeHidden();
@@ -55,6 +64,7 @@ test('mobile uses a static portrait and preserves controls across the breakpoint
 	}
 	const exported = JSON.parse(await page.getByLabel('All hero settings JSON').inputValue());
 	expect(exported.portrait.mobilePositionX).toBe(12);
+	expect(exported.portrait.tabletPositionX).toBe(20);
 	expect(exported.portrait.positionX).toBe(3);
 });
 

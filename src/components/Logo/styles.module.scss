@@ -2,8 +2,18 @@
 // ------------
 
 .logo {
-    width: 6.8rem;
-    height: 2.6rem;
+	overflow: visible;
+	width: 6.8rem;
+	height: 2.6rem;
 
-    fill: var(--brand-c4);
+	fill: var(--brand-c4);
+
+	// The bands only draw during the glitch: at rest their joins could show as hairlines
+	&:not([data-glitch='playing']) {
+		.ghost, .slice { visibility: hidden; }
+	}
+
+	&[data-glitch='playing'] .mark { visibility: hidden; }
 }
+
+.ghost { fill: var(--brand-c8); }

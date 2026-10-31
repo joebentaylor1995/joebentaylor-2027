@@ -18,7 +18,7 @@ export const grid = {
 		sm: '400px',
 		m: '700px',
 		l: '1024px',
-		xl: '1200px',
+		xl: '1180px',
 		hero: '1283px',
 		xxl: '1400px',
 		huge: '1600px',
@@ -26,7 +26,7 @@ export const grid = {
 	},
 	gutter: {
 		s: '2.4rem',
-		m: '3.2rem',
+		m: '4rem',
 		l: '4rem',
 	},
 	maxSize: '1440px',

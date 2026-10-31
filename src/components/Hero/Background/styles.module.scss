@@ -12,6 +12,10 @@
     --mobile-portrait-y: 0%;
     --mobile-portrait-scale: 1;
     --mobile-portrait-rotation: 0deg;
+    --tablet-portrait-x: 0%;
+    --tablet-portrait-y: 0%;
+    --tablet-portrait-scale: 1;
+    --tablet-portrait-rotation: 0deg;
 
     position: absolute;
     inset: 0;
@@ -39,6 +43,11 @@
         transform-origin: center bottom;
         transform: translate(var(--mobile-portrait-x), var(--mobile-portrait-y))
             rotate(var(--mobile-portrait-rotation)) scale(var(--mobile-portrait-scale));
+
+        @include bp(m) {
+            transform: translate(var(--tablet-portrait-x), var(--tablet-portrait-y))
+                rotate(var(--tablet-portrait-rotation)) scale(var(--tablet-portrait-scale));
+        }
 
         @include heroDesktop {
             transform: none;

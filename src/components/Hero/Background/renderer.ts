@@ -1,5 +1,6 @@
 // Imports
 // ------------
+import { mq } from '@tackl';
 import { canHover } from '@utils/desktopHover';
 import { waitForNavigationScene } from '@utils/navigationScene';
 import { gsap } from 'gsap';
@@ -272,17 +273,24 @@ export function mountDepthEffect({
 		gl.uniform1f(u.portraitAspect, photo.naturalWidth / photo.naturalHeight);
 		gl.uniform2f(u.motion, pointer[0] * s.horizontal, pointer[1] * s.vertical);
 		const mobile = !desktopLayout.matches;
+		const small = smallScreenPortrait(s);
 		// CSS fallback scales around centre bottom; shaders rotate around centre.
 		gl.uniform2f(
 			u.positionShift,
-			mobile ? s.mobilePositionX / 100 : s.positionX / 100,
-			mobile ? s.mobilePositionY / 100 + (1 - s.mobileZoom) / 2 : s.positionY / 100
+			mobile ? small.x / 100 : s.positionX / 100,
+			mobile ? small.y / 100 + (1 - small.zoom) / 2 : s.positionY / 100
 		);
 		for (const key of ['intensity', 'lift'] as const) gl.uniform1f(u[key], s[key]);
-		gl.uniform1f(u.zoom, mobile ? s.mobileZoom : s.zoom);
-		gl.uniform1f(u.rotation, ((mobile ? s.mobileRotation : s.rotation) * Math.PI) / 180);
+		gl.uniform1f(u.zoom, mobile ? small.zoom : s.zoom);
+		gl.uniform1f(u.rotation, ((mobile ? small.rotation : s.rotation) * Math.PI) / 180);
 	}
 	const desktopLayout = window.matchMedia(HERO_DESKTOP_QUERY);
+	const tabletLayout = window.matchMedia(mq.up.m);
+	// Below the desktop layout, tablets have their own crop
+	const smallScreenPortrait = (s: DepthSettings) =>
+		tabletLayout.matches
+			? { x: s.tabletPositionX, y: s.tabletPositionY, zoom: s.tabletZoom, rotation: s.tabletRotation }
+			: { x: s.mobilePositionX, y: s.mobilePositionY, zoom: s.mobileZoom, rotation: s.mobileRotation };
 	const profileScene = host.closest<HTMLElement>('[data-profile-scene]');
 	let hasPresented = false;
 	const navigationPaused = () =>
@@ -430,9 +438,10 @@ export function mountDepthEffect({
 					(introConfig.portraitScale + (s.zoom - introConfig.portraitScale) * scaleEase) * widthScale
 				);
 			} else {
-				const zoom = introConfig.portraitScale + (s.mobileZoom - introConfig.portraitScale) * scaleEase;
+				const small = smallScreenPortrait(s);
+				const zoom = introConfig.portraitScale + (small.zoom - introConfig.portraitScale) * scaleEase;
 				gl.uniform1f(u.zoom, zoom);
-				gl.uniform2f(u.positionShift, s.mobilePositionX / 100, s.mobilePositionY / 100 + (1 - zoom) / 2);
+				gl.uniform2f(u.positionShift, small.x / 100, small.y / 100 + (1 - zoom) / 2);
 			}
 			gl.uniform1f(u.entrance, entrance);
 			gl.uniform2f(u.cursorPos, cursor[0], cursor[1]);
@@ -704,9 +713,12 @@ export function mountDepthEffect({
 		load(depthUrl),
 		load('/images/hero-depth/portrait-colour.webp').catch(() => null),
 	])
-		.then(([, depth, colour]) => {
+		.then(async ([, depth, colour]) => {
 			if (disposed) return;
 			colourImage = colour;
+			// The bake decodes the whole depth map, so it waits for the wave like the GPU work
+			await waitForNavigationScene(events.signal);
+			if (disposed) return;
 			bakedDepth = bakeDepth(depth);
 			// The bake and the shader compile each get their own task
 			return yieldToMain().then(() => {
