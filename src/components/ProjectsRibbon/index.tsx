@@ -14,6 +14,7 @@ import { markProjectModalEntry } from '@utils/projectModal';
 import { getImageProps } from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useRef, useState } from 'react';
+import { FILL_PREVIEW, FILL_SCRUB } from './fillSettings';
 import { holdProjectHero } from './handoff';
 
 // Styles
@@ -196,6 +197,22 @@ const ProjectsRibbon = () => {
 		window.addEventListener('message', openProject);
 		return () => window.removeEventListener('message', openProject);
 	}, [router, lenisRef]);
+
+	useEffect(() => {
+		const preview = () =>
+			frame.current?.contentWindow?.postMessage({ type: 'projects:fill-preview' }, window.location.origin);
+		const scrub = (event: Event) =>
+			frame.current?.contentWindow?.postMessage(
+				{ type: 'projects:fill-scrub', flight: event instanceof CustomEvent ? event.detail : null },
+				window.location.origin
+			);
+		window.addEventListener(FILL_PREVIEW, preview);
+		window.addEventListener(FILL_SCRUB, scrub);
+		return () => {
+			window.removeEventListener(FILL_PREVIEW, preview);
+			window.removeEventListener(FILL_SCRUB, scrub);
+		};
+	}, []);
 
 	useEffect(() => {
 		const element = frame.current;

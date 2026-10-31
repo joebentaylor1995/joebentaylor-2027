@@ -192,6 +192,10 @@ const Background = ({ className }: I.BackgroundProps) => {
 						'--mobile-portrait-y': `${settings.mobilePositionY}%`,
 						'--mobile-portrait-scale': settings.mobileZoom,
 						'--mobile-portrait-rotation': `${settings.mobileRotation}deg`,
+						'--tablet-portrait-x': `${settings.tabletPositionX}%`,
+						'--tablet-portrait-y': `${settings.tabletPositionY}%`,
+						'--tablet-portrait-scale': settings.tabletZoom,
+						'--tablet-portrait-rotation': `${settings.tabletRotation}deg`,
 					} as CSSProperties
 				}
 			>

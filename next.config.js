@@ -104,6 +104,8 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+	// Lets other devices on the local network load the dev server, which only trusts localhost by default
+	allowedDevOrigins: ['192.168.*.*'],
 	// Sass — styles are SCSS CSS Modules (styles.module.scss) plus the global
 	// src/css/global.scss. `additionalData` prepends the Tackl SCSS layer
 	// (src/css/tackl) to every .scss file, so bp(), the type and spacing mixins,

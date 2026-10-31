@@ -106,6 +106,7 @@ const Header = () => {
 					className={s.jacket}
 					data-profile={profileOpen ? 'open' : 'closed'}
 					data-tone={isDarkPage ? 'light' : 'dark'}
+					data-case-study={isCaseStudy}
 				>
 					{!isCaseStudy && (
 						<div className={s.blur} aria-hidden='true' data-header-blur>

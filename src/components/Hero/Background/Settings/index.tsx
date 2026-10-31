@@ -3,6 +3,7 @@
 // Imports
 // ------------
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { type BooleanSetting, defaultSettings, type NumericSetting } from '../effect-settings';
 import { type IntroSettings, introDefaults, introEasings, mobileIntroDefaults } from '../scene-intro';
 import IntroTimings from './IntroTimings';
@@ -41,6 +42,10 @@ const ranges: [NumericSetting, string, number, number, number][] = [
 	['mobilePositionY', 'Mobile bottom offset (%)', -100, 100, 0.01],
 	['mobileZoom', 'Mobile scale', 0.3, 2.5, 0.01],
 	['mobileRotation', 'Mobile rotation', -45, 45, 1],
+	['tabletPositionX', 'Tablet X position (%)', -100, 100, 0.01],
+	['tabletPositionY', 'Tablet bottom offset (%)', -100, 100, 0.01],
+	['tabletZoom', 'Tablet scale', 0.3, 2.5, 0.01],
+	['tabletRotation', 'Tablet rotation', -45, 45, 1],
 ];
 const toggles: [BooleanSetting, string][] = [
 	['colourOn', 'Scroll colour switching'],
@@ -81,7 +86,8 @@ export default function Settings({
 			detail.open = value;
 		});
 	// Render
-	return (
+	// NOTE • In the body, or the hero's stacking context lets its copy cover the panel on tablets
+	return createPortal(
 		<div className={s.jacket} data-hero-settings data-lenis-prevent>
 			<button
 				type='button'
@@ -361,13 +367,14 @@ export default function Settings({
 					</details>
 					{[
 						['Mobile and compact portrait', 25, 29],
+						['Tablet portrait', 29, 33],
 						['Scroll response', 0, 4],
 						['Colour transition', 4, 6],
 						['Depth pulse', 6, 10],
 						['Portrait & cursor', 10, 19],
 						['Light & scroll effects', 19, 25],
 					].map(([title, start, end]) => (
-						<details className={s.group} key={title} open={start === 25}>
+						<details className={s.group} key={title} open={start === 25 || start === 29}>
 							<summary>{title}</summary>
 							{start === 25 ? (
 								<p>
@@ -406,6 +413,7 @@ export default function Settings({
 					))}
 				</section>
 			) : null}
-		</div>
+		</div>,
+		document.body
 	);
 }
