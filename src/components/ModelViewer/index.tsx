@@ -4,15 +4,16 @@
 // ------------
 import Image from 'next/image';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
-import type { ModelViewer as Viewer } from './engine';
 
 // Styles + Interfaces
 // ------------
+import type { ModelViewer as Viewer } from './engine';
 import type * as I from './interface';
 import s from './styles.module.scss';
 
 // Helpers
 // ------------
+// Text for the open button: download progress while loading, a retry prompt on error
 const labelFor = (status: I.ViewerStatus, progress: number | null) => {
 	if (status === 'loading') return progress === null ? 'Loading…' : `Loading ${Math.round(progress * 100)}%`;
 	if (status === 'error') return 'Couldn’t load — try again';
@@ -21,6 +22,8 @@ const labelFor = (status: I.ViewerStatus, progress: number | null) => {
 
 // Component
 // ------------
+// Poster image that becomes an interactive 3D model on request. Nothing heavy loads until the visitor
+// presses "View in 3D"; the engine then draws on the canvas that sits over the poster.
 const ModelViewer = ({ src, poster, alt, background, sizes }: I.ModelViewerProps) => {
 	// Refs
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -41,11 +44,14 @@ const ModelViewer = ({ src, poster, alt, background, sizes }: I.ModelViewerProps
 	const handleOpen = async () => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
+
 		abortRef.current = new AbortController();
+		// Reduced motion starts the model still
 		const isRotatingNow = matchMedia('(prefers-reduced-motion: no-preference)').matches;
 		setIsRotating(isRotatingNow);
 		setProgress(null);
 		setStatus('loading');
+
 		try {
 			const { createModelViewer } = await import('./engine');
 			viewerRef.current = await createModelViewer(canvas, src, {

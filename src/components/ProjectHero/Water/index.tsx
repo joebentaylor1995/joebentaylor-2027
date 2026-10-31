@@ -9,17 +9,26 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
+// Mounts the water-distortion canvas over the hero photo once the site loader has landed.
+// Skipped for reduced motion; remounts when the motion or desktop breakpoint changes.
 export default function Water() {
+	// Refs
 	const ref = useRef<HTMLCanvasElement>(null);
+
+	// Effects
 	useEffect(() => {
 		const canvas = ref.current;
 		const host = canvas?.closest<HTMLElement>('[data-project-hero]');
 		const photo = canvas?.parentElement?.querySelector('img');
 		if (!canvas || !host || !photo) return;
+
 		const motion = matchMedia('(prefers-reduced-motion: reduce)');
 		const desktop = matchMedia(mq.up.l);
+
+		// generation lets a stale async start() bail out if a newer start (or unmount) happened while importing
 		let generation = 0;
 		let dispose: (() => void) | undefined;
+
 		const start = async () => {
 			const current = ++generation;
 			dispose?.();
@@ -29,6 +38,7 @@ export default function Water() {
 			if (current !== generation) return;
 			dispose = mountProjectWater(canvas, photo, host);
 		};
+
 		const stopWaiting = whenLoaderLanded(() => void start());
 		motion.addEventListener('change', start);
 		desktop.addEventListener('change', start);
@@ -40,5 +50,7 @@ export default function Water() {
 			dispose?.();
 		};
 	}, []);
+
+	// Render
 	return <canvas ref={ref} className={s.jacket} data-project-water />;
 }

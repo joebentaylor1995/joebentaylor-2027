@@ -1,5 +1,10 @@
+// Imports
+// ------------
 import { loadGeometry } from './geometry';
 
+// Worker
+// ------------
+// Builds the globe geometry on message, then transfers the typed-array buffers back (no copy)
 self.onmessage = async () => {
 	try {
 		const geometry = await loadGeometry(new AbortController().signal);

@@ -4,19 +4,29 @@ import { baseColors } from '@theme/colors';
 import { gsap } from 'gsap';
 import { fragment, vertex } from './shaders';
 
-// Renderer
+// Engine
 // ------------
+// Mounts the 404 digital-rain scene. Two programs run each frame: a gradient backdrop, then a
+// point-sprite pass where every glyph is a point whose position, brightness and shape are decided
+// in the vertex shader. A canvas-baked "404" height map lifts the rain into relief.
+// Pointer input adds ripples (a tap) or a charge-and-release burst that dissolves the glyphs (a hold).
+// Returns { pause, destroy }; throws on setup failure after releasing GL resources.
 export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: boolean) => void) {
+	// Context
 	const context = canvas.getContext('webgl', { alpha: false, antialias: false, powerPreference: 'low-power' });
 	if (!context) return { destroy() {}, pause(_value: boolean) {} };
 	const gl = context;
 	const bindProgram = gl.useProgram.bind(gl);
 	const events = new AbortController();
 	const motion = matchMedia('(prefers-reduced-motion: reduce)');
+
+	// GL objects created along the way, released together by free()
 	const shaders: WebGLShader[] = [],
 		programs: WebGLProgram[] = [],
 		textures: WebGLTexture[] = [],
 		buffers: WebGLBuffer[] = [];
+
+	// Runtime state
 	let disposed = false,
 		paused = false,
 		dirty = true,
@@ -24,12 +34,18 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 		height = 1,
 		count = 0,
 		elapsed = 0;
+
+	// Tiny seeded generator (Lehmer) so the rain layout is identical on every resize
 	let seed = 17;
 	const random = () => {
 		seed = (seed * 16807) % 2147483647;
 		return (seed - 1) / 2147483646;
 	};
+
+	// '#rrggbb' to [r, g, b] in 0..1
 	const rgb = (hex: string) => [1, 3, 5].map(offset => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
+
+	// GL helpers: each one registers what it creates so free() can delete it
 	const compile = (type: number, source: string) => {
 		const shader = gl.createShader(type);
 		if (!shader) throw new Error('Shader unavailable');
@@ -57,6 +73,7 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 		buffers.push(result);
 		return result;
 	};
+	// Uploads a canvas as a clamped, linear-filtered texture on the given unit
 	const upload = (unit: number, source: HTMLCanvasElement) => {
 		const texture = gl.createTexture();
 		if (!texture) throw new Error('Texture unavailable');
@@ -69,13 +86,16 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	};
+
 	const free = () => {
 		for (const resource of textures) gl.deleteTexture(resource);
 		for (const resource of buffers) gl.deleteBuffer(resource);
 		for (const resource of programs) gl.deleteProgram(resource);
 		for (const resource of shaders) gl.deleteShader(resource);
 	};
+
 	try {
+		// Programs: the glyph rain, and a vertical gradient backdrop between two brand colours
 		const rain = program(vertex, fragment);
 		const background = program(
 			'attribute vec2 position; varying vec2 uv; void main(){uv=position*.5+.5;gl_Position=vec4(position,0.,1.);}',
@@ -84,11 +104,16 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 		bindProgram(background);
 		gl.uniform3fv(gl.getUniformLocation(background, 'top'), rgb(baseColors.brand.c4));
 		gl.uniform3fv(gl.getUniformLocation(background, 'bottom'), rgb(baseColors.brand.c1));
+
+		// One oversized triangle covers the screen for the backdrop
 		const backdrop = buffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, backdrop);
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
 		const position = gl.getAttribLocation(background, 'position');
+
 		bindProgram(rain);
+
+		// Uniforms (all prefixed u_ in the shaders)
 		const uniforms: Record<string, WebGLUniformLocation | null> = {};
 		for (const name of [
 			'resolution',
@@ -119,9 +144,12 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 			'blue',
 		])
 			uniforms[name] = gl.getUniformLocation(rain, `u_${name}`);
+
 		const value = (name: string, amount: number) => gl.uniform1f(uniforms[name], amount);
+
 		// One generated height map drives every glyph's light, normal and displacement.
 		const map = Object.assign(document.createElement('canvas'), { width: 1536, height: 640 });
+		// Draw "404" bold, stretched to a fixed width and vertically centred, with a soft halo under a solid fill
 		const c = map.getContext('2d');
 		if (!c) throw new Error('Canvas unavailable');
 		c.fillStyle = '#000';
@@ -140,6 +168,8 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 		c.fillStyle = '#fff';
 		c.fillText('404', 0, baseline);
 		upload(1, map);
+
+		// Glyph atlas: 64 cells in an 8x8 grid of katakana, digits and symbols, repeated to fill
 		const atlas = Object.assign(document.createElement('canvas'), { width: 512, height: 512 });
 		const a = atlas.getContext('2d');
 		if (!a) throw new Error('Atlas unavailable');
@@ -153,6 +183,8 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 		for (let i = 0; i < 64; i++)
 			a.fillText(glyphs[i % glyphs.length], (i % 8) * 64 + 32, Math.floor(i / 8) * 64 + 33);
 		upload(0, atlas);
+
+		// Texture units, then static look settings (the charge animation re-drives some of these per frame)
 		gl.uniform1i(uniforms.atlas, 0);
 		gl.uniform1i(uniforms.portrait, 1);
 		gl.uniform3fv(uniforms.blue, rgb(baseColors.brand.c1));
@@ -171,9 +203,14 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 			ripple: 0.3,
 		}))
 			value(name, amount);
+
+		// Particle buffer: 6 floats per glyph (x, y, speed, glyph, size, brightness), rebuilt on resize
 		const particles = buffer(),
 			drop = gl.getAttribLocation(rain, 'a_drop'),
 			style = gl.getAttribLocation(rain, 'a_style');
+
+		// Size the canvas (pixel ratio capped lower on phones) and regenerate the rain
+		// as three depth layers of columns, each broken into dashed streams
 		const resize = () => {
 			width = Math.max(1, canvas.clientWidth);
 			height = Math.max(1, canvas.clientHeight);
@@ -184,19 +221,24 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 			bindProgram(rain);
 			gl.uniform2f(uniforms.resolution, width, height);
 			value('dpr', ratio);
+
 			seed = 17;
 			const data: number[] = [],
 				scale = 8 / 23,
 				row = 24 * scale;
+
 			for (let layer = 0; layer < 3; layer++) {
 				const spacing = ((layer === 0 ? 32 : 25) * scale) / 1.5;
 				for (let x = 8; x < width + spacing; x += spacing) {
+					// Per column: start offset, fall speed, streak length and gap between streaks
 					const offset = random() * (height + 160),
 						velocity = 35 + random() * 65 + layer * 24,
 						length = 8 + Math.floor(random() * 20),
 						gap = 8 + Math.floor(random() * 14);
+
 					for (let j = 0; j < Math.ceil((height + 160) / row); j++) {
 						const phase = j % (length + gap);
+						// Gap cells emit nothing; streak cells brighten towards the head
 						if (phase >= length) continue;
 						data.push(
 							x + (layer - 1) * 7,
@@ -209,22 +251,32 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 					}
 				}
 			}
+
 			count = data.length / 6;
 			gl.bindBuffer(gl.ARRAY_BUFFER, particles);
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
 			dirty = true;
 		};
+
+		// Pointer state: x/y are eased towards the target tx/ty; active eases towards target (0 or 1)
 		const cursor = { x: 0, y: 0, tx: 0, ty: 0, active: 0, target: 0 };
+
+		// Ring buffer of the four most recent tap ripples (age in seconds)
 		const waves = Array.from({ length: 4 }, () => ({ x: 0, y: 0, age: 10, amplitude: 0 }));
 		const waveData = new Float32Array(16);
 		let waveIndex = 0;
+
+		// Press-and-hold charge; releasing after the hold threshold dissolves the glyphs (dead) and then re-forms them
 		const charge = { holding: false, started: 0, amount: 0, age: 8, dead: false, x: 0, y: 0, pointer: -1 };
+
 		const point = (event: PointerEvent) => {
 			const rect = canvas.getBoundingClientRect();
 			cursor.tx = event.clientX - rect.left;
 			cursor.ty = event.clientY - rect.top;
 			cursor.target = 1;
 		};
+
+		// End a press: a long hold bursts the scene, a short one drops a ripple; cancel just discards it
 		const finish = (cancel = false) => {
 			if (!charge.holding) return;
 			charge.holding = false;
@@ -243,6 +295,8 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 				}
 			}
 		};
+
+		// Input listeners, all removed with events.abort()
 		canvas.addEventListener('pointermove', point, { signal: events.signal });
 		canvas.addEventListener(
 			'pointerdown',
@@ -318,11 +372,15 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 			},
 			{ signal: events.signal }
 		);
+
 		const observer = new ResizeObserver(resize);
 		observer.observe(canvas);
 		resize();
+
 		cursor.x = cursor.tx = width / 2;
 		cursor.y = cursor.ty = height / 2;
+
+		// Frame: skips while hidden, mid-navigation, or idle in a paused/reduced-motion state with nothing to redraw
 		const tick = (_time: number, delta: number) => {
 			if (
 				disposed ||
@@ -331,9 +389,12 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 				((paused || motion.matches) && !dirty)
 			)
 				return;
+
 			dirty = false;
 			const dt = paused || motion.matches ? 0 : Math.min(delta / 1000, 0.05);
 			if (!charge.dead || charge.age >= 4.5) elapsed += dt * 1.3;
+
+			// Frame-rate independent easing of the cursor, and the charge amount (0..1) while holding
 			const ease = 1 - Math.exp(-dt * 9);
 			cursor.x += (cursor.tx - cursor.x) * ease;
 			cursor.y += (cursor.ty - cursor.y) * ease;
@@ -344,8 +405,11 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 			charge.amount +=
 				((charge.holding ? Math.min(1, seconds / 0.7) : 0) - charge.amount) *
 				(1 - Math.exp(-dt * (charge.holding ? 18 : 5)));
+
 			const q = charge.amount,
 				enabled = motion.matches || charge.dead ? 0 : 1;
+
+			// Backdrop pass
 			gl.disable(gl.BLEND);
 			bindProgram(background);
 			gl.bindBuffer(gl.ARRAY_BUFFER, backdrop);
@@ -353,6 +417,8 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 			gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
 			gl.drawArrays(gl.TRIANGLES, 0, 3);
 			gl.disableVertexAttribArray(position);
+
+			// Rain pass, additive blending
 			bindProgram(rain);
 			gl.bindBuffer(gl.ARRAY_BUFFER, particles);
 			gl.enableVertexAttribArray(drop);
@@ -361,6 +427,8 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 			gl.vertexAttribPointer(style, 2, gl.FLOAT, false, 24, 16);
 			gl.enable(gl.BLEND);
 			gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ZERO, gl.ONE);
+
+			// Charging deepens the relief, brightens and magnetises the glyphs
 			value('time', elapsed);
 			value('depth', 0.65 + q * 0.18);
 			value('bend', 0.3 * (1 - q));
@@ -369,6 +437,7 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 			value('chargeDetail', q * 0.25);
 			value('magnet', (0.65 * cursor.active + q * 1.8) * enabled);
 			value('ripple', 0.3 * enabled);
+
 			gl.uniform2f(uniforms.cursor, cursor.x, cursor.y);
 			gl.uniform2f(
 				uniforms.tilt,
@@ -377,12 +446,15 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 			);
 			gl.uniform2f(uniforms.chargeWave, seconds, charge.holding ? 0.2 + q * 0.55 : 0);
 			gl.uniform4f(uniforms.burst, charge.x, charge.y, charge.age, charge.dead ? 1 : 0);
+
 			for (let i = 0; i < 4; i++) {
 				const wave = waves[i];
 				wave.age = Math.min(10, wave.age + dt);
 				waveData.set([wave.x, wave.y, wave.age, wave.amplitude], i * 4);
 			}
 			gl.uniform4fv(uniforms['waves[0]'], waveData);
+
+			// Draw twice: a large soft glow pass (pass 1), then the crisp glyphs (pass 0)
 			value('pass', 1);
 			gl.drawArrays(gl.POINTS, 0, count);
 			value('pass', 0);
@@ -390,9 +462,11 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 			gl.disableVertexAttribArray(drop);
 			gl.disableVertexAttribArray(style);
 		};
+
 		gsap.ticker.add(tick);
 		tick(0, 0);
 		onReady(true);
+
 		return {
 			pause(value: boolean) {
 				paused = value;

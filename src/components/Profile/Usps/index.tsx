@@ -1,9 +1,10 @@
 // Imports
 // ------------
 import Grid, { Col } from '@waffl';
-// Styles
-// ------------
 import type { ProfilePanelContent } from '@/data/site';
+
+// Styles + Interfaces
+// ------------
 import CssDesignAwards from './CssDesignAwards';
 import FeaturedOn from './FeaturedOn';
 import Keycap from './Keycap';
@@ -23,6 +24,7 @@ type UspsProps = Pick<
 // ------------
 // NOTE • Tile content comes from the Profile panel's “Highlights” in Sanity;
 // the location tile (globe) is fixed artwork
+// Bento grid of highlight tiles; on large screens each tile spans a set of the 8 columns
 const Usps = ({ designToolkit, developmentToolkit, keyboards, featuredOn, cssda }: UspsProps) => {
 	// Render
 	return (

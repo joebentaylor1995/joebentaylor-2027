@@ -1,3 +1,8 @@
+// Shaders
+// ------------
+// Vertex: one point per glyph. Positions the glyph (rain fall, relief of the face height map, ripples,
+// charge pulse, hover attraction, burst/dissolve) and passes shading values to the fragment shader.
+// Attributes: a_drop = (x, y, speed, glyph index), a_style = (size, brightness).
 export const vertexShader = `
 	precision mediump float;
 	attribute vec4 a_drop;
@@ -32,6 +37,8 @@ export const vertexShader = `
 	varying float v_visibility;
 	varying float v_break;
 	varying float v_seed;
+
+	// Mask that fades the face silhouette into ordinary rain
 	float portraitFeather(vec2 uv) {
 		// Fade the silhouette into ordinary rain; retain contrast around the eyes and nose.
 		vec2 p = (uv - vec2(0.5, 0.51)) / vec2(0.51, 0.54);
@@ -40,6 +47,7 @@ export const vertexShader = `
 		return oval * smoothstep(0.0, 0.10, min(edge.x, edge.y));
 	}
 
+	// Blurred height-map sample (centre plus four diagonal taps) blended with a dome so the face reads as raised
 	float surface(vec2 uv) {
 		float bounds = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
 		vec2 texUV = clamp(uv, 0.0, 1.0);
@@ -55,18 +63,21 @@ export const vertexShader = `
 	}
 
 	void main() {
+		// Fall: wrap y within the screen plus an 80px margin each side
 		float height = u_resolution.y;
 		float y = mod(a_drop.y + u_time * a_drop.z, height + 160.0) - 80.0;
 		float x = a_drop.x;
 		float portraitHeight = min(u_resolution.y * 0.96, u_resolution.x / u_aspect * 0.9) * u_portraitSize;
 		vec2 extent = vec2(portraitHeight * u_aspect, portraitHeight);
 		vec2 uv = (vec2(x, y) - u_resolution * 0.5) / extent + 0.5;
+		// Where this glyph sits on the face
 		float z = surface(uv);
 		// Keep the relief smooth, but recover the original portrait's fine features on charge.
 		float portraitBounds = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
 		float rawDetail = texture2D(u_portrait, clamp(uv, 0.0, 1.0)).r;
 		float surrounding = (texture2D(u_portrait, clamp(uv + vec2(0.006, 0.0), 0.0, 1.0)).r + texture2D(u_portrait, clamp(uv - vec2(0.006, 0.0), 0.0, 1.0)).r + texture2D(u_portrait, clamp(uv + vec2(0.0, 0.006), 0.0, 1.0)).r + texture2D(u_portrait, clamp(uv - vec2(0.0, 0.006), 0.0, 1.0)).r) * 0.25;
 		v_detail = clamp((rawDetail + (rawDetail - surrounding) * 1.4 - 0.10) * 1.35, 0.0, 1.0) * portraitBounds * portraitFeather(uv);
+		// Surface slope by central differences, used for flow and shading
 		float stepSize = 0.018;
 		vec2 slope = vec2(surface(uv + vec2(stepSize, 0.0)) - surface(uv - vec2(stepSize, 0.0)), surface(uv + vec2(0.0, stepSize)) - surface(uv - vec2(0.0, stepSize))) / (2.0 * stepSize);
 		// Flow around protruding ridges, then project the raised relief in 3D.
@@ -125,9 +136,11 @@ export const vertexShader = `
 		vec2 attraction = delta * min(0.7, u_magnet * 0.45) * falloff;
 		x += attraction.x;
 		y += attraction.y;
+		// Lighting from the surface normal
 		vec3 normal = normalize(vec3(-slope.x * u_depth * 0.35, -slope.y * u_depth * 0.35, 1.0));
 		v_shade = 0.25 + 0.75 * max(0.0, dot(normal, normalize(vec3(-0.65, -0.4, 1.0))));
 		v_surface = z * mix(1.0, portraitFeather(uv), u_chargeDetail);
+		// Burst: a shock front leaves the click point, fractures glyphs into debris, then the scene re-forms top to bottom
 		float burstAge = u_burst.z;
 		float burstOn = u_burst.w;
 		float seed = fract(sin(a_drop.w * 1.17 + a_drop.x * 0.03 + a_drop.y * 0.011) * 437.58);
@@ -159,6 +172,7 @@ export const vertexShader = `
 		y += returnCrest * 10.0;
 		v_wave += returnCrest * 0.18;
 		v_wave += sin(randomAngle + burstAge * 2.0) * breaking * 0.22;
+		// Output: clip-space position, point size (the glow pass draws 2.8x larger) and varyings
 		gl_Position = vec4(x / u_resolution.x * 2.0 - 1.0, 1.0 - y / height * 2.0, 0.0, 1.0);
 		gl_PointSize = a_style.x * u_size * u_dpr * (1.0 - u_chargeDetail * faceMask * 0.16) * (1.0 + abs(wave) * 0.55) * (u_pass > 0.5 ? 2.8 : 1.0);
 		v_glyph = mod(a_drop.w + floor(u_time * (1.5 + a_style.y)), 64.0);
@@ -167,6 +181,8 @@ export const vertexShader = `
 	}
 `;
 
+// Fragment: samples the glyph atlas (or a soft round glow in pass 1), distorts it with wave and
+// burst values, and tints it from base blue towards light blue where the face relief is.
 export const fragmentShader = `
 	precision mediump float;
 	uniform mediump float u_chargeDetail;
@@ -192,6 +208,7 @@ export const fragmentShader = `
 	varying float v_break;
 	varying float v_seed;
 	void main() {
+		// face = how strongly this glyph is part of the raised portrait
 		float face = mix(v_surface, v_detail, u_chargeDetail) * u_face;
 		float fade = pow(v_y, u_fade);
 		float ink;
@@ -217,6 +234,7 @@ export const fragmentShader = `
 			float fragmentLife = fract(sin(dot(cell, vec2(12.1, 7.7)) + v_seed * 31.0) * 437.58);
 			ink *= smoothstep(v_break * 1.08 - 0.07, v_break * 1.08 + 0.07, fragmentLife + 0.08);
 		}
+		// Colour and final alpha
 		vec3 blue = vec3(22.0, 83.0, 255.0) / 255.0;
 		vec3 color = mix(blue, vec3(0.38, 0.70, 1.0), clamp(face * v_shade, 0.0, 1.0));
 		float portraitLight = mix(v_shade * (0.45 + v_light * 2.0), 0.75 + v_light * 0.65, u_chargeDetail);

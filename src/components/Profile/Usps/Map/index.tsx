@@ -13,10 +13,13 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
+// Interactive dotted globe centred on Doncaster. The WebGL engine is lazy-loaded when the profile is
+// present and only renders while the tile is on screen; a text fallback covers failure.
 const GlobeMap = () => {
 	// Context
 	const profilePresent = use(ProfilePresenceContext);
 	const settings = useSyncExternalStore(subscribe, getSettings, () => defaults);
+
 	// Refs
 	const container = useRef<HTMLDivElement>(null);
 
@@ -24,10 +27,13 @@ const GlobeMap = () => {
 	useEffect(() => {
 		const element = container.current;
 		if (!element || !profilePresent) return;
+
 		const controller = new AbortController();
 		let disposed = false;
 		let visible = false;
 		let scene: Awaited<ReturnType<typeof import('./engine').createGlobe>> | undefined;
+
+		// createGlobe is async (it loads geometry), so check for disposal again before keeping the scene
 		const stopPreparing = prepareScene(element, () =>
 			import('./engine')
 				.then(async ({ createGlobe }) => {
@@ -46,6 +52,7 @@ const GlobeMap = () => {
 					}
 				})
 		);
+
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				visible = entry.isIntersecting;
@@ -55,6 +62,7 @@ const GlobeMap = () => {
 			{ threshold: 0.1 }
 		);
 		observer.observe(element);
+
 		return () => {
 			disposed = true;
 			controller.abort();

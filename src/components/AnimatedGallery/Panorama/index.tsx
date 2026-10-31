@@ -4,6 +4,7 @@
 // ------------
 import Image from 'next/image';
 import { type CSSProperties, useCallback, useMemo, useRef, useState } from 'react';
+
 // Styles + Interfaces
 // ------------
 import type * as I from '../interface';
@@ -25,6 +26,7 @@ const CARD_STYLE = {
 
 // Component
 // ------------
+// Cards on a ring round the camera, panning one card at a time (layout maths lives in ./layout)
 const Panorama = ({ images, background, sizes }: I.GalleryAnimationProps) => {
 	// Refs
 	const stageRef = useRef<HTMLDivElement>(null);

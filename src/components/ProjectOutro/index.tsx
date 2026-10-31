@@ -1,8 +1,8 @@
 'use client';
 
-import { GlobalContext } from '@parts/Contexts';
 // Imports
 // ------------
+import { GlobalContext } from '@parts/Contexts';
 import PageTitleReveal from '@parts/PageTitleReveal';
 import { mq } from '@tackl';
 import { navigateNextProject } from '@utils/projectHandoff';
@@ -12,45 +12,58 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { use, useEffect, useRef } from 'react';
+
 // Styles + Interfaces
 // ------------
 import type { ProjectOutroProps } from './interface';
 import Matrix from './Matrix';
 import s from './styles.module.scss';
 
-// Component
+// Constants
 // ------------
 // NOTE • The project modal's ending — it invites a conversation instead of the next case study
 // NOTE • Two lines, as on the profile's call to action
 const CONTACT_LINES = ['Ready?', 'Let’s grow.'];
+
+// Text the glyph-rain footer is built from in the contact ending
 const CONTACT_MATRIX = 'Let’s grow';
 
 // NOTE • Matches ProjectExperience: the call to action fills over the last
 // 35% of a screen before the outro's bottom reaches the bottom of the view
 const OUTRO_FILL_RANGE = 0.35;
 
+// Component
+// ------------
+// End of a case study: the client's review, then a giant call to action over a glyph-rain footer,
+// either "Next Project" (with a handoff transition) or, in the modal, "Ready? Let's grow." to open contact.
 const ProjectOutro = ({ review, nextProject, cta = 'next' }: ProjectOutroProps) => {
+	// Context
 	const { lenisRef, setContactOpen } = use(GlobalContext);
 	const isContact = cta === 'contact';
 	const router = useRouter();
+
 	// Refs
 	const ref = useRef<HTMLElement>(null);
 
 	// Effects
+	// Publish where the review's credit line ends, as --outro-gradient-top, so the CSS gradient can start there
 	useEffect(() => {
 		const root = ref.current;
 		if (!root) return;
+
 		const credit = review ? root.querySelector('figcaption') : null;
 		const measure = () => {
 			const top = credit ? credit.getBoundingClientRect().bottom - root.getBoundingClientRect().top : 0;
 			root.style.setProperty('--outro-gradient-top', `${top}px`);
 		};
+
 		const observer = new ResizeObserver(measure);
 		observer.observe(root);
 		if (credit) observer.observe(credit);
 		const reviewElement = root.querySelector('figure');
 		if (reviewElement) observer.observe(reviewElement);
 		measure();
+
 		return () => observer.disconnect();
 	}, [review]);
 
@@ -60,16 +73,19 @@ const ProjectOutro = ({ review, nextProject, cta = 'next' }: ProjectOutroProps) 
 		const root = ref.current;
 		const panel = root?.closest<HTMLElement>('#profile-panel');
 		if (!root || !panel) return;
+
 		const update = () => {
 			const distance = root.getBoundingClientRect().bottom - panel.getBoundingClientRect().bottom;
 			const progress = Math.min(1, Math.max(0, 1 - distance / (panel.clientHeight * OUTRO_FILL_RANGE)));
 			root.style.setProperty('--project-outro-progress', String(progress));
 		};
+
 		// NOTE • Re-measures when the panel's content first appears (it mounts hidden) or reflows
 		const resize = new ResizeObserver(update);
 		resize.observe(root);
 		resize.observe(panel);
 		panel.addEventListener('scroll', update, { passive: true });
+
 		return () => {
 			resize.disconnect();
 			panel.removeEventListener('scroll', update);
@@ -78,17 +94,20 @@ const ProjectOutro = ({ review, nextProject, cta = 'next' }: ProjectOutroProps) 
 	}, []);
 
 	// Animations
+	// The reviewer's portrait pops in once 30% visible; the call to action fills on hover/focus (desktop only)
 	useAnimation(
 		({ reduced }) => {
 			const root = ref.current;
 			const portrait = root?.querySelector('[data-outro-portrait]');
 			const next = root?.querySelector<HTMLElement>('[data-next-project], [data-contact-cta]');
 			if (!root || !portrait || !next || reduced) return;
+
 			const reveal = gsap.fromTo(
 				portrait,
 				{ scale: 0 },
 				{ scale: 1, duration: 0.8, ease: 'power3.out', paused: true }
 			);
+
 			const observer = new IntersectionObserver(
 				([entry]) => {
 					if (!entry.isIntersecting || entry.intersectionRatio < 0.3) return;
@@ -99,6 +118,7 @@ const ProjectOutro = ({ review, nextProject, cta = 'next' }: ProjectOutroProps) 
 			);
 			// Observe the untransformed wrapper so scale zero can still enter view.
 			observer.observe(portrait.parentElement as HTMLElement);
+
 			const hover = gsap.to(next, { '--hover-fill': 111, duration: 0.8, ease: 'power2.inOut', paused: true });
 			const enter = () => {
 				if (matchMedia(`${mq.up.l} and (hover: hover) and (pointer: fine)`).matches) hover.play();
@@ -106,10 +126,12 @@ const ProjectOutro = ({ review, nextProject, cta = 'next' }: ProjectOutroProps) 
 			const leave = () => {
 				hover.reverse();
 			};
+
 			next.addEventListener('pointerenter', enter);
 			next.addEventListener('pointerleave', leave);
 			next.addEventListener('focus', enter);
 			next.addEventListener('blur', leave);
+
 			return () => {
 				observer.disconnect();
 				next.removeEventListener('pointerenter', enter);

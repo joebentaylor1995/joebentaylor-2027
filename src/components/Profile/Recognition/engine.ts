@@ -1,6 +1,5 @@
 // Imports
 // ------------
-
 import { getSettings, getSettingsTarget } from '@parts/ProfileReveal/Settings/store';
 import { canHover } from '@utils/desktopHover';
 import { yieldSceneWork } from '@utils/prepareScene';
@@ -10,22 +9,40 @@ import type { RecognitionScene } from './interface';
 import { clamp } from './motion';
 import { fragmentShader, posterVertexShader } from './shaders';
 
-// Scene
+// Constants
 // ------------
+// Spiral geometry, in scene units: radius, vertical rise per full turn, and posters per turn
 const RADIUS = 3.85;
 const PITCH = 6.5;
 const PER_TURN = 10;
+
+// Poster card size (the artwork is 420x595)
 const CARD_WIDTH = 2.4;
 const CARD_HEIGHT = (CARD_WIDTH * 595) / 420;
+
+// How much larger an inspected poster is than one on the spiral
 const FOCUS_SCALE = 1.75;
 const TAU = Math.PI * 2;
+
+// Types
+// ------------
 type Award = THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
 
+// Helpers
+// ------------
+// Unwraps a required DOM element, throwing if the markup is missing it
 function required<T>(element: T | null): T {
 	if (!element) throw new Error('Recognition element missing');
 	return element;
 }
 
+// Engine
+// ------------
+// Renders awards as shader-driven cards on a helical spiral. Phase (in turns) advances on its own,
+// with scroll, and with drag/keys; clicking or pressing Enter lifts one card to the front for
+// inspection, where the pointer tilts it and adds glare. Frame work runs on GSAP's ticker only
+// while visible. section.dataset.* mirrors state for styling and tests.
+//
 // NOTE • posters are the award image URLs (Sanity, or the local fallback) — the
 // spiral's length follows however many there are
 export function createRecognition(
@@ -33,11 +50,16 @@ export function createRecognition(
 	signal: AbortSignal,
 	posters: readonly string[]
 ): RecognitionScene {
+	// Total turns of the spiral; phase wraps modulo this
 	const TURNS = posters.length / PER_TURN;
+
+	// DOM
 	const stage = required(section.querySelector<HTMLElement>('[data-recognition-stage]'));
 	const scroller = required(section.closest<HTMLElement>('#profile-panel'));
 	const canvas = required(section.querySelector<HTMLCanvasElement>('canvas'));
 	const returnButton = required(section.querySelector<HTMLButtonElement>('[data-recognition-return]'));
+
+	// Three.js objects
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
 	renderer.setPixelRatio(Math.min(devicePixelRatio, getSettingsTarget() === 'mobile' ? 1.5 : 2));
 	renderer.setClearColor(0x000000, 0);
@@ -54,6 +76,8 @@ export function createRecognition(
 	const euler = new THREE.Euler();
 	const focusPosition = new THREE.Vector3();
 	const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+
+	// Lifecycle flags + spiral motion (phase is eased towards targetPhase; scrollSpeed follows the panel scroll)
 	let visible = false;
 	let disposed = false;
 	let ready = false;
@@ -66,12 +90,16 @@ export function createRecognition(
 	let direction = 1;
 	let width = 1;
 	let height = 1;
+
+	// Inspect state: focusProgress runs 0..1 linearly, focusBlend is its smoothed version used for animation
 	let selected: Award | null = null;
 	let focused = false;
 	let focusBlend = 0;
 	let focusProgress = 0;
 	let glare = 0;
 	let velocity = 0;
+
+	// Pointer / drag tracking
 	let pointerId: number | null = null;
 	let downX = 0;
 	let downY = 0;
@@ -81,6 +109,7 @@ export function createRecognition(
 	let moved = false;
 	let pressed: Award | null = null;
 
+	// Enters (card) or leaves (null) inspection; a tapped card keeps the spiral where it is while selected
 	function focus(card: Award | null) {
 		if (card) {
 			selected = card;
@@ -91,6 +120,8 @@ export function createRecognition(
 		section.dataset.focus = String(focused);
 		returnButton.hidden = !focused;
 	}
+
+	// Fit the renderer and camera to the stage; the camera pulls back so narrow stages still frame the spiral
 	function resize() {
 		width = Math.max(stage.clientWidth, 1);
 		height = Math.max(stage.clientHeight, 1);
@@ -104,6 +135,7 @@ export function createRecognition(
 	observer.observe(stage);
 	resize();
 
+	// Pointer in normalised device coordinates (-1..1, y up)
 	function updatePointer(event: PointerEvent) {
 		const rect = canvas.getBoundingClientRect();
 		pointer.set(
@@ -111,6 +143,7 @@ export function createRecognition(
 			(-(event.clientY - rect.top) / rect.height) * 2 + 1
 		);
 	}
+	// Front-facing card under the pointer, if any (cards at the back or off the visible band are ignored)
 	function pick() {
 		scene.updateMatrixWorld();
 		camera.updateMatrixWorld();
@@ -118,6 +151,8 @@ export function createRecognition(
 		const hit = raycaster.intersectObjects(cards, false)[0]?.object as Award | undefined;
 		return hit && hit.position.z > 1.5 && Math.abs(hit.position.y) < 3.5 ? hit : null;
 	}
+
+	// Drag moves the spiral (a 6px threshold separates a drag from a tap); a tap on a card inspects it
 	function down(event: PointerEvent) {
 		if (pointerId !== null || (event.pointerType === 'mouse' && event.button !== 0)) return;
 		updatePointer(event);
@@ -158,6 +193,7 @@ export function createRecognition(
 		pressed = null;
 		section.dataset.dragging = 'false';
 	}
+	// Keyboard: Enter inspects the most central card (or returns), Escape returns, Space pauses, arrows nudge
 	function key(event: KeyboardEvent) {
 		if (event.key === 'Escape' && selected) {
 			event.stopPropagation();
@@ -182,6 +218,8 @@ export function createRecognition(
 			targetPhase += event.key === 'ArrowRight' ? 0.055 : -0.055;
 		}
 	}
+
+	// Listeners, all removed through the abort signal
 	const events = { signal };
 	canvas.addEventListener('pointerdown', down, events);
 	canvas.addEventListener('pointermove', move, events);
@@ -216,6 +254,8 @@ export function createRecognition(
 		events
 	);
 
+	// Frame: update spiral phase, inspect animation and card uniforms, then render.
+	// Layer 1 holds the inspected card, drawn in a second pass over a cleared depth buffer so it never clips into the spiral.
 	function tick(_time: number, deltaTime: number) {
 		const scrollDelta = scroller.scrollTop - lastScroll;
 		lastScroll = scroller.scrollTop;
@@ -223,6 +263,7 @@ export function createRecognition(
 			scrollSpeed = 0;
 			return;
 		}
+
 		const dt = clamp(deltaTime / 1000, 0.001, 0.05);
 		const settings = getSettings();
 		if (camera.zoom !== settings.awardZoom) {
@@ -230,18 +271,23 @@ export function createRecognition(
 			camera.updateProjectionMatrix();
 		}
 		section.dataset.spiralZoom = String(camera.zoom);
+
 		const size = settings.awardSize / 100;
 		const ease = reduced.matches ? 1 : 1 - Math.exp(-9 * dt);
+
+		// Scroll sets the spiral's direction and adds a speed boost
 		if (Math.abs(scrollDelta) > 0.5 && !reduced.matches) direction = Math.sign(scrollDelta);
 		const scrollTarget = reduced.matches
 			? 0
 			: clamp(scrollDelta / dt / height, -3, 3) * 0.25 * settings.awardScrollBoost;
 		scrollSpeed = THREE.MathUtils.lerp(scrollSpeed, scrollTarget, ease);
+
 		const speed = playing ? direction * 0.023 * settings.awardSpeed + scrollSpeed : 0;
 		if (!selected && pointerId === null) {
 			targetPhase += (speed + velocity) * dt;
 			velocity *= Math.exp(-dt / (settings.awardDragEasing * 1.3));
 		}
+
 		phase = THREE.MathUtils.lerp(
 			phase,
 			targetPhase,
@@ -251,9 +297,11 @@ export function createRecognition(
 		const turns = Math.floor(phase / TURNS) * TURNS;
 		phase -= turns;
 		targetPhase -= turns;
+
 		section.dataset.spiralSpeed = speed.toFixed(4);
 		section.dataset.awardSize = String(settings.awardSize);
 		section.dataset.dragEasing = String(settings.awardDragEasing);
+
 		focusProgress = reduced.matches
 			? focused
 				? 1
@@ -270,6 +318,8 @@ export function createRecognition(
 			focusProgress = 0;
 			selected = null;
 		}
+
+		// Inspection target: just in front of the spiral; the pointer tilts the card while it is hovered
 		focusPosition.set(0, 0, RADIUS + 0.8);
 		tiltTarget.set(0, 0);
 		let overSelected = false;
@@ -284,6 +334,7 @@ export function createRecognition(
 		// Damp the rigid card tilt without paper wobble or surface ripples.
 		if (reduced.matches) tilt.set(0, 0);
 		else tilt.lerp(tiltTarget, 1 - Math.exp(-dt * 10));
+
 		const hoverStrength = Math.min(settings.awardHoverIntensity * 10, 2);
 		section.dataset.cardTilt = tilt.length().toFixed(3);
 		glare = THREE.MathUtils.lerp(
@@ -293,8 +344,11 @@ export function createRecognition(
 		);
 		section.dataset.cardGlare = glare.toFixed(3);
 		rotation.setFromEuler(euler.set(-tilt.y * 0.1 * hoverStrength, tilt.x * 0.12 * hoverStrength, 0));
+
 		const hovered = canHover() && !selected && pointerId === null ? pick() : null;
 		section.dataset.hover = String(Boolean(hovered));
+
+		// Place every card on the helix, t = its offset in turns from the middle of the spiral
 		cards.forEach((card, index) => {
 			const t = THREE.MathUtils.euclideanModulo(index / PER_TURN + phase, TURNS) - TURNS / 2;
 			const angle = -t * TAU;
@@ -314,6 +368,7 @@ export function createRecognition(
 				card.material.uniforms.depth.value = THREE.MathUtils.lerp(depth, 1, focusBlend);
 			}
 		});
+
 		camera.layers.set(0);
 		renderer.render(scene, camera);
 		if (selected) {
@@ -325,6 +380,8 @@ export function createRecognition(
 			renderer.autoClear = true;
 		}
 	}
+
+	// Run the ticker only while visible, loaded and the tab is showing
 	function syncTicker() {
 		gsap.ticker.remove(tick);
 		if (visible && ready && !disposed && !document.hidden) {
@@ -334,6 +391,7 @@ export function createRecognition(
 	}
 	document.addEventListener('visibilitychange', syncTicker, { signal });
 
+	// Load every poster in parallel, then build one card each (one task per card so the main thread stays responsive)
 	const loader = new THREE.TextureLoader();
 	const loadAwards = async () => {
 		if (signal.aborted) return;
@@ -351,6 +409,7 @@ export function createRecognition(
 			})
 		);
 		if (signal.aborted) return;
+
 		for (const result of results) {
 			await yieldSceneWork();
 			if (signal.aborted) return;
@@ -374,10 +433,12 @@ export function createRecognition(
 			cards.push(mesh);
 			scene.add(mesh);
 		}
+
 		if (!cards.length) {
 			section.dataset.state = 'fallback';
 			return;
 		}
+
 		await renderer.compileAsync(scene, camera);
 		if (signal.aborted) return;
 		ready = true;
@@ -389,9 +450,12 @@ export function createRecognition(
 		section.dataset.awards = String(cards.length);
 		syncTicker();
 	};
+
 	void loadAwards().catch(() => {
 		if (!signal.aborted) section.dataset.state = 'fallback';
 	});
+
+	// Handle
 	return {
 		setVisible(next) {
 			visible = next;

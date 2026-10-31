@@ -1,6 +1,5 @@
 // Imports
 // ------------
-
 import PageTitleReveal from '@parts/PageTitleReveal';
 import SpecialHeading from '@parts/SpecialHeading';
 import Image from 'next/image';
@@ -13,6 +12,8 @@ import Water from './Water';
 
 // Component
 // ------------
+// Case study opener: full-bleed hero photo with the water canvas over it and the title below.
+// In preview mode it is a plain image and heading: no water canvas, title animation or page-level ids.
 const ProjectHero = ({ project, preview = false }: ProjectHeroProps) => (
 	// NOTE • The case study streams in under Suspense, so the site loader and
 	// Water can reach this section before React hydrates it and set

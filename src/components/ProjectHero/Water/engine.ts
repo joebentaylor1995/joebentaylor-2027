@@ -1,3 +1,5 @@
+// Imports
+// ------------
 import { mq } from '@tackl';
 import { gsap } from 'gsap';
 import { drawHeroContent } from '../../Hero/Background/hero-content-texture';
@@ -7,8 +9,15 @@ import { liquidVertex } from '../../Hero/Background/liquid-shaders';
 import { sceneIntros } from '../../Hero/Background/scene-intro';
 import { HERO_SHADE_START } from '../framing';
 
+// Engine
+// ------------
 // The shared water pass receives a covered project image instead of the homepage's depth portrait.
+//
+// Each frame (while dirty) a small program composites the photo, a saturation/shade pass and the
+// baked hero title into the liquid layer's portrait target, then the liquid layer ripples it.
+// Returns destroy(); it also runs itself on context loss or if initialisation fails.
 export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageElement, host: HTMLElement) {
+	// GL + shared handles
 	const gl = canvas.getContext('webgl', { alpha: false, antialias: false, powerPreference: 'low-power' });
 	if (!gl) return () => {};
 	const bindProgram = gl.useProgram.bind(gl);
@@ -16,6 +25,8 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 	const media = photo.parentElement;
 	if (!media) return () => {};
 	const textRaster = document.createElement('canvas');
+
+	// Lifecycle + GL resources, filled in by initialize()
 	let disposed = false;
 	let layer: LiquidLayer | undefined;
 	let program: WebGLProgram | null = null;
@@ -24,15 +35,21 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 	let textTexture: WebGLTexture | null = null;
 	let resizeObserver: ResizeObserver | undefined;
 	let observer: IntersectionObserver | undefined;
+
+	// Render bookkeeping: frames are skipped unless something below changed (dirty) or the pointer is stirring the water
 	let visible = true;
 	let framesRemaining = 0;
 	let dirty = true;
 	let position = 0;
+
+	// Uniform locations
 	let cover: WebGLUniformLocation | null = null;
 	let source: WebGLUniformLocation | null = null;
 	let textSource: WebGLUniformLocation | null = null;
 	let textOpacity: WebGLUniformLocation | null = null;
 	let textOffset: WebGLUniformLocation | null = null;
+
+	// Last-drawn values, compared each frame to decide whether the portrait needs redrawing
 	let rasterOffset = 0;
 	let previousTextOffset = 0;
 	let previousTextOpacity = 1;
@@ -45,6 +62,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 	let shadeOpacity = 0;
 	let previousImageScale = 1;
 	let previousMediaTop = Number.NaN;
+
 	const profileScene = host.closest<HTMLElement>('[data-profile-scene]');
 	const syncTicker = () => {
 		gsap.ticker.remove(draw);
@@ -53,7 +71,10 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			gsap.ticker.add(draw);
 		}
 	};
+
+	// Re-sync whenever the surrounding scene flips data-scene-paused
 	const pauseObserver = new MutationObserver(syncTicker);
+	// Intro state shared with the scene intro sequencer (registered in sceneIntros)
 	const entrance = { portrait: 1, marqueeBoost: 0, waterReveal: 1, colour: 0 };
 	let previousReveal = Number.NaN;
 	const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
@@ -61,12 +82,17 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 	// scrolls natively over the held image, so the DOM text stays visible above the canvas.
 	// Water remounts when the breakpoint changes, so this is read once.
 	const bakeText = matchMedia(mq.up.l).matches;
+
+	// Frame: read the hero's CSS-driven values, redraw the portrait only if one changed, then advance the water
 	const draw = (_time: number, delta: number) => {
 		if (!layer || disposed || !visible || document.hidden || profileScene?.dataset.scenePaused === 'true') return;
 		if (!canvas.clientWidth || !canvas.clientHeight || gl.isContextLost()) return;
+
 		const mediaBounds = media.getBoundingClientRect();
 		const bounds = canvas.getBoundingClientRect();
 		const mediaTop = mediaBounds.top - bounds.top;
+
+		// Scroll/intro-driven values the hero writes as CSS custom properties
 		const imageScale = Number(host.style.getPropertyValue('--project-intro-scale') || 1);
 		const textAlpha = Number(host.style.getPropertyValue('--project-text-opacity') || 1);
 		const copyOffset = Number(host.style.getPropertyValue('--project-copy-offset') || 0) - rasterOffset;
@@ -76,8 +102,11 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		if (imageSaturation !== previousSaturation) dirty = true;
 		if (imageScale !== previousImageScale) dirty = true;
 		if (Math.abs(mediaTop - previousMediaTop) > 0.01 || Number.isNaN(previousMediaTop)) dirty = true;
+
 		if (!dirty && framesRemaining <= 0 && entrance.waterReveal === 1 && previousReveal === 1) return;
+
 		const dt = Math.min(delta / 1000, 0.025);
+
 		if (dirty) {
 			layer.beginPortrait();
 			bindProgram(program);
@@ -86,12 +115,15 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
 			gl.activeTexture(gl.TEXTURE0);
 			gl.bindTexture(gl.TEXTURE_2D, texture);
+			// Photo, cover-fitted to the media box
 			gl.uniform1i(source, 0);
 			const aspect = mediaBounds.width / mediaBounds.height;
 			const imageAspect = photo.naturalWidth / photo.naturalHeight;
 			gl.uniform2f(cover, Math.min(1, aspect / imageAspect), Math.min(1, imageAspect / aspect));
 			gl.uniform2f(imageBox, mediaTop / bounds.height, mediaBounds.height / bounds.height);
 			gl.uniform2f(introImage, imageScale, 1 - (window.innerHeight * 0.5) / mediaBounds.height);
+
+			// Baked title, then colour/shade adjustments
 			gl.activeTexture(gl.TEXTURE1);
 			gl.bindTexture(gl.TEXTURE_2D, textTexture);
 			gl.uniform1i(textSource, 1);
@@ -100,6 +132,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			gl.uniform1f(saturation, imageSaturation);
 			gl.uniform2f(shade, shadeScale, shadeOpacity);
 			gl.drawArrays(gl.TRIANGLES, 0, 6);
+
 			previousMediaTop = mediaTop;
 			previousImageScale = imageScale;
 			previousTextOpacity = textAlpha;
@@ -107,6 +140,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			previousSaturation = imageSaturation;
 			dirty = false;
 		}
+
 		layer.draw(dt, 0, 0);
 		previousReveal = entrance.waterReveal;
 		framesRemaining -= dt;
@@ -114,6 +148,8 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		if (bakeText) host.dataset.waterText = 'true';
 		canvas.dataset.intro = entrance.waterReveal === 1 ? 'complete' : 'playing';
 	};
+
+	// Idempotent teardown of observers, listeners and GL resources, restoring the plain hero
 	const destroy = () => {
 		if (disposed) return;
 		disposed = true;
@@ -133,6 +169,8 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		delete canvas.dataset.ready;
 		delete canvas.dataset.intro;
 	};
+
+	// Resize the backing store (capped by texture size and a pixel budget) and re-bake the title raster
 	const resize = () => {
 		if (disposed || gl.isContextLost() || !canvas.clientWidth || !canvas.clientHeight) return;
 		const width = Math.max(1, canvas.clientWidth),
@@ -142,6 +180,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		const viewportHeight = title ? Number.parseFloat(getComputedStyle(title).minHeight) : height;
 		shadeScale = height / (viewportHeight || height);
 		shadeOpacity = Number.parseFloat(getComputedStyle(host, '::after').opacity);
+
 		const max = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
 		const ratio = Math.min(
 			devicePixelRatio,
@@ -149,6 +188,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			max / Math.max(width, height),
 			Math.sqrt(4000000 / (width * height))
 		);
+
 		canvas.width = Math.round(width * ratio);
 		canvas.height = Math.round(height * ratio);
 		try {
@@ -159,6 +199,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			destroy();
 			return;
 		}
+
 		if (textTexture && bakeText) {
 			// Keep the texture opaque on resize; the shader applies the live scroll fade.
 			const opacity = host.style.getPropertyValue('--project-text-opacity');
@@ -175,12 +216,16 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textRaster);
 			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 		}
+
 		dirty = true;
 	};
+
+	// Async setup: decode the photo, build the compositing program, create textures, then the liquid layer
 	const initialize = async () => {
 		await photo.decode();
 		await document.fonts.ready;
 		if (disposed) return;
+
 		program = gl.createProgram();
 		if (!program) throw new Error('Project water program unavailable');
 		for (const [type, code] of [
@@ -194,13 +239,16 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 					uniform vec2 cover, imageBox, introImage, shade;
 					uniform float textOpacity, textOffset, saturation;
 					void main() {
+						// Cover-fit the photo, scaled around an anchor for the intro zoom
 						vec2 imageUV = vec2(uv.x, 1. - ((1. - uv.y) - imageBox.x) / imageBox.y);
 						vec2 anchor = vec2(.5, introImage.y);
 						imageUV = (imageUV - anchor) / introImage.x + anchor;
 						vec4 photo = texture2D(source, (imageUV - .5) * cover + .5);
+						// Desaturate, then darken towards the bottom (shade.x = height scale, shade.y = opacity)
 						float grey = dot(photo.rgb, vec3(.2126, .7152, .0722));
 						photo.rgb = mix(vec3(grey), photo.rgb, saturation);
 						photo.rgb *= 1. - clamp(((1. - uv.y) * shade.x - ${HERO_SHADE_START}) / ${1 - HERO_SHADE_START}, 0., 1.) * shade.y;
+						// Overlay the baked title
 						vec2 textUV = uv + vec2(0., textOffset);
 						vec4 text = texture2D(textSource, textUV);
 						text.a *= step(0., textUV.y) * step(textUV.y, 1.);
@@ -217,6 +265,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			gl.deleteShader(shader);
 		}
 		gl.linkProgram(program);
+
 		// A cold shader cache compiles for ~200ms; reading LINK_STATUS straight
 		// away would block the page through the visitor's first scroll.
 		const parallel = gl.getExtension('KHR_parallel_shader_compile');
@@ -225,6 +274,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			if (disposed || gl.isContextLost()) return;
 		} while (parallel && !gl.getProgramParameter(program, parallel.COMPLETION_STATUS_KHR));
 		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('Project water shader failed');
+
 		position = gl.getAttribLocation(program, 'position');
 		cover = gl.getUniformLocation(program, 'cover');
 		source = gl.getUniformLocation(program, 'source');
@@ -235,6 +285,8 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		imageBox = gl.getUniformLocation(program, 'imageBox');
 		introImage = gl.getUniformLocation(program, 'introImage');
 		shade = gl.getUniformLocation(program, 'shade');
+
+		// Full-screen quad (two triangles) and the photo texture
 		buffer = gl.createBuffer();
 		texture = gl.createTexture();
 		if (!buffer || !texture) throw new Error('Project water resources unavailable');
@@ -248,6 +300,8 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, photo);
 		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+
+		// Title texture; its pixels are uploaded by resize()
 		textTexture = gl.createTexture();
 		if (!textTexture) throw new Error('Project text texture unavailable');
 		gl.bindTexture(gl.TEXTURE_2D, textTexture);
@@ -255,18 +309,21 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
 		resize();
 		layer = await createLiquidLayer(gl, canvas, host, { ...liquidSettings }, () => disposed, true, mq.up.l);
 		if (disposed) {
 			layer.destroy();
 			return;
 		}
+
 		sceneIntros.set(host, entrance);
 		resizeObserver = new ResizeObserver(resize);
 		resizeObserver.observe(canvas);
 		resizeObserver.observe(media);
 		document.fonts.addEventListener('loadingdone', resize, { signal: events.signal });
 		host.addEventListener('page-title:revealed', resize, { signal: events.signal });
+
 		observer = new IntersectionObserver(entries => {
 			visible = entries[0].isIntersecting;
 			syncTicker();
@@ -275,6 +332,8 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		if (profileScene)
 			pauseObserver.observe(profileScene, { attributes: true, attributeFilter: ['data-scene-paused'] });
 		document.addEventListener('visibilitychange', syncTicker, { signal: events.signal });
+
+		// Pointer stirs the water only on fine pointers, inside the canvas, over the hero or header
 		window.addEventListener(
 			'pointermove',
 			event => {
@@ -299,13 +358,16 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 					return;
 				}
 				layer?.move((event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height);
+				// Keep drawing a while after the pointer stops so the ripples can settle
 				framesRemaining = 13;
 			},
 			{ signal: events.signal }
 		);
+
 		host.addEventListener('pointerleave', () => layer?.resetPointer(), { signal: events.signal });
 		syncTicker();
 	};
+
 	canvas.addEventListener('webglcontextlost', destroy, { signal: events.signal });
 	void initialize().catch(destroy);
 	return destroy;

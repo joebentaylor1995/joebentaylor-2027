@@ -1,3 +1,5 @@
+// Types
+// ------------
 export interface ModelViewerProps {
 	// The .glb — fetched only when a visitor opens the viewer
 	src: string;
