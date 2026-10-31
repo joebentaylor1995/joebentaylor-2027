@@ -8,16 +8,16 @@ const routeHistory = routeWindow.history;
 const fromHost = event => event.origin === location.origin && (event.source === routeWindow || event.source === window);
 
 function syncProjectRoute() {
- if (typeof ready === 'undefined' || !ready) return;
- const slug = new URL(routeLocation.href).searchParams.get('project');
- if (!slug) {
-  if (projectTransition.active || projectTransition.loading) projectTransition.returnToGallery();
- } else if (!projectTransition.active || projectTransition.slug(projectTransition.project) !== slug) {
-  projectTransition.openRoute(slug);
- }
+	if (typeof ready === 'undefined' || !ready) return;
+	const slug = new URL(routeLocation.href).searchParams.get('project');
+	if (!slug) {
+		if (projectTransition.active || projectTransition.loading) projectTransition.returnToGallery();
+	} else if (!projectTransition.active || projectTransition.slug(projectTransition.project) !== slug) {
+		projectTransition.openRoute(slug);
+	}
 }
 window.addEventListener('message', event => {
- if (fromHost(event) && event.data?.type === 'projects:route') syncProjectRoute();
+	if (fromHost(event) && event.data?.type === 'projects:route') syncProjectRoute();
 });
 // In the host, useSearchParams forwards Back/Forward without retaining listeners
 // on the parent after this frame unmounts. Standalone previews listen locally.
