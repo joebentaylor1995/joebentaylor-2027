@@ -15,6 +15,7 @@ const MEDIA_FILES = process.env.NEXT_PUBLIC_MEDIA_URL
 
 // Exports
 // ------------
+// Swaps a Sanity file URL onto the media Worker; anything else passes through untouched
 export const toMediaUrl = (url: string): string =>
 	MEDIA_FILES && url.startsWith(SANITY_FILES) ? MEDIA_FILES + url.slice(SANITY_FILES.length) : url;
 

@@ -7,14 +7,14 @@ import StatusPage, { actionClass } from '@parts/StatusPage';
 import { ppNeueMontreal, sequel } from '@theme/fonts';
 import { useEffect } from 'react';
 
-// Styles
+// Styles + Interfaces
 // ------------
 // NOTE • Replaces the root layout when it fails, so it brings its own
 // document, styles and font
 import '@css/tokens.css';
 import '@css/global.scss';
 
-// Interfaces
+// Types
 // ------------
 type GlobalErrorProps = {
 	error: Error & { digest?: string };

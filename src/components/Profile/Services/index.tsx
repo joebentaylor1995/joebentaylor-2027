@@ -11,7 +11,7 @@ import Image from 'next/image';
 import { use, useRef } from 'react';
 import type { ProfilePanelContent } from '@/data/site';
 
-// Styles
+// Styles + Interfaces
 // ------------
 import s from './styles.module.scss';
 
@@ -25,8 +25,10 @@ interface ServicesProps {
 // Component
 // ------------
 const Services = ({ intro, services }: ServicesProps) => {
-	// Context + Refs
+	// Context
 	const present = use(ProfilePresenceContext);
+
+	// Refs
 	const sectionRef = useRef<HTMLElement>(null);
 
 	// Animations
@@ -35,13 +37,19 @@ const Services = ({ intro, services }: ServicesProps) => {
 			const section = sectionRef.current;
 			const scroller = section?.closest('#profile-panel');
 			if (!present || !section || !scroller || reduceMotion) return;
+
+			// SECTION • Each row's title slides in beside its image, which scales up, then both retract as the row leaves
 			for (const row of section.querySelectorAll<HTMLElement>('[data-service]')) {
 				const title = row.querySelector('[data-service-title]');
 				const image = row.querySelector('[data-service-image]');
+
+				// Title shifts left by the image's width plus the row gap
 				const offset = () =>
 					-((image as HTMLElement).offsetWidth + parseFloat(getComputedStyle(row).columnGap));
+
 				gsap.set(title, { x: offset, opacity: 0.4 });
 				gsap.set(image, { scale: 0 });
+
 				gsap.timeline({
 					defaults: { duration: 0.5, ease: 'none' },
 					scrollTrigger: {
@@ -58,6 +66,8 @@ const Services = ({ intro, services }: ServicesProps) => {
 					.to(title, { x: offset, opacity: 0.4 }, 0.5)
 					.to(image, { scale: 0 }, 0.5);
 			}
+
+			// SECTION • Highlighted phrases in the intro fade up once, staggered
 			gsap.fromTo(
 				section.querySelectorAll('mark'),
 				{ opacity: 0.4 },

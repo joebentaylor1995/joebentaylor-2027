@@ -17,9 +17,9 @@
  * @component
  */
 
-import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 // Imports
 // ------------
+import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { cn } from '@utils/cn';
 import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
@@ -56,9 +56,11 @@ const NECESSARY_COOKIES: string[] = [];
 
 // Helpers
 // ------------
+// Every optional category granted
 const allConsent = (): I.Consent =>
 	Object.fromEntries(OPTIONAL_CATEGORIES.map(category => [category, true])) as I.Consent;
 
+// True when the visitor had granted a category that the new choice turns off
 const isWithdrawn = (previous: I.Consent | null, next: I.Consent): boolean =>
 	OPTIONAL_CATEGORIES.some(category => previous?.[category] && !next[category]);
 
@@ -70,6 +72,7 @@ const expireCookies = (): void => {
 	for (const cookie of document.cookie.split(';')) {
 		const name = cookie.split('=')[0]?.trim();
 		if (!name || NECESSARY_COOKIES.includes(name)) continue;
+
 		for (const domain of domains) {
 			// biome-ignore lint/suspicious/noDocumentCookie: expiring a cookie is done by writing document.cookie directly
 			document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/${domain ? `;domain=${domain}` : ''}`;
@@ -106,6 +109,7 @@ const CookieBar = ({
 	// Handlers
 	const commit = (consent: I.Consent) => {
 		const previous = getConsent();
+
 		saveConsent(consent);
 		setIsOpen(false);
 		setIsChoosing(false);
@@ -157,6 +161,7 @@ const CookieBar = ({
 	}, [isChoosing]);
 
 	// Animations
+	// Wipes the banner in from the left once the site loader has settled; skips straight to the end under reduced motion
 	useAnimation(
 		({ reduced }) => {
 			const banner = bannerRef.current;
@@ -164,16 +169,21 @@ const CookieBar = ({
 				enteredRef.current = false;
 				return;
 			}
+
 			if (enteredRef.current) return;
+
+			// Hidden and inert until the entrance finishes, so it can't be tabbed to mid-wipe
 			banner.dataset.entrance = 'waiting';
 			banner.inert = true;
 			gsap.set(banner, { autoAlpha: 0, clipPath: 'inset(0 100% 0 0)' });
+
 			const complete = () => {
 				enteredRef.current = true;
 				banner.inert = false;
 				banner.dataset.entrance = 'complete';
 				if (isReopened) choicesRef.current?.querySelector<HTMLInputElement>('input:enabled')?.focus();
 			};
+
 			const entrance = gsap.timeline({ paused: true, onComplete: complete });
 			entrance
 				.set(banner, { autoAlpha: 1 })
@@ -184,12 +194,15 @@ const CookieBar = ({
 					{ y: 0, opacity: 1, duration: reduced ? 0 : 0.45, stagger: reduced ? 0 : 0.06, ease: 'power3.out' },
 					reduced ? 0 : 0.16
 				);
+
 			const reveal = () => {
 				banner.dataset.entrance = 'entering';
 				entrance.play();
 			};
+
 			if (isLoaderSettled()) reveal();
 			else window.addEventListener(LOADER_SETTLED, reveal, { once: true });
+
 			return () => {
 				window.removeEventListener(LOADER_SETTLED, reveal);
 				banner.inert = false;

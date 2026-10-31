@@ -23,14 +23,20 @@ import { profile } from '@/config';
 // is Next's built-in default — pass `fonts` to ImageResponse for your own.
 export const ogImageSize = { width: 1200, height: 630 };
 
+// Constants
+// ------------
 const LOGO_WIDTH = 360;
 const LOGO_HEIGHT = (LOGO_WIDTH * LOGO_BOX.height) / LOGO_BOX.width;
 
+// Types
+// ------------
 type OgImageProps = {
 	title: string;
 	eyebrow?: string;
 };
 
+// Component
+// ------------
 export const createOgImage = ({ title, eyebrow = 'joebentaylor.co.uk' }: OgImageProps) =>
 	new ImageResponse(
 		<div

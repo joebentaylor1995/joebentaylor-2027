@@ -13,6 +13,9 @@ const personId = `${siteUrl}/#person`;
 const businessId = `${siteUrl}/#business`;
 const websiteId = `${siteUrl}/#website`;
 
+// Helpers
+// ------------
+// The three linked entities (person, business, website), cross-referenced by @id
 const buildGraph = (settings: SiteSettings) => {
 	const sameAs = settings.socials.map(({ url }) => url);
 

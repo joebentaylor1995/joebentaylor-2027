@@ -7,10 +7,13 @@ import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
 import { use, useRef } from 'react';
 
-// Styles
+// Styles + Interfaces
 // ------------
 import s from './styles.module.scss';
 
+// Constants
+// ------------
+// Seconds, except FILL_START / FILL_END, which are the --tfw-fill range
 const OPEN_DELAY = 0.65;
 const FILL_DURATION = 1.1;
 const LINE_STAGGER = 0.25;
@@ -29,20 +32,28 @@ const Title = ({ lines }: { lines: string[] }) => {
 	const revealed = useRef(false);
 
 	// Animations
+	// Each line's fill wave runs once per panel open, staggered; reduced motion shows the filled text straight away
 	useAnimation(
 		({ reduced }) => {
 			const root = ref.current;
 			if (!root) return;
+
 			const text = root.querySelectorAll('[data-title-text]');
+
 			if (!present) revealed.current = false;
+
+			// Start empty (or already filled once revealed / reduced motion)
 			gsap.set(text, { '--tfw-fill': reduced || revealed.current ? FILL_END : FILL_START });
+
 			if (!present || reduced || revealed.current) return;
+
 			const timeline = gsap.timeline({
 				delay: OPEN_DELAY,
 				onComplete: () => {
 					revealed.current = true;
 				},
 			});
+
 			text.forEach((word, index) => {
 				const start = index * LINE_STAGGER;
 				timeline.to(word, { '--tfw-fill': FILL_END, duration: FILL_DURATION, ease: 'expo.out' }, start);

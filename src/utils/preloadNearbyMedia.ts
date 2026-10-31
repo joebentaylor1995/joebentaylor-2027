@@ -27,6 +27,7 @@ const warm = (media: Element) => {
 
 // Exports
 // ------------
+// The element whose scroll box the lazy media should be measured against
 export function mediaScrollRoot(host: HTMLElement) {
 	// Desktop case studies translate content inside a clipped, pinned panel.
 	// Expanding an ancestor's margin cannot pierce that intermediate clip.
@@ -35,14 +36,18 @@ export function mediaScrollRoot(host: HTMLElement) {
 		: host.closest<HTMLElement>('#profile-panel, .lenis');
 }
 
+// ANCHOR • Warms lazy images and videos ahead of the scroll; returns a cleanup
 export function preloadNearbyMedia(host: HTMLElement) {
 	let observer: IntersectionObserver | undefined;
+
 	const pending = new Set<Element>();
+
 	const track = (media: Element) => {
 		if (pending.has(media)) return;
 		pending.add(media);
 		observer?.observe(media);
 	};
+
 	// NOTE • Content that mounts after the panel opens (Profile's frames, a newly
 	// opened case study) brings its own lazy media — watch for it too
 	const collect = (node: Node) => {
@@ -50,6 +55,7 @@ export function preloadNearbyMedia(host: HTMLElement) {
 		if (node.matches(LAZY_MEDIA)) track(node);
 		for (const media of node.querySelectorAll(LAZY_MEDIA)) track(media);
 	};
+
 	const connect = () => {
 		observer?.disconnect();
 		const root = mediaScrollRoot(host);
@@ -68,17 +74,22 @@ export function preloadNearbyMedia(host: HTMLElement) {
 		observer = current;
 		for (const media of pending) current.observe(media);
 	};
+
 	collect(host);
 	connect();
+
 	const additions = new MutationObserver(records => {
 		for (const record of records) for (const node of record.addedNodes) collect(node);
 	});
 	additions.observe(host, { childList: true, subtree: true });
+
 	// The parent's scroll enhancement is installed after child effects, and can
 	// change again at the desktop breakpoint or with reduced-motion preferences.
 	const experience = host.closest('[data-project-experience]');
 	const layout = new MutationObserver(connect);
+
 	if (experience) layout.observe(experience, { attributes: true, attributeFilter: ['data-enhanced'] });
+
 	return () => {
 		observer?.disconnect();
 		additions.disconnect();

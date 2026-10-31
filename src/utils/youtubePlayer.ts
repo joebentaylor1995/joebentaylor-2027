@@ -1,6 +1,11 @@
+// Imports
+// ------------
 import { observeScenePause } from './observeScenePause';
 import { getYouTubeEmbedUrl } from './youtube';
 
+// Types
+// ------------
+// Only the slice of the IFrame Player API that this file uses
 interface YouTubePlayer {
 	getPlayerState(): number;
 	pauseVideo(): void;
@@ -13,6 +18,7 @@ interface YouTubeApi {
 		options: { events: { onReady: () => void; onStateChange: () => void } }
 	) => YouTubePlayer;
 }
+
 declare global {
 	interface Window {
 		YT?: YouTubeApi;
@@ -20,15 +26,23 @@ declare global {
 	}
 }
 
+// State
+// ------------
 let api: Promise<YouTubeApi> | undefined;
+
+// Helpers
+// ------------
+// Loads the YouTube IFrame API script once and shares the promise between players
 const loadPlayerApi = () => {
 	if (window.YT?.Player) return Promise.resolve(window.YT);
 	api ??= new Promise<YouTubeApi>((resolve, reject) => {
+		// Chain any existing ready callback instead of overwriting it
 		const previousReady = window.onYouTubeIframeAPIReady;
 		window.onYouTubeIframeAPIReady = () => {
 			previousReady?.();
 			if (window.YT) resolve(window.YT);
 		};
+
 		const script = document.createElement('script');
 		script.src = 'https://www.youtube.com/iframe_api';
 		script.onerror = () => {
@@ -38,9 +52,12 @@ const loadPlayerApi = () => {
 		};
 		document.head.append(script);
 	});
+
 	return api;
 };
 
+// Exports
+// ------------
 // Called only inside ConsentGate. Keep the standard controls and preserve the
 // viewer's playback position; only a previously playing video resumes.
 export function mountYouTubePlayer(host: HTMLElement, id: string, title: string) {
@@ -55,6 +72,7 @@ export function mountYouTubePlayer(host: HTMLElement, id: string, title: string)
 	iframe.allowFullscreen = true;
 	iframe.loading = 'lazy';
 	host.append(iframe);
+
 	let player: YouTubePlayer | undefined;
 	let ready = false;
 	let disposed = false;
@@ -62,6 +80,8 @@ export function mountYouTubePlayer(host: HTMLElement, id: string, title: string)
 	let resume = false;
 	let apiUnavailable = false;
 	let unloaded = false;
+
+	// Pauses (and later resumes) the video whenever the scene is covered or the tab hidden
 	const syncPlayback = () => {
 		if (apiUnavailable) {
 			const paused = scenePaused || document.hidden;
@@ -83,11 +103,14 @@ export function mountYouTubePlayer(host: HTMLElement, id: string, title: string)
 			player.playVideo();
 		}
 	};
+
 	const stopObserving = observeScenePause(host, paused => {
 		scenePaused = paused;
 		syncPlayback();
 	});
+
 	document.addEventListener('visibilitychange', syncPlayback);
+
 	void loadPlayerApi()
 		.then(YT => {
 			if (disposed) return;
@@ -107,6 +130,7 @@ export function mountYouTubePlayer(host: HTMLElement, id: string, title: string)
 			apiUnavailable = true;
 			syncPlayback();
 		});
+
 	return () => {
 		disposed = true;
 		stopObserving();

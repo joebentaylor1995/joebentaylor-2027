@@ -20,6 +20,7 @@ export const viewport: Viewport = {
 // renders without the site chrome (Lenis, theme providers, Header). The
 // main site lives under app/(site).
 const StudioLayout = ({ children }: { children: React.ReactNode }) => {
+	// Render
 	return (
 		<html lang='en'>
 			<body>{children}</body>

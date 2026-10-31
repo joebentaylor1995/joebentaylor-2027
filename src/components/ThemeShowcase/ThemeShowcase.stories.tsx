@@ -1,6 +1,10 @@
+// Imports
+// ------------
 import type { Meta, StoryObj } from '@storybook/nextjs';
 import ThemeShowcase from './';
 
+// Story config
+// ------------
 const meta: Meta<typeof ThemeShowcase> = {
 	title: 'Theme/Overview',
 	component: ThemeShowcase,
@@ -9,6 +13,8 @@ const meta: Meta<typeof ThemeShowcase> = {
 	},
 };
 
+// Exports
+// ------------
 export default meta;
 type Story = StoryObj<typeof ThemeShowcase>;
 

@@ -1,6 +1,5 @@
-// Property Documentation
+// Overview
 // ------------
-
 // NOTE • The consent store, shared by the CookieBar, ConsentGate, your own
 // code and the root layout (server). Kept free of 'use client' so the layout
 // can inline the head script below, and any module can gate on hasConsent().
@@ -9,13 +8,14 @@
 // ------------
 import type * as I from './interface';
 
-// Config
+// Constants
 // ------------
 // NOTE • Bump CONSENT_VERSION whenever the categories or the privacy policy
 // change in a way visitors should re-consent to — older choices are ignored
 // and the banner shows again.
 export const CONSENT_KEY = 'tackl-cookie-consent';
 export const CONSENT_VERSION = 1;
+// Choices expire after a year
 export const CONSENT_TTL_MS = 1000 * 60 * 60 * 24 * 365;
 
 // NOTE • Optional categories — "necessary" is implicit and always granted.
@@ -28,6 +28,7 @@ export const OPTIONAL_CATEGORIES = ['analytics', 'marketing'] as const;
 // itself whenever it's present.
 export const CONSENT_ATTRIBUTE = 'data-cookie-consent';
 
+// Window events: a choice was saved / the settings panel was requested
 const CHANGE_EVENT = 'tackl:cookie-consent';
 const SETTINGS_EVENT = 'tackl:cookie-settings';
 
@@ -71,6 +72,7 @@ export const getConsent = (): I.Consent | null => {
 export const hasConsent = (category: I.ConsentCategory): boolean =>
 	category === 'necessary' || getConsent()?.[category] === true;
 
+// Stores the choice, marks <html> and tells listeners (onConsentChange)
 export const saveConsent = (consent: I.Consent): void => {
 	const record: I.ConsentRecord = { version: CONSENT_VERSION, at: new Date().toISOString(), consent };
 
@@ -98,11 +100,13 @@ export const openCookieSettings = (): void => {
 	window.dispatchEvent(new Event(SETTINGS_EVENT));
 };
 
+// Subscribes to openCookieSettings() — returns an unsubscribe
 export const onOpenCookieSettings = (callback: () => void): (() => void) => {
 	window.addEventListener(SETTINGS_EVENT, callback);
 	return () => window.removeEventListener(SETTINGS_EVENT, callback);
 };
 
+// A fresh all-declined object (a copy, so callers can mutate it safely)
 export const noConsent = (): I.Consent => ({ ...NO_CONSENT });
 
 // Head script
