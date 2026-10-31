@@ -187,20 +187,26 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			[gl.VERTEX_SHADER, liquidVertex],
 			[
 				gl.FRAGMENT_SHADER,
-				`precision highp float; varying vec2 uv; uniform sampler2D source,textSource; uniform vec2 cover,imageBox,introImage,shade; uniform float textOpacity,textOffset,saturation;
-				void main(){
-				vec2 imageUV=vec2(uv.x,1.-((1.-uv.y)-imageBox.x)/imageBox.y);
-				vec2 anchor=vec2(.5,introImage.y);
-				imageUV=(imageUV-anchor)/introImage.x+anchor;
-				vec4 photo=texture2D(source,(imageUV-.5)*cover+.5);
-				float grey=dot(photo.rgb,vec3(.2126,.7152,.0722));
-				photo.rgb=mix(vec3(grey),photo.rgb,saturation);
-				photo.rgb*=1.-clamp(((1.-uv.y)*shade.x-${HERO_SHADE_START})/${1 - HERO_SHADE_START},0.,1.)*shade.y;
-				vec2 textUV=uv+vec2(0.,textOffset);
-				vec4 text=texture2D(textSource,textUV);
-				text.a*=step(0.,textUV.y)*step(textUV.y,1.);
-				gl_FragColor=vec4(mix(photo.rgb,text.rgb,text.a*textOpacity),1.);
-				}`,
+				`
+					precision highp float;
+					varying vec2 uv;
+					uniform sampler2D source, textSource;
+					uniform vec2 cover, imageBox, introImage, shade;
+					uniform float textOpacity, textOffset, saturation;
+					void main() {
+						vec2 imageUV = vec2(uv.x, 1. - ((1. - uv.y) - imageBox.x) / imageBox.y);
+						vec2 anchor = vec2(.5, introImage.y);
+						imageUV = (imageUV - anchor) / introImage.x + anchor;
+						vec4 photo = texture2D(source, (imageUV - .5) * cover + .5);
+						float grey = dot(photo.rgb, vec3(.2126, .7152, .0722));
+						photo.rgb = mix(vec3(grey), photo.rgb, saturation);
+						photo.rgb *= 1. - clamp(((1. - uv.y) * shade.x - ${HERO_SHADE_START}) / ${1 - HERO_SHADE_START}, 0., 1.) * shade.y;
+						vec2 textUV = uv + vec2(0., textOffset);
+						vec4 text = texture2D(textSource, textUV);
+						text.a *= step(0., textUV.y) * step(textUV.y, 1.);
+						gl_FragColor = vec4(mix(photo.rgb, text.rgb, text.a * textOpacity), 1.);
+					}
+				`,
 			],
 		] as const) {
 			const shader = gl.createShader(type);
