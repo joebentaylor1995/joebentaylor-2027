@@ -1,11 +1,25 @@
 'use strict';
+
+// Introduction
+// ------------
+// Timing and settings for the slide-reveal cascade that plays when the ribbon first appears.
+// Wired up by app.js, which calls `update(time)` each frame and passes `progress` (0..1) and
+// `settings` to the ribbon shader. Builds its controls into the settings panel, before
+// `#intro-replay`, and persists the user's tweaks to localStorage under `ribbon-introduction`.
+
 class RibbonIntroduction {
+	// `requestFrame` asks app.js for a render; `prepare` runs at the start of each `play()`.
 	constructor(requestFrame, prepare) {
 		this.requestFrame = requestFrame;
 		this.prepare = prepare;
+
+		// Reveal progress 0..1, whether the intro is running, and the timestamp it started at.
 		this.progress = 0;
 		this.active = false;
 		this.start = null;
+
+		// Defaults. `duration` is seconds; `intensity` and `transitionStart` are percentages;
+		// `cascadeStagger` is milliseconds between slides.
 		this.settings = {
 			version: 2,
 			effect: 9,
@@ -15,6 +29,9 @@ class RibbonIntroduction {
 			cascadeStagger: 50,
 			transitionStart: 50,
 		};
+
+		// Restore saved duration and intensity, clamped to the slider limits.
+		// Ignored unless the stored settings carry the current version.
 		try {
 			const saved = JSON.parse(localStorage.getItem('ribbon-introduction') || '{}');
 			if (saved.version === 2)
@@ -24,10 +41,27 @@ class RibbonIntroduction {
 				])
 					if (Number.isFinite(saved[key])) this.settings[key] = Math.min(max, Math.max(min, saved[key]));
 		} catch {}
+
+		// Cascade controls are injected here rather than written in index.html.
 		const cascade = document.createElement('div');
 		cascade.innerHTML =
-			'<label for="intro-cascadeEase">Cascade easing</label><select id="intro-cascadeEase"><option value="0">Smooth in/out</option><option value="1">Cubic out</option><option value="2">Quartic out</option><option value="3">Sine in/out</option><option value="4">Linear</option></select><div class="control"><div class="control-top"><label for="intro-cascadeStagger">Cascade stagger</label><output id="intro-cascadeStagger-value"></output></div><input id="intro-cascadeStagger" type="range" min="0" max="200" step="5"></div><div class="control"><div class="control-top"><label for="intro-transitionStart">Start during page transition</label><output id="intro-transitionStart-value"></output></div><input id="intro-transitionStart" type="range" min="0" max="100" step="5"></div>';
+			'<label for="intro-cascadeEase">Cascade easing</label>' +
+			'<select id="intro-cascadeEase">' +
+			'<option value="0">Smooth in/out</option>' +
+			'<option value="1">Cubic out</option>' +
+			'<option value="2">Quartic out</option>' +
+			'<option value="3">Sine in/out</option>' +
+			'<option value="4">Linear</option>' +
+			'</select>' +
+			'<div class="control"><div class="control-top">' +
+			'<label for="intro-cascadeStagger">Cascade stagger</label><output id="intro-cascadeStagger-value"></output>' +
+			'</div><input id="intro-cascadeStagger" type="range" min="0" max="200" step="5"></div>' +
+			'<div class="control"><div class="control-top">' +
+			'<label for="intro-transitionStart">Start during page transition</label><output id="intro-transitionStart-value"></output>' +
+			'</div><input id="intro-transitionStart" type="range" min="0" max="100" step="5"></div>';
 		document.querySelector('#intro-replay').before(cascade);
+
+		// Restore the cascade settings, clamped to 0..max (the easing is a whole-number option index).
 		try {
 			const saved = JSON.parse(localStorage.getItem('ribbon-introduction') || '{}');
 			for (const [key, max] of [
@@ -41,6 +75,8 @@ class RibbonIntroduction {
 						Math.min(max, key === 'cascadeEase' ? Math.round(saved[key]) : saved[key])
 					);
 		} catch {}
+
+		// Bind each control: edits save as you drag, and releasing the control replays the intro.
 		for (const key of ['duration', 'intensity', 'cascadeEase', 'cascadeStagger', 'transitionStart']) {
 			const input = document.querySelector('#intro-' + key);
 			input.value = this.settings[key];
@@ -53,9 +89,12 @@ class RibbonIntroduction {
 			});
 			input.addEventListener('change', () => this.play());
 		}
+
 		document.querySelector('#intro-replay').onclick = () => this.play();
 		this.sync();
 	}
+
+	// Refreshes the value read-outs beside the sliders.
 	sync() {
 		document.querySelector('#intro-duration-value').textContent = this.settings.duration.toFixed(1) + 's';
 		document.querySelector('#intro-intensity-value').textContent = this.settings.intensity + '%';
@@ -64,6 +103,9 @@ class RibbonIntroduction {
 		document.querySelector('#intro-description').textContent =
 			'Slides reveal from their centres in a staggered sequence. Changes save automatically.';
 	}
+
+	// Starts (or restarts) the intro. With `waitForPage`, `update()` holds the start until
+	// the host's page transition has progressed far enough.
 	play(waitForPage = false) {
 		this.prepare();
 		this.waitForPage = waitForPage;
@@ -75,6 +117,8 @@ class RibbonIntroduction {
 			: 'Playing — scroll to take control.';
 		this.requestFrame();
 	}
+
+	// Jumps to the fully revealed state and ends the intro.
 	finish() {
 		this.active = false;
 		this.progress = 1;
@@ -82,18 +126,24 @@ class RibbonIntroduction {
 		document.querySelector('#intro-status').textContent = 'Ready. Replay slide cascade.';
 		this.requestFrame();
 	}
+
+	// Per-frame step; `time` is the rAF timestamp in ms. Returns true while the intro still
+	// needs frames (including while it waits for the host transition).
 	update(time) {
 		if (!this.active) return false;
 		const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 		if (this.start === null) {
 			// Let the host cross-dissolve finish before revealing live WebGL behind its snapshot.
 			if (this.waitForPage && !reduced) {
 				try {
 					const root = window.parent.document.documentElement;
+					// The host's own wave transition reports progress 0..1 as a data attribute.
 					if (root.dataset.navigationWave === 'running') {
 						if (Number(root.dataset.navigationWaveProgress || 0) < this.settings.transitionStart / 100)
 							return true;
 					} else if (
+						// Otherwise wait for any running view-transition or `vt-fade` animation on the host.
 						window.parent.document
 							.getAnimations()
 							.some(
@@ -109,6 +159,9 @@ class RibbonIntroduction {
 			this.start = time;
 			this.waitForPage = false;
 		}
+
+		// Elapsed time over total length. Reduced motion is a flat 250 ms fade; otherwise the
+		// duration plus, for the cascade effect (9), 4 x the stagger in ms.
 		this.progress = Math.max(
 			0,
 			Math.min(
@@ -120,6 +173,7 @@ class RibbonIntroduction {
 							(this.settings.effect === 9 ? 4 * this.settings.cascadeStagger : 0))
 			)
 		);
+
 		if (this.progress >= 1) {
 			this.finish();
 			return false;

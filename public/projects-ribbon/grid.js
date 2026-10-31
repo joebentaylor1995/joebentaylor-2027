@@ -1,4 +1,14 @@
 'use strict';
+
+// Project grid
+// ------------
+// The "All projects" view: an endless, pannable grid of tiles that the ribbon opens into and
+// closes back from. Created by app.js as `gridView`; app.js feeds it the catalogue, pointer input and the
+// ribbon's current view, and calls `update()` then `render()` each frame. Draws with its own WebGL
+// program on the shared context. Uses #stage, #hover-title and #grid-controls from index.html.
+
+// Project links
+// ------------
 // The grid holds metadata for the entire catalogue, but renders only viewport cells.
 // Its bounded texture cache therefore stays the same size for 25 or 1,000 projects.
 // Case studies require an explicit Is ready toggle. External listings keep their own links.
@@ -8,13 +18,21 @@ function isProjectClickable(project) {
 	if (/^\/projects\/[^/]+\/?$/.test(project.href)) return project.isReady === true;
 	return /^https?:\/\//.test(project.href);
 }
+
+// Hover tooltip
+// ------------
+// State for the tooltip near the pointer: its input source, position, dismissal and current label key.
 let tooltipInput = null,
 	tooltipPoint = null,
 	tooltipDismissed = false,
 	tooltipKey = null;
+
+// Tooltip label for a project: "Coming soon", "View" (local case study) or "View Offsite".
 function projectKind(project) {
 	return !isProjectClickable(project) ? 'Coming soon' : project.href.startsWith('/') ? 'View' : 'View Offsite';
 }
+
+// Hides the tooltip and clears the stage's aria-describedby / aria-disabled.
 function clearProjectTooltip() {
 	const label = document.querySelector('#hover-title'),
 		stage = document.querySelector('#stage');
@@ -23,6 +41,8 @@ function clearProjectTooltip() {
 	stage.removeAttribute('aria-describedby');
 	stage.removeAttribute('aria-disabled');
 }
+
+// Small padlock icon (10 x 12 viewBox) shown beside "Coming soon".
 function projectLockIcon() {
 	const ns = 'http://www.w3.org/2000/svg',
 		svg = document.createElementNS(ns, 'svg');
@@ -46,6 +66,9 @@ function projectLockIcon() {
 	svg.append(shackle, body);
 	return svg;
 }
+
+// Shows the tooltip for `project` at `point` (viewport px). The label and the stage's aria-label are
+// only rebuilt when the project or its kind changes.
 function showProjectTooltip(project, point) {
 	if (!project || !point || tooltipDismissed) {
 		clearProjectTooltip();
@@ -67,9 +90,13 @@ function showProjectTooltip(project, point) {
 	label.hidden = false;
 	stage.setAttribute('aria-describedby', 'hover-title');
 	stage.setAttribute('aria-disabled', String(!isProjectClickable(project)));
+	// Sits just below-right of the pointer, kept inside the viewport.
 	label.style.left = Math.max(12, Math.min(point.x + 18, innerWidth - label.offsetWidth - 20)) + 'px';
 	label.style.top = Math.max(12, Math.min(point.y + 20, innerHeight - 70)) + 'px';
 }
+
+// Layout
+// ------------
 // Host integration: the All projects grid layout — a shuffled block (rebuilt each time the grid opens)
 // wrapped across the infinite grid, so no project repeats within a screen-sized window.
 // - The window is one screen's worth of tiles, measured from the viewport (partly visible tiles included),
@@ -81,9 +108,13 @@ function showProjectTooltip(project, point) {
 const GRID_LAYOUT_MIN_COLS = 16,
 	GRID_LAYOUT_MIN_ROWS = 8,
 	GRID_LAYOUT_REPAIR_STEPS = 40000;
+
 // NOTE • The window is what one screen shows (in layout axes: `along` the ribbon, `across` it).
 // It shrinks until it holds at most GRID_WINDOW_FILL of the projects, so a clash-free fill always exists.
 const GRID_WINDOW_FILL = 0.7;
+
+// Shrinks the screen window (`along` x `across` tiles) to at most GRID_WINDOW_FILL of the catalogue,
+// trimming the longer side first. Returns { w, h }.
 function gridWindow(projectCount, along = 5, across = 4) {
 	let w = Math.max(1, along),
 		h = Math.max(1, across);
@@ -93,15 +124,21 @@ function gridWindow(projectCount, along = 5, across = 4) {
 	}
 	return { w, h };
 }
+
+// Builds the block of project indices that tiles the infinite grid. Returns { cols, rows, cells, w, h },
+// where cells[row][col] is a project index. `anchor` is the ribbon position the ribbon run is centred on.
 function buildGridLayout(featuredCount, projectCount, anchor = 0, along, across) {
+	// Positive modulo, so negative offsets wrap to the other side of the block.
 	const mod = (a, n) => ((a % n) + n) % n,
 		f = Math.max(1, featuredCount),
 		n = Math.max(1, projectCount);
 	const { w, h } = gridWindow(n, along, across);
 	// NOTE • Block sides are whole multiples of the window, so windows that wrap round the block fit too
 	const roundUp = (value, step) => Math.ceil(value / step) * step;
+	// Block size: at least the minimum, large enough for the catalogue, and a whole number of windows.
 	const cols = roundUp(Math.max(n, GRID_LAYOUT_MIN_COLS, 2 * w), w),
 		rows = roundUp(Math.max(GRID_LAYOUT_MIN_ROWS, 2 * h), h);
+	// -1 marks an unfilled cell. `fixed` holds the columns of row 0 that carry the ribbon run.
 	const cells = Array.from({ length: rows }, () => new Array(cols).fill(-1)),
 		fixed = new Set();
 	// The ribbon run: the featured slides centred on the ribbon's position, in ribbon order
@@ -111,6 +148,7 @@ function buildGridLayout(featuredCount, projectCount, anchor = 0, along, across)
 		cells[0][c] = mod(anchor + k, f);
 		fixed.add(c);
 	}
+	// Fisher-Yates shuffle of every project index.
 	const shuffled = () => {
 		const a = Array.from({ length: n }, (_, i) => i);
 		for (let i = a.length - 1; i > 0; i--) {
@@ -120,6 +158,8 @@ function buildGridLayout(featuredCount, projectCount, anchor = 0, along, across)
 		return a;
 	};
 	// NOTE • Two tiles clash when one screen-sized window could hold both: closer than w along AND h across
+	// Counts cells within the window around (t, c) that already hold project `v`. The block wraps
+	// in both directions.
 	const clashes = (t, c, v) => {
 		let hits = 0;
 		for (let dr = 1 - h; dr < h; dr++)
@@ -129,6 +169,7 @@ function buildGridLayout(featuredCount, projectCount, anchor = 0, along, across)
 			}
 		return hits;
 	};
+	// Picks the candidate with the fewest clashes, choosing at random between ties.
 	const pick = (t, c, candidates) => {
 		let best = [],
 			bestHits = Infinity;
@@ -162,42 +203,67 @@ function buildGridLayout(featuredCount, projectCount, anchor = 0, along, across)
 	}
 	return { cols, rows, cells, w, h };
 }
+
+// Grid view
+// ------------
 // How long a grid video keeps playing after its tile was last drawn
 const VIDEO_IDLE_MS = 500;
+
+// Draws and animates the grid. app.js drives it through setProjects / setView / update / render.
 class ProjectGrid {
 	constructor(gl, requestFrame) {
 		this.gl = gl;
 		this.requestFrame = requestFrame;
+
+		// Catalogue: every project, and the featured subset the ribbon shows (the first `featured.length`).
 		this.projects = [];
 		this.featured = [];
+
+		// View state. `mix` eases from 0 (ribbon) to 1 (grid) towards `target`; `paused` stops tile videos.
 		this.vertical = false;
 		this.paused = false;
 		this.mix = 0;
 		this.target = 0;
+
+		// Layout anchoring: `anchor` is the ribbon position the layout was built around, `origin` rebases
+		// cell coordinates (see setView), and `returning` / `aligning` flag the grid-to-ribbon hand-back.
 		this.anchor = 0;
 		this.startPosition = 0;
 		this.origin = { col: 0, row: 0 };
 		this.returning = false;
 		this.aligning = false;
+
+		// Pan in px: `pan` is the current offset and `goal` where it is easing to. `speed` is the pan velocity
+		// (normalised, up to 1.8) and `bend` the lens curvature that follows it.
 		this.pan = { x: 0, y: 0 };
 		this.goal = { x: 0, y: 0 };
 		this.speed = 0;
 		this.bend = 0;
+
+		// Panel settings (restored from localStorage): size and curve in %, gap in px, response and inertia 0-100.
 		this.settings = { size: 100, gap: 32, curve: 8, response: 100, inertia: 95, exitEarly: 65 };
 		try {
 			const saved = JSON.parse(localStorage.getItem('ribbon-grid-settings') || '{}');
 			for (const key in this.settings) if (Number.isFinite(saved[key])) this.settings[key] = saved[key];
 		} catch {}
+
+		// Texture cache keyed by poster / video URL. `visible*` hold the indices drawn this frame; `frame` counts
+		// renders and lets the cache evict the least recently used entries.
 		this.cache = new Map();
 		this.visible = new Set();
 		this.visibleFeatured = new Set();
+
+		// Pointer, hovered tile and active drag.
 		this.pointer = null;
 		this.hover = null;
 		this.drag = null;
 		this.frame = 0;
+
 		this.compile();
 		this.createControls();
 	}
+
+	// Adds one slider per setting to #grid-controls, clamping saved values to the slider range.
 	createControls() {
 		const specs = [
 			['size', 'Project size', 65, 145, '%'],
@@ -211,7 +277,9 @@ class ProjectGrid {
 			this.settings[key] = Math.max(min, Math.min(max, this.settings[key]));
 			const row = document.createElement('div');
 			row.className = 'control';
-			row.innerHTML = `<div class="control-top"><label for="grid-${key}">${label}</label><output id="grid-${key}-value">${this.settings[key]}${unit}</output></div><input id="grid-${key}" type="range" min="${min}" max="${max}" value="${this.settings[key]}">`;
+			row.innerHTML =
+				`<div class="control-top"><label for="grid-${key}">${label}</label><output id="grid-${key}-value">${this.settings[key]}${unit}</output></div>` +
+				`<input id="grid-${key}" type="range" min="${min}" max="${max}" value="${this.settings[key]}">`;
 			document.querySelector('#grid-controls').append(row);
 			row.querySelector('input').oninput = e => {
 				this.settings[key] = +e.target.value;
@@ -223,6 +291,8 @@ class ProjectGrid {
 			};
 		}
 	}
+
+	// Builds the shader program, the tile mesh and the placeholder texture.
 	compile() {
 		const gl = this.gl;
 		const shader = (type, src) => {
@@ -244,15 +314,20 @@ class ProjectGrid {
 					uniform float uMix, uRow, uCol, uBend, uRadius, uDistance, uScale, uRotation, uAmount, uSpread, uTwist, uVertical;
 					varying vec2 vUV;
 					void main() {
+						// Flip V so images appear upright.
 						vUV = vec2(aUV.x, 1.0 - aUV.y);
+						// Ribbon position. Each tile is wrapped onto a curved strip: angle is the vertex angle round the strip,
+						// pitch the angle per tile (60 deg, or 37.5 deg when vertical), vertical the offset across it.
 						vec2 ribbon = vec2(0.0);
 						float w = 1.0;
 						if (uMix < 1.0) {
 							float pitch = mix(1.0471975512, .6544984695, uVertical);
 							float angle = (uCol + mix(aUV.x, aUV.y, uVertical) - .5) * pitch;
 							float vertical = (mix(aUV.y, aUV.x, uVertical) - .5) * uRadius * pitch * mix(.625, 1.6, uVertical);
+							// Twist builds up towards the strip's ends, controlled by uAmount, uTwist and uSpread.
 							float twist = sign(angle) * uAmount * uTwist * smoothstep(.62, .62 + uSpread, abs(angle) / pitch) * (1.0 - smoothstep(2.5, 3.14159265, abs(angle)));
 							float radial = uRadius + vertical * sin(twist);
+							// 3D position, then roll by uRotation, then perspective divide by depth w (clamped to .12).
 							vec3 p = vec3(radial * sin(angle), vertical * cos(twist), uRadius - uDistance - radial * cos(angle));
 							if (uVertical > .5)p.xy = p.yx;
 							float c = cos(uRotation), s = sin(uRotation);
@@ -261,13 +336,18 @@ class ProjectGrid {
 							ribbon = clamp(vec2(roll.x / (.77 * uViewport.x / uViewport.y), roll.y / .77) / w, vec2(-4.0), vec2(4.0));
 						}
 						// Extra rows grow out from the separating ribbon, then fill the viewport.
+						// Grid position: tile centre plus corner offset, in pixels, converted to clip space (y flipped).
 						vec2 pixel = uCentre + vec2((aUV.x - .5) * uSize.x, (.5 - aUV.y) * uSize.y);
 						vec2 grid = vec2(2.0 * pixel.x / uViewport.x, -2.0 * pixel.y / uViewport.y);
+						// Barrel lens: stretch grows with distance from the centre, scaled by uBend.
 						float lens = 1.0 + uBend * (grid.x * grid.x + .4 * grid.y * grid.y);
 						grid *= lens;
+						// Tiles more than 1.8 columns out are parked beside the ribbon rather than wrapped onto it.
 						if (abs(uCol) > 1.8)ribbon = vec2(sign(uCol) * (2.5 + max(0.0, abs(uCol) - 2.0) * .5) + (aUV.x - .5) * .4, (aUV.y - .5) * .5);
 						if (abs(uCol) > 1.8 && uVertical > .5)ribbon = ribbon.yx;
+						// Other rows start just off-screen along the cross axis, then travel into place as uMix rises.
 						if (abs(uRow) > .1)ribbon = uVertical > .5 ? vec2(sign(grid.x) * (1.5 + abs(grid.x) * .25), grid.y) : vec2(grid.x, sign(grid.y) * (1.5 + abs(grid.y) * .25));
+						// Blend ribbon to grid. Output w carries the ribbon depth, so the texture stays perspective-correct.
 						vec2 result = mix(ribbon, grid, uMix);
 						float depth = mix(w, 1.0, uMix);
 						gl_Position = vec4(result * depth, 0.0, depth);
@@ -286,10 +366,13 @@ class ProjectGrid {
 					uniform float uOpacity, uRibbonBlend, uClip;
 					varying vec2 vUV;
 					void main() {
+						// Slice of the atlas for this tile (uAtlas = offset, width), inset slightly from the tile edges.
 						vec2 uv = vec2(uAtlas.x + clamp(vUV.x, .0006, .9994) * uAtlas.y, clamp(vUV.y, .0006, .9994));
 						vec2 ribbonUV = vec2(uRibbonAtlas.x + clamp(vUV.x, .0006, .9994) * uRibbonAtlas.y, uv.y);
+						// uClip reveals the tile from its centre outwards: 0 hides it, 1 shows all of it, with a soft edge between.
 						float edge = max(abs(vUV.x - .5), abs(vUV.y - .5));
 						float mask = uClip >= 1.0 ? 1.0 : (uClip <= 0.0 ? 0.0 : 1.0 - smoothstep(max(0.0, uClip * .5 - .004), uClip * .5, edge));
+						// Cross-fade between the grid texture (outgoing) and the ribbon's texture (incoming).
 						float outgoing = mask * (1.0 - uRibbonBlend), incoming = uRibbonBlend;
 						float alpha = outgoing + incoming;
 						if (alpha * uOpacity < .001)discard;
@@ -330,6 +413,8 @@ class ProjectGrid {
 			'Vertical',
 		])
 			this.uniforms[name] = gl.getUniformLocation(this.program, 'u' + name);
+
+		// Tile mesh: a 24 x 24 quad grid over UV 0..1, so the ribbon curve bends smoothly.
 		const vertices = [],
 			indices = [];
 		const nx = 24,
@@ -349,11 +434,14 @@ class ProjectGrid {
 		this.indices = gl.createBuffer();
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indices);
 		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+		// 1 x 1 dark grey shown until a tile's own texture has loaded.
 		this.fallback = gl.createTexture();
 		gl.bindTexture(gl.TEXTURE_2D, this.fallback);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([24, 24, 24, 255]));
 		this.textureParams();
 	}
+
 	// Host integration: Video loop projects play in the All projects grid too. The poster shows until the loop
 	// has a frame; each new frame is cover-cropped to the 16:10 tile and uploaded. A loop pauses itself once its
 	// tile hasn't been drawn for VIDEO_IDLE_MS (scrolled away, or back on the ribbon) or the page is hidden.
@@ -371,6 +459,8 @@ class ProjectGrid {
 		video.src = src;
 		entry.video = video;
 		entry.lastSeen = performance.now();
+		// Runs for each new video frame: flags the tile for upload and asks for a render. Pauses the loop
+		// instead when the grid is paused, the page is hidden or the tile has been unseen for VIDEO_IDLE_MS.
 		const onFrame = () => {
 			entry.frameCallback = 0;
 			if (entry.video !== video) return;
@@ -383,8 +473,13 @@ class ProjectGrid {
 			if (video.requestVideoFrameCallback) entry.frameCallback = video.requestVideoFrameCallback(onFrame);
 		};
 		entry.onFrame = onFrame;
+
+		// Without requestVideoFrameCallback, timeupdate is the frame signal.
 		if (!video.requestVideoFrameCallback) video.addEventListener('timeupdate', onFrame);
 	}
+
+	// Called whenever a video tile is requested: marks it seen, starts playback if needed and, when a
+	// new frame is ready, uploads it as the tile's texture.
 	updateVideoTexture(entry) {
 		const video = entry.video;
 		entry.lastSeen = performance.now();
@@ -392,6 +487,7 @@ class ProjectGrid {
 			video.pause();
 			return;
 		}
+
 		if (video.paused && !entry.playPending) {
 			entry.playPending = true;
 			video
@@ -409,10 +505,12 @@ class ProjectGrid {
 					entry.playPending = false;
 				});
 		}
+
 		if (!entry.videoDirty || video.readyState < 2 || !video.videoWidth) return;
 		entry.videoDirty = false;
 		entry.hasVideoFrame = true;
 		const gl = this.gl,
+			// Cover-crop: scale so the frame covers 512 x 320, then copy the centred sw x sh source rectangle.
 			c =
 				entry.videoCanvas ||
 				(entry.videoCanvas = Object.assign(document.createElement('canvas'), { width: 512, height: 320 })),
@@ -427,6 +525,8 @@ class ProjectGrid {
 		this.textureParams();
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
 	}
+
+	// While paused, stops every tile video and cancels its frame callback.
 	setPaused(paused) {
 		this.paused = paused;
 		if (!paused) return;
@@ -438,6 +538,8 @@ class ProjectGrid {
 			entry.frameCallback = 0;
 		}
 	}
+
+	// Unloads an evicted tile's video so the browser can free it.
 	releaseVideo(entry) {
 		const video = entry.video;
 		if (!video) return;
@@ -447,6 +549,8 @@ class ProjectGrid {
 		video.removeAttribute('src');
 		video.load();
 	}
+
+	// Clamp-to-edge and linear filtering for the texture currently bound.
 	textureParams() {
 		const gl = this.gl;
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -454,14 +558,20 @@ class ProjectGrid {
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 	}
+
+	// Supplies the catalogue and rebuilds the layout. Without extra projects, the featured list is used.
 	setProjects(featured, projects) {
 		this.featured = featured;
 		this.projects = projects.length ? projects : featured;
 		this.layout = this.buildLayout();
 		this.requestFrame();
 	}
+
+	// Switches between the ribbon (`all` false) and the grid (`all` true) and sets up the transition.
+	// `position` is the ribbon position. When leaving, returns the featured index to settle the ribbon on.
 	setView(all, position, vertical = false) {
 		let selected = null;
+		// Opening from the ribbon: build a fresh layout around the current ribbon position.
 		if (all && this.target === 0 && this.mix < 0.01) {
 			this.vertical = vertical;
 			this.anchor = Math.round(position);
@@ -473,6 +583,8 @@ class ProjectGrid {
 			this.goal = { x: 0, y: 0 };
 			this.speed = 0;
 		}
+		// Closing: rebase onto the featured tile nearest the centre without moving anything on screen,
+		// then ease pan, mix and bend back to the ribbon (`returnMotion`, duration in seconds).
 		if (!all && this.target === 1) {
 			const nearest = this.nearestFeatured();
 			if (nearest) {
@@ -491,6 +603,7 @@ class ProjectGrid {
 				this.returnMotion = { elapsed: 0, duration: 2.2, pan: { ...this.pan }, mix: this.mix, bend: this.bend };
 			}
 		}
+		// Duration in seconds.
 		if (all && this.target === 0) this.entryMotion = { elapsed: 0, duration: 0.85, mix: this.mix };
 		if (!all) this.entryMotion = null;
 		this.target = all ? 1 : 0;
@@ -502,10 +615,13 @@ class ProjectGrid {
 		this.requestFrame();
 		return selected;
 	}
+
+	// Finds the featured tile closest to the screen centre. Returns { col, row, index } or null.
 	nearestFeatured() {
 		if (!this.featured.length || !this.projects.length) return null;
 		const d = this.dimensions(),
 			featuredCount = Math.min(this.featured.length, this.projects.length);
+		// Screen centre in cell units.
 		const centreCol = -this.pan.x / d.pitchX,
 			centreRow = -this.pan.y / d.pitchY;
 		// NOTE • Reads the real layout via indexFor (featured slides are projects 0…featuredCount−1).
@@ -524,6 +640,7 @@ class ProjectGrid {
 				if (index < 0 || index >= featuredCount) continue;
 				const x = (col + this.rowShift(row)) * d.pitchX + this.pan.x,
 					y = row * d.pitchY + this.pan.y;
+				// Distance measured through the same lens stretch as the vertex shader, so it matches what is on screen.
 				const nx = (2 * x) / innerWidth,
 					ny = (2 * y) / innerHeight,
 					lens = 1 + this.bend * (nx * nx + 0.4 * ny * ny);
@@ -533,6 +650,9 @@ class ProjectGrid {
 		}
 		return best;
 	}
+
+	// Tile size in px: width follows the viewport (20.5%, clamped to 190-340) times the size setting,
+	// 16:10 shape, and the pitch adds the gap.
 	dimensions() {
 		const width = (Math.min(340, Math.max(190, innerWidth * 0.205)) * this.settings.size) / 100;
 		return {
@@ -542,6 +662,7 @@ class ProjectGrid {
 			pitchY: width / 1.6 + this.settings.gap,
 		};
 	}
+
 	// How many tiles one screen shows (partly visible included), in layout axes
 	screenWindow() {
 		const d = this.dimensions(),
@@ -549,16 +670,21 @@ class ProjectGrid {
 			rows = Math.ceil(innerHeight / d.pitchY) + 1;
 		return this.vertical ? { along: rows, across: cols } : { along: cols, across: rows };
 	}
+
+	// Rebuilds the layout for the current screen size.
 	buildLayout() {
 		const { along, across } = this.screenWindow();
 		return buildGridLayout(this.featured.length, this.projects.length, this.anchor, along, across);
 	}
+
 	// Keep the anchored row centred while preserving brickwork after rebasing.
 	rowShift(row) {
 		const origin = this.origin?.row || 0,
 			parity = n => ((n % 2) + 2) % 2;
 		return 0.5 * (parity(row + origin) - parity(origin));
 	}
+
+	// Project index shown at grid cell (col, row), after applying the origin rebase.
 	indexFor(col, row) {
 		const mod = (a, n) => ((a % n) + n) % n;
 		col += this.origin?.col || 0;
@@ -570,25 +696,35 @@ class ProjectGrid {
 		if (!layout) return v === 0 ? mod(u, this.featured.length) : mod(u + v * 7, this.projects.length);
 		return layout.cells[mod(v, layout.rows)][mod(u, layout.cols)];
 	}
+
+	// True while the grid is the target view.
 	isActive() {
 		return this.target === 1;
 	}
+
+	// Smoothstep falling from 1 to 0 as `mix` rises through its first 18%. render() fades the grid tiles in by
+	// one minus this, which hands the live ribbon over to them.
 	ribbonHandoff() {
 		const t = Math.max(0, Math.min(1, this.mix / 0.18));
 		return 1 - t * t * (3 - 2 * t);
 	}
+
+	// Wheel and trackpad scroll move the pan goal. Deltas are converted to px (line = 16, page = viewport
+	// height) and capped at 600 per event; the sign is flipped so content follows the scroll.
 	wheel(e) {
 		const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;
 		this.goal.y -= Math.max(-600, Math.min(600, e.deltaY * unit));
 		this.goal.x -= Math.max(-600, Math.min(600, e.deltaX * unit));
 		this.requestFrame();
 	}
+
 	pointerDown(e) {
 		this.pointer = { x: e.clientX, y: e.clientY };
 		this.drag = { x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, moved: false };
 		this.goal = { ...this.pan };
 		this.clearHover();
 	}
+
 	pointerMove(e) {
 		this.pointer = { x: e.clientX, y: e.clientY };
 		if (this.drag) {
@@ -598,20 +734,27 @@ class ProjectGrid {
 			this.goal.y += dy;
 			this.drag.x = e.clientX;
 			this.drag.y = e.clientY;
+			// Movement past 5 px turns a press into a drag.
 			this.drag.moved ||= Math.hypot(e.clientX - this.drag.startX, e.clientY - this.drag.startY) > 5;
 		}
 		this.requestFrame();
 	}
+
+	// Ends a drag. Returns true when it was a click, meaning the pointer never moved far enough to drag.
 	pointerUp() {
 		const clicked = !!this.drag && !this.drag.moved;
 		this.drag = null;
 		this.requestFrame();
 		return clicked;
 	}
+
 	clearHover() {
 		this.hover = null;
 		clearProjectTooltip();
 	}
+
+	// Undoes the lens stretch for a viewport point (px). The stretch depends on the point itself, so this
+	// solves it by fixed-point iteration (12 rounds).
 	inversePoint(x, y) {
 		const sx = ((x - innerWidth / 2) * 2) / innerWidth,
 			sy = (-(y - innerHeight / 2) * 2) / innerHeight;
@@ -622,6 +765,9 @@ class ProjectGrid {
 		}
 		return { x: ((sx / factor) * innerWidth) / 2, y: ((-sy / factor) * innerHeight) / 2 };
 	}
+
+	// Returns { index, project, col, row } for the tile under (x, y) in viewport px, or null for a gap or
+	// before the grid has fully opened. An optional `mapPointer` hook remaps the coordinates first.
 	hitTest(x, y) {
 		if (this.mapPointer) {
 			const point = this.mapPointer(x, y);
@@ -641,6 +787,8 @@ class ProjectGrid {
 		const index = this.indexFor(col, row);
 		return { index, project: this.projects[index], col, row };
 	}
+
+	// Updates the hovered tile, cursor, tooltip and stage label. The keyboard case hovers the screen centre.
 	refreshHover() {
 		if (!this.target) {
 			this.clearHover();
@@ -658,7 +806,10 @@ class ProjectGrid {
 				'All projects. Drag in any direction or scroll vertically to explore the infinite grid.'
 			);
 	}
-	// Host integration: builds the image tiles' textures one at a time in idle slots once the ribbon is ready, so the first switch to All projects doesn't decode and upload every tile in a single frame. Video tiles are skipped so their loops aren't all downloaded up front.
+
+	// Host integration: builds the image tiles' textures one at a time in idle slots once the ribbon is ready,
+	// so the first switch to All projects doesn't decode and upload every tile in a single frame. Video tiles
+	// are skipped so their loops aren't all downloaded up front.
 	prewarm() {
 		if (this.prewarming) return;
 		this.prewarming = true;
@@ -684,6 +835,9 @@ class ProjectGrid {
 		};
 		idle(next);
 	}
+
+	// Returns the GL texture for project `index`, starting its load on first use. Until it arrives (or if
+	// it fails) the fallback texture is used. Images are cover-cropped to 512 x 320.
 	requestTexture(index) {
 		// Host integration: Video loop tiles key by their video so the poster and the loop share one entry.
 		const project = this.projects[index],
@@ -725,6 +879,8 @@ class ProjectGrid {
 		image.src = project.poster;
 		return this.fallback;
 	}
+
+	// Per-frame step; `dt` is in seconds. Returns true while anything is still moving, so the caller keeps rendering.
 	update(dt) {
 		if (this.entryMotion && this.target) {
 			const motion = this.entryMotion;
@@ -737,6 +893,7 @@ class ProjectGrid {
 			const motion = this.returnMotion;
 			motion.elapsed += dt;
 			const t = reducedMotion() ? 1 : Math.min(1, motion.elapsed / motion.duration);
+			// Quintic smootherstep (6x^5 - 15x^4 + 10x^3) on a clamped 0..1 input.
 			const ease = x => {
 				x = Math.max(0, Math.min(1, x));
 				return x * x * x * (x * (x * 6 - 15) + 10);
@@ -756,10 +913,13 @@ class ProjectGrid {
 			}
 			return t < 1;
 		}
+
+		// Mix eases towards its target at 6.2 per second.
 		const ease = reducedMotion() ? 1 : 1 - Math.exp(-dt * 6.2);
 		const mixTarget = this.aligning ? 1 : this.target;
 		this.mix += (mixTarget - this.mix) * ease;
 		if (Math.abs(this.mix - mixTarget) < 0.0005) this.mix = mixTarget;
+		// Pan follow rate in 1/s: a higher Glide setting gives a lower rate, so the pan keeps gliding for longer.
 		const rate = 30 - this.settings.inertia * 0.24;
 		const moveEase = reducedMotion() ? 1 : 1 - Math.exp(-dt * (this.aligning ? 12 : rate)),
 			oldX = this.pan.x,
@@ -772,9 +932,11 @@ class ProjectGrid {
 			this.pan = { x: 0, y: 0 };
 			this.aligning = false;
 		}
+		// Pan speed in px/s, normalised by 1700 and capped at 1.8, then smoothed (rate 9 per second).
 		const speed = Math.hypot(this.pan.x - oldX, this.pan.y - oldY) / Math.max(dt, 0.001);
 		this.speed += (Math.min(speed / 1700, 1.8) - this.speed) * (1 - Math.exp(-dt * 9));
 		if (this.speed < 0.0003) this.speed = 0;
+		// Lens curvature: resting curve plus a share of the motion speed.
 		this.bend =
 			(this.settings.curve / 100) * 0.35 +
 			(reducedMotion() ? 0 : (this.settings.response / 100) * this.speed * 0.28);
@@ -787,6 +949,9 @@ class ProjectGrid {
 			this.speed > 0
 		);
 	}
+
+	// Draws the visible tiles. `featuredTexture` is the ribbon's atlas of `featuredCount` slides and `view`
+	// its current look, which the vertex shader uses to place the ribbon-line tiles identically.
 	render(featuredTexture, featuredCount, view) {
 		if (this.mix === 0 || !this.projects.length) return;
 		const gl = this.gl,
@@ -809,6 +974,8 @@ class ProjectGrid {
 		gl.bindTexture(gl.TEXTURE_2D, featuredTexture);
 		gl.uniform1i(u.RibbonTexture, 1);
 		gl.activeTexture(gl.TEXTURE0);
+
+		// Smoothstep of the mix.
 		const smooth = this.mix * this.mix * (3 - 2 * this.mix);
 		let outgoingClip = 1;
 		if (this.entryMotion && this.target) {
@@ -826,6 +993,7 @@ class ProjectGrid {
 		gl.uniform1f(u.Mix, smooth);
 		gl.uniform1f(u.Bend, this.bend);
 		gl.uniform1f(u.Vertical, view.vertical || 0);
+		// Ribbon radius runs from 14 (curve 0) to 3.6 (curve 100).
 		gl.uniform1f(u.Radius, 14 + ((3.6 - 14) * view.curve) / 100);
 		gl.uniform1f(u.Distance, 2.5 + (4.5 * view.distance) / 100);
 		gl.uniform1f(u.Scale, view.scale / 100);
@@ -833,10 +1001,14 @@ class ProjectGrid {
 		gl.uniform1f(u.Amount, (view.amount * Math.PI) / 180);
 		gl.uniform1f(u.Spread, view.spread / 100);
 		gl.uniform1f(u.Twist, view.twist);
+
+		// Cell range covering 65% of the viewport either side of the centre, plus a one-cell margin.
 		const left = Math.floor((-innerWidth * 0.65 - this.pan.x) / d.pitchX) - 1,
 			right = Math.ceil((innerWidth * 0.65 - this.pan.x) / d.pitchX) + 1;
 		const top = Math.floor((-innerHeight * 0.65 - this.pan.y) / d.pitchY) - 1,
 			bottom = Math.ceil((innerHeight * 0.65 - this.pan.y) / d.pitchY) + 1;
+
+		// Row 0 (the ribbon line) is drawn last, so it sits on top.
 		const rows = [];
 		for (let row = top; row <= bottom; row++) if (row !== 0) rows.push(row);
 		if (top <= 0 && bottom >= 0) rows.push(0);
@@ -846,6 +1018,7 @@ class ProjectGrid {
 					const preload = this.indexFor(col, row);
 					if (preload >= featuredCount) this.requestTexture(preload);
 				}
+				// The spine is the line of tiles the ribbon occupied; it stays opaque while the rest fade in.
 				const spine = this.vertical ? col === 0 : row === 0,
 					axial = this.vertical ? -row : col,
 					cross = this.vertical ? col : row;
@@ -872,6 +1045,8 @@ class ProjectGrid {
 				}
 				gl.drawElements(gl.TRIANGLES, this.vertexCount, gl.UNSIGNED_SHORT, 0);
 			}
+
+		// Keep at most 96 cached textures, evicting the least recently used and never one drawn this frame.
 		if (this.cache.size > 96) {
 			for (const [key, entry] of [...this.cache].sort((a, b) => a[1].last - b[1].last)) {
 				if (this.cache.size <= 96) break;
@@ -885,6 +1060,9 @@ class ProjectGrid {
 		this.refreshHover();
 	}
 }
+
+// Helpers
+// ------------
 function reducedMotion() {
 	return matchMedia('(prefers-reduced-motion: reduce)').matches;
 }

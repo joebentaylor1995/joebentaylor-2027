@@ -1,3 +1,6 @@
+/* Standalone ribbon page styles. Loaded by index.html inside the iframe, which does not load the site's tokens. */
+
+/* Fonts */
 @font-face {
 	font-family: "PP Neue Montreal";
 	src: url("assets/fonts/montreal-regular.woff2") format("woff2");
@@ -19,6 +22,8 @@
 	font-style: normal;
 	font-display: swap;
 }
+
+/* Base */
 :root {
 	color-scheme: dark;
 	font-family: "PP Neue Montreal", sans-serif;
@@ -47,6 +52,8 @@ input:focus-visible {
 	outline: 2px solid #efff00;
 	outline-offset: 5px;
 }
+
+/* Stage (the WebGL canvas) */
 #stage {
 	position: fixed;
 	inset: 0;
@@ -58,6 +65,8 @@ input:focus-visible {
 #stage:active {
 	cursor: grabbing;
 }
+
+/* Header and settings toggle */
 header {
 	position: fixed;
 	top: 0;
@@ -125,6 +134,8 @@ button {
 	background: #edff00;
 	border-radius: 50%;
 }
+
+/* Settings panel */
 #settings {
 	position: fixed;
 	right: 42px;
@@ -239,6 +250,8 @@ input[type="range"]::-moz-range-thumb {
 	color: #838383;
 	margin: 12px 0 0;
 }
+
+/* Footer: project info, navigation and hint */
 footer {
 	position: fixed;
 	bottom: 30px;
@@ -312,6 +325,8 @@ nav > button:hover {
 	font-size: 9px;
 	color: #686868;
 }
+
+/* Error message */
 #error {
 	position: fixed;
 	top: 45%;
@@ -321,6 +336,8 @@ nav > button:hover {
 	background: #222;
 	padding: 20px;
 }
+
+/* Small screens */
 @media (max-width: 700px) {
 	header {
 		padding: 22px;
@@ -370,12 +387,16 @@ nav > button:hover {
 		gap: 10px;
 	}
 }
+
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
 	* {
 		transition: none !important;
 	}
 }
 
+
+/* Extra settings controls */
 #settings {
 	max-height: calc(100dvh - 150px);
 	overflow-y: auto;
@@ -421,6 +442,8 @@ nav > button:hover {
 	clip-path: inset(100%);
 }
 
+
+/* View switch */
 .view-switch {
 	position: fixed;
 	z-index: 4;
@@ -454,6 +477,8 @@ nav > button:hover {
 	margin-left: 5px;
 	opacity: 0.6;
 }
+
+/* Hover tooltip */
 /* Host integration: every project tooltip is borderless brand-c3 (#212121 = --brand-c3 in src/theme; the ribbon frame doesn't load the site's tokens) */
 #hover-title {
 	position: fixed;
@@ -466,6 +491,8 @@ nav > button:hover {
 	padding: 9px 12px;
 	max-width: 260px;
 }
+
+/* Hidden elements */
 #hover-title[hidden],
 [hidden] {
 	display: none !important;
@@ -476,6 +503,8 @@ nav > button:hover {
 	color: #aaa;
 	margin: 0 0 23px;
 }
+
+/* All projects view */
 .all-projects footer nav {
 	visibility: hidden;
 	pointer-events: none;
@@ -499,6 +528,8 @@ footer .hint {
 	outline: 1px solid #eaff00;
 	outline-offset: -5px;
 }
+
+/* Medium screens */
 @media (max-width: 800px) {
 	.subtitle {
 		display: none;
@@ -527,6 +558,8 @@ footer .hint {
 	}
 }
 
+
+/* Introduction controls */
 #intro-controls {
 	border-bottom: 1px solid #383838;
 	margin-bottom: 20px;
@@ -603,6 +636,8 @@ footer .hint {
 	}
 }
 
+
+/* Lens controls */
 #lens-controls {
 	border-bottom: 1px solid #383838;
 	margin-bottom: 20px;
@@ -613,6 +648,8 @@ footer .hint {
 	padding-top: 0;
 }
 
+
+/* Settings groups */
 .settings-group {
 	border: 0 !important;
 	border-bottom: 1px solid #383838 !important;
@@ -689,6 +726,8 @@ header {
 	width: 68px;
 	height: 15px;
 }
+
+/* Availability */
 .availability {
 	font-size: 10px;
 	line-height: 1.32;
@@ -705,6 +744,8 @@ header {
 .availability > span {
 	color: #8d8d8d;
 }
+
+/* Site navigation */
 .site-nav {
 	display: flex;
 	gap: 48px;
@@ -747,6 +788,8 @@ header {
 .intro {
 	display: none;
 }
+
+/* Portfolio view switch */
 .view-switch {
 	top: auto;
 	bottom: var(--page-inset);
@@ -787,6 +830,8 @@ header {
 .view-switch button[aria-pressed="true"] span {
 	color: #12121299;
 }
+
+/* Portfolio footer */
 footer {
 	left: var(--page-inset);
 	right: var(--page-inset);
@@ -852,6 +897,8 @@ footer nav {
 	right: var(--page-inset);
 	top: 120px;
 }
+
+/* Portfolio chrome: medium screens */
 @media (max-width: 800px) {
 	:root {
 		--page-inset: 24px;
@@ -886,6 +933,8 @@ footer nav {
 		font-size: 9px;
 	}
 }
+
+/* Portfolio chrome: small screens */
 @media (max-width: 560px) {
 	.availability {
 		display: none;
