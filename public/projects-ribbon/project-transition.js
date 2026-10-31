@@ -1,11 +1,34 @@
 'use strict';
+
+// Project transition
+// ------------
+// The ribbon-to-case-study transition, owned by the `projectTransition` instance that app.js creates. Clicking a
+// project flies one sheet (a mesh textured with the clicked slide, then the hero image) from the slide's place on
+// the ribbon until it fills the viewport, spreading outwards from the click point with a small ripple.
+// Loaded before app.js, which creates the instance; at call time it uses app.js globals (canvas, gridView, ready,
+// featured, position, atlas sizes, requestRender, imageLoad) and navigation.js (routeHistory, routeLocation, fromHost).
+//
+// Phases:
+// 1. open() fetches the hero details, (when embedded) asks the host to prepare its page, loads the hero image and
+//    uploads it, then queues `pending`.
+// 2. begin(), called by app.js's renderScene once the ribbon has drawn, grabs that frame as a backdrop, works out
+//    where the clicked slide sits and builds the mesh.
+// 3. draw() runs each frame while `active`, then settles: the host is told to open the real page, or the
+//    standalone #project-page is revealed.
+// 4. returnToGallery() plays the flight backwards (or fades if the viewport changed), then close() restores the page.
+
+// Easing
+// ------------
 const projectEase = t => t * t * (3 - 2 * t);
+// Samples in the baked easing table; the shader receives PROJECT_CURVE_SAMPLES + 1 values.
 const PROJECT_CURVE_SAMPLES = 32;
 // The eases the settings panel offers, without loading GSAP into the ribbon. 'custom' is a plain ease-out whose exponent is the softness slider.
 function projectEasing(name, softness) {
 	if (name === 'none') return t => t;
+	// Names follow GSAP: power1 to power4, sine, expo and circ, each with .in, .out or .inOut.
 	const [, family, level, direction] = /^(power([1-4])|sine|expo|circ)\.(in|out|inOut)$/.exec(name) || [];
 	if (!family) return t => 1 - Math.pow(1 - t, softness);
+	// The ease-in curve for the family; out and inOut are built by mirroring it.
 	const accelerate = level
 		? t => Math.pow(t, +level + 1)
 		: family === 'sine'
@@ -17,6 +40,9 @@ function projectEasing(name, softness) {
 	if (direction === 'out') return t => 1 - accelerate(1 - t);
 	return t => (t < 0.5 ? accelerate(2 * t) / 2 : 1 - accelerate(2 - 2 * t) / 2);
 }
+
+// Fill settings
+// ------------
 // Tuned from the site's global settings panel. Keep in step with fillDefaults in src/components/ProjectsRibbon/fillSettings.ts.
 // stagger: how far behind the clicked point the farthest corner sets off, as a fraction of the expansion. wave: height, as a fraction of the viewport's shorter side.
 const PROJECT_FILL_DEFAULTS = {
@@ -31,6 +57,7 @@ const PROJECT_FILL_DEFAULTS = {
 	lift: 0.05,
 	shading: 0.55,
 };
+// Saved tuning over the defaults, clamped, with the easing baked into `curve` (see below).
 function projectFillSettings() {
 	const settings = { ...PROJECT_FILL_DEFAULTS };
 	try {
@@ -49,25 +76,36 @@ function projectFillSettings() {
 	);
 	return settings;
 }
+// UV scale that crops an image to cover a box (like object-fit: cover): the overflowing axis is shrunk below 1.
 const projectCover = (imageAspect, boxAspect) => [
 	Math.min(1, boxAspect / imageAspect),
 	Math.min(1, imageAspect / boxAspect),
 ];
+
+// Source surface
+// ------------
 // Snapshot the selected surface in homogeneous coordinates, preserving perspective.
+// u and v run 0..1 across the slide (or grid tile). Returns [x, y, w]: clip-space x and y before the divide by w,
+// where w is the depth. The ribbon branch repeats the vertex shader's surface() on the CPU, so the sheet starts
+// exactly where the ribbon was drawn.
 function projectSurface(u, v, source, view, width, height) {
 	if (source.grid) {
 		const { centre, size, bend } = source.grid;
+		// Grid tile: centre and size are in CSS pixels; convert to clip space (y flipped) and bow the tile outwards by `bend`.
 		let x = (2 * (centre.x + (u - 0.5) * size.width)) / width,
 			y = (-2 * (centre.y + (v - 0.5) * size.height)) / height;
 		const lens = 1 + bend * (x * x + 0.4 * y * y);
 		return [x * lens, y * lens, 1];
 	}
+	// Same constants as the ribbon shader: angle per slide, cylinder radius and viewing distance.
 	const pitch = view.vertical ? Math.PI / 4.8 : Math.PI / 3,
 		radius = 14 - (10.4 * view.curve) / 100,
 		distance = 2.5 + (4.5 * view.distance) / 100;
+	// Angle around the cylinder, relative to the slide at the current scroll offset.
 	const angle = (source.slide + (view.vertical ? 1 - v : u) - source.offset - 0.5) * pitch;
 	const acrossHeight = view.vertical ? 2 * u - 1 : 1 - 2 * v;
 	const smooth = (a, b, t) => projectEase(Math.max(0, Math.min(1, (t - a) / (b - a))));
+	// Twist as in the shader: ramps in beyond .62 slides (over `spread`) and fades out towards the back.
 	const twist =
 		((Math.sign(angle) * view.amount * Math.PI) / 180) *
 		view.twist *
@@ -78,9 +116,11 @@ function projectSurface(u, v, source, view, width, height) {
 		radial = radius + across * Math.sin(twist);
 	let x = radial * Math.sin(angle),
 		y = across * Math.cos(twist);
+	// Vertical mode swaps the axes; stacked bands sit 2.08 half-heights away.
 	if (view.vertical) [x, y] = [y, x];
 	if (view.vertical) x += source.band * half * 2.08;
 	else y += source.band * half * 2.08;
+	// Head tilt and scale, then the shader's .77 focal factor with the aspect correction; the last entry is depth.
 	const a = (view.rotation * Math.PI) / 180,
 		c = Math.cos(a),
 		s = Math.sin(a),
@@ -91,6 +131,10 @@ function projectSurface(u, v, source, view, width, height) {
 		distance - radius + radial * Math.cos(angle),
 	];
 }
+// Transition
+// ------------
+// State flags: `pending` (queued by open, consumed by begin), `loading` (open in progress), `active` (flight or case-study page
+// on screen), `returning` (reverse flight or fade), `settled` (flight finished).
 class ProjectTransition {
 	constructor(gl) {
 		this.gl = gl;
@@ -103,6 +147,7 @@ class ProjectTransition {
 		this.resources = [];
 		this.savedInert = [];
 		this.heroChoices = new Map();
+		// The standalone case-study page. Hidden when embedded, where the host renders the real page.
 		this.page = document.createElement('section');
 		this.page.id = 'project-page';
 		this.page.hidden = true;
@@ -111,11 +156,13 @@ class ProjectTransition {
 		document.body.append(this.page);
 		this.returning = false;
 		this.fadeSerial = 0;
+		// Cover for the fade fallback used when a reverse flight is not possible.
 		this.fade = document.createElement('div');
 		this.fade.id = 'project-return-fade';
 		this.fade.hidden = true;
 		this.fade.setAttribute('aria-hidden', 'true');
 		document.body.append(this.fade);
+		// Back uses history when this script pushed the route entry, otherwise drops ?project and returns directly.
 		this.page.querySelector('button').onclick = () => {
 			if (this.returning) return;
 			if (routeHistory.state?.ribbonProject) routeHistory.back();
@@ -132,12 +179,14 @@ class ProjectTransition {
 				this.page.querySelector('button').click();
 			}
 		});
+		// Messages from the host's fill settings panel: play a preview, or scrub the flight to a fixed point.
 		window.addEventListener('message', e => {
 			if (!fromHost(e)) return;
 			if (e.data?.type === 'projects:fill-preview') this.preview();
 			else if (e.data?.type === 'projects:fill-scrub') this.scrub(e.data.flight);
 		});
 	}
+	// URL slug: kebab-case name plus the project index.
 	slug(project) {
 		return (
 			project.name
@@ -237,6 +286,9 @@ class ProjectTransition {
 			requestRender();
 		} else if (!this.loading && !this.active) this.preview();
 	}
+	// Starts a transition. Fetches the hero details and (when embedded) waits for the host to prepare its page, with a 15 s
+	// timeout, then loads and uploads the hero and queues `pending` for begin(). `serial` voids the call if another open or
+	// a close happens first.
 	async open(project, hit, point) {
 		if (this.active || this.loading || this.returning || (gridView?.mix > 0 && gridView.mix < 1)) return;
 		this.embedded = window.parent !== window;
@@ -261,6 +313,8 @@ class ProjectTransition {
 				const slug = path.pathname.split('/')[2];
 				const data = await this.heroData(slug);
 				if (serial !== this.serial) return;
+				// Embedded: ask the host to prepare the case-study page. Its reply carries the hero image URL plus the hero's height
+				// and top offset on that page.
 				const prepared = await new Promise((resolve, reject) => {
 					const listener = event => {
 						if (
@@ -318,6 +372,7 @@ class ProjectTransition {
 		gl.activeTexture(unit);
 		return t;
 	}
+	// Makes the rest of the page inert and pauses the videos while a case study is open; close() undoes it.
 	lock() {
 		this.savedInert = [...document.body.children]
 			.filter(
@@ -330,6 +385,8 @@ class ProjectTransition {
 		document.title = this.project.name + ' — Joe Ben Taylor';
 		document.body.classList.add('project-open');
 	}
+	// Called by renderScene with the ribbon's `view` once the click's frame has drawn. Captures that frame as the backdrop,
+	// locates the clicked slide or tile, builds the mesh and draws the first frame.
 	begin(view) {
 		const { project, hit, point, image, destination } = this.pending;
 		this.pending = null;
@@ -343,6 +400,7 @@ class ProjectTransition {
 		this.backURL = routeLocation.pathname + routeLocation.search + routeLocation.hash;
 		const url = new URL(routeLocation.href);
 		url.searchParams.set('project', this.slug(project));
+		// Standalone: push a history entry so Back works. Embedded: the host owns the route.
 		if (!this.embedded)
 			routeHistory.pushState({ ribbonProject: true, projectSlug: this.slug(project), hero: image.src }, '', url);
 		this.page.querySelector('img').src = image.src;
@@ -358,8 +416,10 @@ class ProjectTransition {
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		this.background = this.texture();
+		// Copies the frame just drawn into the backdrop texture.
 		gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGB, 0, 0, canvas.width, canvas.height, 0);
 		this.destination = destination;
+		// Where the sheet starts: a grid tile (centre and size in px) or a ribbon slide (band, scroll offset, slide).
 		let source;
 		if (hit?.grid) {
 			const d = gridView.dimensions();
@@ -374,12 +434,15 @@ class ProjectTransition {
 				},
 			};
 		} else {
+			// Same band and shift formula as drawFeaturedRibbons and pickFeatured.
 			const band = hit?.band || 0,
 				shift = Math.max(1, Math.floor((count * (band === 1 ? 1 : 2)) / 3));
 			const offset = band ? mod(-position + count - 1 - shift + 0.5, count) : mod(position, count);
 			const slide = hit?.slide ?? Math.floor(offset + 0.5);
 			source = { band, offset, slide };
 		}
+		// Featured slides read from the shared atlas; `sourceAtlas` is the tile's rectangle in atlas UV (x, y, width, height).
+		// Other projects use the grid's tile texture.
 		const index = featured.findIndex(item => item.poster === project.poster);
 		this.sourceTexture = index >= 0 ? texture : gridView.requestTexture(hit?.index ?? project.index);
 		this.sourceAtlas =
@@ -391,11 +454,13 @@ class ProjectTransition {
 						1 / atlasRows,
 					]
 				: [0, 0, 1, 1];
+		// Viewport at capture time; a reverse flight is only valid while it is unchanged (see returnToGallery).
 		this.captureSize = [innerWidth, innerHeight];
 		this.makeMesh(source, view, point);
 		this.compile();
 		this.draw(performance.now());
 	}
+	// Creates a tracked texture with linear filtering and clamped edges, and leaves it bound.
 	texture() {
 		const gl = this.gl,
 			t = gl.createTexture();
@@ -410,6 +475,9 @@ class ProjectTransition {
 			gl.texParameteri(gl.TEXTURE_2D, key, val);
 		return t;
 	}
+	// Builds the sheet: a grid of vertices holding the start position [x, y, w] on the source surface plus UV. Also finds
+	// `origin` (the vertex nearest the click, in UV), `reach` (aspect-corrected UV distance from origin to the farthest corner)
+	// and `sourceHeight` (the source slide's on-screen height in CSS px).
 	makeMesh(source, view, point) {
 		const gl = this.gl,
 			vertices = [],
@@ -434,6 +502,7 @@ class ProjectTransition {
 					v = y / ny,
 					start = projectSurface(u, v, source, view, innerWidth, innerHeight);
 				vertices.push(...start, u, v);
+				// Ignore vertices behind or very close to the camera.
 				if (point && start[2] > 0.04) {
 					const distance = Math.hypot(
 						((start[0] / start[2] + 1) / 2) * innerWidth - point.x,
@@ -472,6 +541,7 @@ class ProjectTransition {
 			this.warmProgram = this.link();
 		} catch {}
 	}
+	// Uses the warmed program if there is one, and caches the uniform locations.
 	compile() {
 		const gl = this.gl;
 		this.program = this.warmProgram || this.link();
@@ -503,6 +573,7 @@ class ProjectTransition {
 		])
 			this.uniforms[key] = gl.getUniformLocation(this.program, 'u' + key);
 	}
+	// Compiles and links the sheet program.
 	link() {
 		const gl = this.gl,
 			program = gl.createProgram();
@@ -520,20 +591,32 @@ class ProjectTransition {
 					const vec2 LIGHT = vec2(-.53, .85);
 					void main() {
 						vUV = aUV;
+						// The vertex's destination: the viewport corner to corner in clip space.
 						vec3 end = vec3(aUV.x * 2. - 1., 1. - aUV.y * 2., 1.);
+						// Background pass: the captured frame as a flat full-screen quad.
 						if (uBackground > .5) {
 							vBlend = 0.;
 							vShade = 0.;
 							gl_Position = vec4(end.xy, 0., 1.);
 							return;
 						}
+						// rel is the offset from the click origin in aspect-corrected UV; d is that distance as a fraction of uReach.
 						vec2 rel = (aUV - uOrigin) * uAspect;
+						// local: this vertex's own 0..1 flight, delayed by d * uStagger.
+						// eased: local looked up in the baked uCurve table, interpolated between samples.
+						// env: sin(PI * local), zero at both ends, scales the billow. phase: the ripple, uWaves cycles across d, drifting with progress.
 						float r = length(rel), d = r / uReach, local = clamp((uProgress - d * uStagger) / (1. - uStagger), 0., 1.), sample = min(floor(local * 32.), 31.), eased = mix(uCurve[int(sample)], uCurve[int(sample) + 1], local * 32. - sample), env = sin(3.14159265 * local) * uMotion, phase = 6.2831853 * (uWaves * d - uTravel * uProgress);
+						// Ripple direction: away from the click (y flipped to clip space), faded in over the first 18% of d so the click point stays put.
 						vec2 dir = vec2(rel.x, -rel.y) / max(r, .0001) * smoothstep(0., .18, d);
+						// Depth relaxes from the source surface's own depth to 1 as the sheet lands.
 						float depth = mix(max(.04, aStart.z), 1., eased);
+						// Blend from the perspective-divided start to the destination; lift scales it outwards and the ripple pushes it along dir.
 						vec2 screen = mix(aStart.xy / max(.04, aStart.z), end.xy, eased) * (1. + uLift * env) + dir * sin(phase) * env * uWave;
+						// The image cross-fades from the ribbon slide to the hero between 25% and 95% of the eased flight.
 						vBlend = smoothstep(.25, .95, eased);
+						// Shade follows the ripple against a fixed light direction.
 						vShade = -cos(phase) * env * dot(dir, LIGHT);
+						// z grows with d, so vertices further from the click sit behind the leading ones.
 						gl_Position = vec4(screen * depth, d * .9 * depth, depth);
 					}
 				`,
@@ -550,12 +633,16 @@ class ProjectTransition {
 					varying float vBlend, vShade;
 					void main() {
 						vec2 uv = clamp(vUV, vec2(.001), vec2(.999));
+						// Background pass: the captured frame, y flipped.
 						if (uBackground > .5) {
 							gl_FragColor = vec4(texture2D(uSource, vec2(vUV.x, 1. - vUV.y)).rgb, uOpacity);
 							return;
 						}
+						// before: the source image from the atlas or grid tile, cropped to the sheet's on-screen aspect.
+						// after: the hero, cropped to cover; uHeroViewport and uHeroOffset pick the visible part of the taller page hero.
 						vec3 before = texture2D(uSource, uAtlas.xy + clamp((vUV - .5) * uSourceCrop + .5, vec2(.001), vec2(.999)) * uAtlas.zw).rgb;
 						vec3 after = texture2D(uHero, (vec2(vUV.x, vUV.y * uHeroViewport + uHeroOffset) - .5) * uCrop + .5).rgb;
+						// Cross-fade by vBlend, then lighten or darken by the ripple shade.
 						gl_FragColor = vec4(mix(before, after, vBlend) * (1. + vShade * uShading), uOpacity);
 					}
 				`,
@@ -577,6 +664,9 @@ class ProjectTransition {
 		}
 		return program;
 	}
+	// One frame of the flight, called by renderScene while `active`. `progress` is elapsed / duration (or the scrubbed value).
+	// A return plays `returnFrom` back down through the same flight on a smoothstep. `flight` is the shader's progress and
+	// `t` its eased value, which also drives the crop and the real page's fade-in.
 	draw(time) {
 		if (!this.program || (this.settled && !this.returning)) return;
 		if (this.start === null) this.start = time;
@@ -589,6 +679,7 @@ class ProjectTransition {
 			gl = this.gl,
 			u = this.uniforms;
 		this.meshProgress = flight;
+		// The page content fades in over the last 35% of the eased flight.
 		this.page.style.setProperty(
 			'--project-content',
 			String(projectEase(Math.max(0, Math.min(1, (t - 0.65) / 0.35))))
@@ -613,6 +704,7 @@ class ProjectTransition {
 		const a = gl.getAttribLocation(this.program, 'aStart'),
 			b = gl.getAttribLocation(this.program, 'aUV');
 		gl.enableVertexAttribArray(a);
+		// Interleaved vertices: 5 floats (20 bytes), position xyw then UV.
 		gl.vertexAttribPointer(a, 3, gl.FLOAT, false, 20, 0);
 		gl.enableVertexAttribArray(b);
 		gl.vertexAttribPointer(b, 2, gl.FLOAT, false, 20, 12);
@@ -642,6 +734,8 @@ class ProjectTransition {
 		gl.uniform1f(u.Motion, reduced ? 0 : 1);
 		gl.uniform2f(u.Wave, (2 * wave) / innerWidth, (2 * wave) / innerHeight);
 		gl.uniform4fv(u.Atlas, this.sourceAtlas);
+		// The visible box grows from the source slide (16:10, hence 1.6) to the full viewport as `t` rises. Both the slide
+		// and the hero are cropped to cover it, and the hero moves towards its height and top offset on the host page.
 		const cropProgress = t,
 			boxHeight = this.sourceHeight + (innerHeight - this.sourceHeight) * cropProgress,
 			boxWidth = this.sourceHeight * 1.6 + (innerWidth - this.sourceHeight * 1.6) * cropProgress,
@@ -655,7 +749,10 @@ class ProjectTransition {
 		gl.drawElements(gl.TRIANGLES, this.vertexCount, gl.UNSIGNED_SHORT, 0);
 		gl.disable(gl.DEPTH_TEST);
 		gl.disable(gl.BLEND);
+		// Scrubbing holds a fixed frame.
 		if (holding) return;
+		// Keep flying; when a return finishes, restore the page. When a flight finishes, settle: a preview flies back after 400 ms,
+		// an embedded page tells the host to open the real case study after 100 ms, and standalone reveals its own page.
 		if (this.progress < 1) requestRender();
 		else if (this.returning) {
 			this.close();
@@ -691,6 +788,7 @@ class ProjectTransition {
 			this.page.querySelector('button').focus({ preventScroll: true });
 		}
 	}
+	// Releases this flight's GL textures, buffers and program.
 	dispose() {
 		const gl = this.gl;
 		if (this.program) {
@@ -707,6 +805,7 @@ class ProjectTransition {
 		this.resources = [];
 		this.program = null;
 	}
+	// Ends the transition and restores the gallery: inert state, title, focus, videos and the idle timer.
 	close() {
 		clearTimeout(this.handoffTimer);
 		++this.serial;
@@ -730,6 +829,7 @@ class ProjectTransition {
 		resumeVideos();
 		requestRender();
 	}
+	// Stops a fade-based return and clears `returning`.
 	cancelReturn() {
 		++this.fadeSerial;
 		this.fadeAnimation?.cancel();
@@ -737,6 +837,8 @@ class ProjectTransition {
 		this.fade.hidden = true;
 		this.returning = false;
 	}
+	// Back to the ribbon. If the viewport is unchanged and motion is allowed, plays the flight in reverse. Otherwise fades a
+	// cover in, restores the gallery underneath and fades it out. `fadeSerial` voids a superseded run.
 	async returnToGallery() {
 		if (this.returning) return;
 		if (!this.active) {
@@ -780,6 +882,7 @@ class ProjectTransition {
 			if (serial === this.fadeSerial) this.cancelReturn();
 		}
 	}
+	// Deep link or reload with ?project=slug: shows the finished case study with no flight. An unknown slug drops the parameter.
 	openRoute(slug) {
 		const project = allProjects.find(item => this.slug(item) === slug);
 		if (!project) {

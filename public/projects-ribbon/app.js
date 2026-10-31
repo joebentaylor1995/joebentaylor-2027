@@ -1,4 +1,21 @@
 'use strict';
+
+// Projects ribbon
+// ------------
+// Main script of the standalone WebGL ribbon, which runs inside an iframe on the portfolio. It owns the
+// featured ribbon (a subdivided two-sided cylinder drawn by one shader pair), the tuning panel, input,
+// the poster/video atlas, catalogue loading and the frame loop. Plain scripts share one global scope, so
+// every top-level name here is public: later scripts (export.js) and the tests reach in by name.
+// Loaded after the helper scripts in index.html (navigation, grid, video-atlas, frame-meter, intro, idle,
+// mouse-tilt, velocity-shape, project-transition, loader-wave) and uses their classes directly.
+//
+// Frame loop: input and host messages call `requestRender()`, which schedules `render()`. Each frame
+// `renderScene()` advances the intro, idle drift, tilt, scroll easing and grid, uploads video frames,
+// sets the uniforms and draws the ribbon (then the grid on top). While a case study is open the frame is
+// handed to `projectTransition.draw()` instead.
+
+// Host integration
+// ------------
 const canvas = document.querySelector('#stage');
 // Share the host's brand background with the opaque WebGL canvas.
 try {
@@ -7,13 +24,20 @@ try {
 		if (colour) document.documentElement.style.setProperty(token, colour);
 	}
 } catch {}
+
+// Phone layout below 768 px; the `change` listener under Resize swaps layouts live.
 const mobileViewport = matchMedia('(width < 768px)');
 let mobile = mobileViewport.matches;
+
+// `hostActive` follows the host's `projects:active` message (standalone, or on /projects). `hostPrepared` flips once
+// the first frame has painted, which is when the host is told the page wave can start.
 let hostActive = window.parent === window || /^\/projects\/?$/.test(window.parent.location.pathname),
 	hostPrepared = false;
+// True while the host page is navigating or running its page wave (flags set on the parent's <html>).
 const hostTransition = () =>
 	window.parent !== window &&
 	window.parent.document.documentElement.matches('[data-navigation-pending], [data-navigation-wave]');
+// The host wrapper around this iframe; it sets `data-scene-paused` while the scene is covered.
 const hostScene = window.frameElement?.closest('[data-profile-scene]');
 const scenePaused = () => hostScene?.dataset.scenePaused === 'true';
 // Phones keep drawing through the page crossfade, so the ribbon is already moving as it fades in
@@ -22,6 +46,9 @@ const hostSuspended = () => !hostActive || scenePaused() || document.hidden || (
 // returns to the resting ribbon rather than replaying the project from its last expanded frame
 let restingFrame = false;
 const canRender = () => !scenePaused() && !document.hidden && (!hostPrepared || restingFrame || !hostSuspended());
+
+// Pauses or resumes the frame loop, idle drift, grid and videos to match `hostSuspended()`. Called on host
+// messages, host attribute changes and tab visibility.
 function syncHostActivity() {
 	clearTimeout(snapTimer);
 	if (hostSuspended()) idleMotion.reset(false);
@@ -43,6 +70,8 @@ function syncHostActivity() {
 	// Finish the single off-page warm frame if opening Profile interrupted it.
 	requestRender();
 }
+
+// Resolves once the host scene is no longer paused (straight away if it is not).
 function waitForUncoveredScene() {
 	if (!scenePaused()) return Promise.resolve();
 	return new Promise(resolve => {
@@ -55,6 +84,9 @@ function waitForUncoveredScene() {
 		observer.observe(hostScene, { attributes: true, attributeFilter: ['data-scene-paused'] });
 	});
 }
+
+// Host message: activate or deactivate the ribbon. Going inactive also closes any open case-study
+// transition and paints one resting frame so the page returns to the ribbon, not the project.
 window.addEventListener('message', event => {
 	if (!fromHost(event) || event.data?.type !== 'projects:active') return;
 	hostActive = event.data.active === true;
@@ -69,6 +101,8 @@ window.addEventListener('message', event => {
 		requestRender();
 	}
 });
+
+// Re-sync whenever the host starts or ends a navigation, or pauses this scene.
 if (window.parent !== window)
 	new MutationObserver(syncHostActivity).observe(window.parent.document.documentElement, {
 		attributes: true,
@@ -79,9 +113,13 @@ if (hostScene)
 		attributes: true,
 		attributeFilter: ['data-scene-paused'],
 	});
+// Context and settings
+// ------------
 let settingsKey = mobile ? 'ribbon-settings-mobile' : 'ribbon-settings';
 const gl = canvas.getContext('webgl', { alpha: false, antialias: true, preserveDrawingBuffer: false });
+// Site-loader wave overlay (see loader-wave.js); only exists when the URL has `loaderWave`.
 let loaderWave = new URL(location.href).searchParams.has('loaderWave') && gl ? new RibbonLoaderWave(gl) : null;
+// The host drives the wave with `progress` (0..1) and optional tuning values; at 1 the overlay is disposed.
 window.addEventListener('message', event => {
 	if (!fromHost(event) || event.data?.type !== 'projects:loader-wave' || !loaderWave) return;
 	const progress = event.data.progress;
@@ -95,6 +133,9 @@ window.addEventListener('message', event => {
 	}
 	requestRender();
 });
+
+// Default tuning. Units match the panel sliders: degrees for rotation/tilt/amount, percent for the rest.
+// stacked, vertical, twist and the velocity/mouse toggles are 0/1 flags.
 const desktopDefaults = {
 	rotation: 0,
 	mouseTilt: 0,
@@ -116,6 +157,8 @@ const desktopDefaults = {
 	amount: 180,
 	spread: 48,
 };
+
+// Phone overrides: a vertical, stacked ribbon that is larger, more curved and faster than desktop.
 const mobileDefaults = {
 	vertical: 1,
 	stacked: 1,
@@ -127,14 +170,19 @@ const mobileDefaults = {
 	blur: 24,
 };
 const defaults = { ...desktopDefaults, ...(mobile ? mobileDefaults : {}) };
+// Live settings. Edited by the panel and persisted to localStorage.
 const state = { ...defaults };
 // Preserve the approved 576 × 991 mobile composition using width-based projection.
 const mobileReferenceAspect = 576 / 991;
+// Settings as drawn this frame: `state` plus the velocity-driven tilt/curve and mouse tilt (raw `state` while
+// the intro plays). On phones `scale` is multiplied by the viewport aspect over the reference aspect.
 function featuredView() {
 	const view = introduction.active ? { ...state } : velocityShape.view({ ...state, rotation: mouseTilt.rotation });
 	if (mobile) view.scale *= innerWidth / innerHeight / mobileReferenceAspect;
 	return view;
 }
+
+// Restore saved settings; only finite numbers under known keys are accepted.
 try {
 	const saved = JSON.parse(localStorage.getItem(settingsKey) || '{}');
 	for (const key of [
@@ -159,12 +207,14 @@ try {
 	])
 		if (Number.isFinite(saved[key])) state[key] = saved[key];
 } catch {}
+// Persists `state`. Skipped in `?capture` mode.
 function saveSettings() {
 	if (new URLSearchParams(location.search).has('capture')) return;
 	try {
 		localStorage.setItem(settingsKey, JSON.stringify(state));
 	} catch {}
 }
+// Migrations run once per browser, each guarded by a localStorage flag, so later panel changes persist.
 // Apply the requested mobile tuning once, including on phones with saved settings.
 function migrateMobileSettings() {
 	if (mobile) {
@@ -199,6 +249,7 @@ function restoreDesktopOrientation() {
 	}
 }
 restoreDesktopOrientation();
+// One-off reset of desktop rotation, distance and curve, then of tilt.
 function migrateDesktopSettings() {
 	if (!mobile) {
 		const tuning = { rotation: 0, distance: 100, curve: 74 };
@@ -220,12 +271,19 @@ function migrateDesktopSettings() {
 }
 migrateDesktopSettings();
 
+// State
+// ------------
+// `featured` is the slide list in atlas order. `featuredProjects` and `allProjects` are the CMS lists, and
+// `catalogRevision` lets a newer catalogue load supersede an older one still in flight.
 let featured = [];
 let featuredProjects = [],
 	allProjects = [],
 	catalogRevision = 0;
+// Poster-load promises by URL, reused when the catalogue is applied again.
 const posterCache = new Map();
 let names = Array.from({ length: 12 }, (_, i) => `Featured ${String(i + 1).padStart(2, '0')}`);
+// `position` is the eased scroll in slides and `target` where it is heading. Both are unbounded and wrapped
+// with `mod(.., count)`. `ready` is set once the atlas texture exists.
 let count = names.length,
 	position = 0,
 	target = 0,
@@ -234,9 +292,13 @@ let count = names.length,
 	snapTimer,
 	texture,
 	ready = false;
+// Smoothed slide velocity in slides per second; drives motion blur and VelocityShape.
 let scrollVelocity = 0;
+// 0..1 progress of the stacked bands flying away while the grid is showing.
 let stackedDeparture = 0;
+// When non-zero, overrides the device pixel ratio used to size the canvas (set by export.js).
 let exportPixelRatio = 0;
+// Video slides, plus atlas tile size in px and the tile grid layout (columns by rows).
 let videoSlides = [],
 	atlasWidth = 1024,
 	atlasHeight = 640,
@@ -245,10 +307,14 @@ let atlasColumns = 12,
 	atlasRows = 1;
 const numberLabel = document.querySelector('#slide-number'),
 	titleLabel = document.querySelector('#slide-title');
+// Last label state written by `updateUI`, so unchanged frames skip the DOM.
 let uiKey = '';
 const frameMeter = new FrameMeter();
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 if (reduced) position = 0;
+// Panel controls
+// ------------
+// Slider definitions as [state key, label, min, max, unit]; each becomes a row in the tuning panel.
 const controls = [
 	['rotation', 'Head tilt', -45, 45, '°'],
 	['distance', 'Viewing distance', 0, 100, '%'],
@@ -275,6 +341,8 @@ for (const [key, label, min, max, unit] of controls) {
 const velocityShape = new VelocityShape();
 const velocityControls = document.createElement('div');
 document.querySelector('#controls').before(velocityControls);
+
+// Velocity tilt and curvature: a toggle plus a "maximum added" slider each. Desktop only.
 for (const [toggle, key, label, max, unit] of [
 	['velocityTilt', 'velocityTiltAmount', 'Velocity tilt', 30, '°'],
 	['velocityCurve', 'velocityCurveAmount', 'Velocity curvature', 100, '%'],
@@ -295,6 +363,7 @@ for (const [toggle, key, label, max, unit] of [
 	};
 	velocityControls.append(section);
 }
+// Mirrors `state` into the velocity controls.
 function syncVelocityControls() {
 	velocityControls.hidden = mobile;
 	velocityControls.style.display = mobile ? 'none' : '';
@@ -309,6 +378,8 @@ function syncVelocityControls() {
 		document.getElementById(key + '-value').textContent = state[key] + unit;
 	}
 }
+
+// Mouse-controlled tilt (desktop only): a toggle plus min/max sliders for the top and bottom of the viewport.
 const mouseTilt = new MouseTilt(state.rotation);
 const mouseTiltRow = document.createElement('div');
 mouseTiltRow.className = 'switch-row';
@@ -332,6 +403,7 @@ for (const [key, label, min, max] of [
 	};
 	mouseTiltLimits.append(row);
 }
+// Mirrors `state` into the mouse-tilt controls; the manual head-tilt slider is disabled while the mouse owns rotation.
 function syncMouseTilt() {
 	syncVelocityControls();
 	mouseTiltRow.hidden = mobile;
@@ -353,6 +425,7 @@ mouseTiltToggle.onchange = () => {
 	saveSettings();
 	requestRender();
 };
+// Pointer height as 0..1 (top to bottom) feeds MouseTilt.
 window.addEventListener(
 	'pointermove',
 	e => {
@@ -372,6 +445,7 @@ stackedToggle.onchange = () => {
 };
 const verticalToggle = document.querySelector('#vertical');
 verticalToggle.checked = !!state.vertical;
+// Sets the hint arrow and prev/next arrows for the scroll axis.
 function syncDirection() {
 	if (!gridView?.target) {
 		const arrow = document.querySelector('.hint span');
@@ -387,6 +461,8 @@ verticalToggle.onchange = () => {
 	syncDirection();
 	requestRender();
 };
+
+// Twist amount and spread only apply while twist is on.
 const twistToggle = document.querySelector('#twist');
 function syncTwist() {
 	syncMouseTilt();
@@ -400,7 +476,13 @@ twistToggle.onchange = () => {
 	requestRender();
 };
 syncTwist();
+
+// Labels and navigation
+// ------------
+// Positive modulo (JS `%` keeps the sign of the dividend).
 const mod = (v, n) => ((v % n) + n) % n;
+// Updates the slide number, title, tags and dots for the slide at the rounded `position`, or the hovered
+// project while the grid is showing. Does nothing if the state key has not changed.
 function updateUI() {
 	if (!gridView?.target) refreshFeaturedTooltip();
 	const key = gridView?.target
@@ -430,6 +512,7 @@ function updateUI() {
 		b.setAttribute('aria-current', i === index ? 'true' : 'false');
 	});
 }
+// One dot per slide. A click moves `target` the shortest way round the loop.
 function buildDots() {
 	uiKey = '';
 	document.querySelector('#dots').replaceChildren();
@@ -447,6 +530,7 @@ function buildDots() {
 	});
 	updateUI();
 }
+// True while a case-study transition or the grid's return to the ribbon is running; input is ignored then.
 function returningToFeatured() {
 	return (
 		projectTransition.active ||
@@ -455,14 +539,20 @@ function returningToFeatured() {
 		(gridView?.returning && !gridView.target && gridView.mix > 0)
 	);
 }
+// Steps one slide from the nearest whole slide, so repeated presses always land on a slide.
 function move(direction) {
 	if (returningToFeatured()) return;
 	clearTimeout(snapTimer);
 	target = Math.round(target) + direction;
 	requestRender();
 }
+
+// Input
+// ------------
 document.querySelector('#prev').onclick = () => move(-1);
 document.querySelector('#next').onclick = () => move(1);
+// Escape dismisses the tooltip. Enter or Space on the focused canvas opens the project at the viewport centre.
+// Arrows pan the grid, or step the ribbon (up/down only in vertical mode).
 window.addEventListener('keydown', e => {
 	if (returningToFeatured()) return;
 	if (/INPUT|BUTTON|SELECT/.test(e.target.tagName)) return;
@@ -501,6 +591,7 @@ window.addEventListener('keydown', e => {
 		move(e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1);
 	}
 });
+// With Snap on, rounds `target` to a whole slide 160 ms after scrolling stops.
 function scheduleSnap() {
 	clearTimeout(snapTimer);
 	if (projectTransition.loading || projectTransition.active) return;
@@ -510,6 +601,8 @@ function scheduleSnap() {
 			requestRender();
 		}, 160);
 }
+// Wheel: delta is normalised from lines (x16) or pages (x viewport height) to pixels, clamped to +-250 and
+// converted to slides at 0.0025 per pixel, scaled by the speed setting.
 canvas.addEventListener(
 	'wheel',
 	e => {
@@ -530,6 +623,7 @@ canvas.addEventListener(
 	},
 	{ passive: false }
 );
+// Active ribbon drag, or null. Grid drags live in `gridView.drag`.
 let drag = null;
 canvas.addEventListener('pointerdown', e => {
 	if (returningToFeatured()) return;
@@ -546,6 +640,8 @@ canvas.addEventListener('pointerdown', e => {
 	drag = { x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, moved: false };
 	canvas.style.cursor = 'grabbing';
 });
+// Dragging converts pointer travel to slides: 30% of the viewport (at least 220 px) is one slide, scaled by
+// the speed setting. `moved` flips past 5 px so a tap can be told from a drag.
 canvas.addEventListener('pointermove', e => {
 	if (returningToFeatured()) return;
 	tooltipInput = e.pointerType === 'touch' ? 'touch' : 'pointer';
@@ -571,6 +667,9 @@ canvas.addEventListener('pointermove', e => {
 	drag.moved ||= Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > 5;
 	requestRender();
 });
+// Opens a project. Unavailable ones show the tooltip; external links go to the host; non-featured case
+// studies open in the host's modal; featured ones start the ribbon-to-page transition from the clicked
+// slide (`hit`) and the click point, which is null for keyboard clicks.
 function projectClick(project, hit) {
 	if (!isProjectClickable(project)) {
 		showProjectTooltip(
@@ -593,12 +692,14 @@ function projectClick(project, hit) {
 	projectTransition.open(project, hit || project.ribbonHit, tooltipInput === 'keyboard' ? null : tooltipPoint);
 	canvas.dispatchEvent(new CustomEvent('project:select', { detail: { project }, bubbles: true }));
 }
+// Enter or Space: acts on whatever is under the viewport centre.
 function projectKeyboardClick() {
 	if (gridView?.isActive()) {
 		const hit = gridView.hitTest(innerWidth / 2, innerHeight / 2);
 		if (hit) projectClick(hit.project, { ...hit, grid: true });
 	} else projectClick(pickFeatured(innerWidth / 2, innerHeight / 2));
 }
+// A release without movement counts as a click.
 canvas.addEventListener('pointerup', e => {
 	if (returningToFeatured()) return;
 	tooltipInput = e.pointerType === 'touch' ? 'touch' : 'pointer';
@@ -642,6 +743,7 @@ canvas.addEventListener('blur', () => {
 	if (gridView) gridView.pointer = null;
 	requestRender();
 });
+// Hit-tests under the pointer (viewport centre for keyboard) and updates the cursor and tooltip.
 function refreshFeaturedTooltip() {
 	const point = tooltipInput === 'keyboard' ? { x: innerWidth / 2, y: innerHeight / 2 } : tooltipPoint;
 	const project = ready && point && !drag && !returningToFeatured() ? pickFeatured(point.x, point.y) : null;
@@ -650,6 +752,14 @@ function refreshFeaturedTooltip() {
 	if (!project)
 		canvas.setAttribute('aria-label', 'Featured projects. Scroll, drag, or use the arrow keys to explore.');
 }
+// Hit-test for the featured ribbon: the CPU mirror of the vertex shader's `surface()`. Returns the project
+// under a client position plus `ribbonHit` ({ band, slide }), or null.
+// 1. Map the pixel to view space: NDC scaled by the shader's .77 focal factor and aspect, divided by scale.
+// 2. Undo the head tilt, and swap axes in vertical mode.
+// 3. Intersect the pointer ray with the cylinder (a quadratic in `t`; `A` is its leading coefficient).
+// 4. `pitch` is the angle of one slide (PI/3, or PI/4.8 vertical). Past the strip's half height only a stacked
+//    band can be hit (bands sit 2.08 half-heights away, as in the shader).
+// 5. The hit angle divided by `pitch` gives a slide; `shift` picks the same image as drawFeaturedRibbons.
 function pickFeatured(clientX, clientY) {
 	const shaped = featuredView();
 	const x = ((((((clientX / innerWidth) * 2 - 1) * innerWidth) / innerHeight) * 0.77) / shaped.scale) * 100,
@@ -684,6 +794,8 @@ function pickFeatured(clientX, clientY) {
 		ribbonHit: { band, slide: Math.floor(angle / pitch + offset + 0.5) },
 	};
 }
+// Switches between the featured ribbon and the all-projects grid (desktop only). Resets drag and scroll
+// state and updates the aria labels, toggles and panel copy.
 function setProjectView(all) {
 	if (mobile) all = false;
 	if (!gridView) return;
@@ -721,6 +833,9 @@ function setProjectView(all) {
 }
 document.querySelector('#view-featured').onclick = () => setProjectView(false);
 document.querySelector('#view-all').onclick = () => setProjectView(true);
+// Tuning panel
+// ------------
+// Opens or closes the panel; it is inert while closed so it cannot take focus.
 function panel(open) {
 	document.querySelector('#settings').classList.toggle('hidden', !open);
 	document.querySelector('#settings').inert = !open;
@@ -733,6 +848,7 @@ document.querySelector('#close').onclick = () => {
 	document.querySelector('#toggle').focus();
 };
 panel(false);
+// Reset restores the grid defaults while the grid is showing, otherwise the ribbon defaults.
 document.querySelector('#reset').onclick = () => {
 	if (gridView?.isActive()) {
 		Object.assign(gridView.settings, { size: 100, gap: 32, curve: 8, response: 100, inertia: 95, exitEarly: 65 });
@@ -760,10 +876,14 @@ document.querySelector('#reset').onclick = () => {
 	saveSettings();
 	requestRender();
 };
+// The panel stays hidden unless the route has `?projectSettings` (the S key also toggles it, see the end of the file).
 const showRibbonSettings = new URL(routeLocation.href).searchParams.has('projectSettings');
 document.querySelector('#toggle').hidden = true;
 panel(showRibbonSettings);
 document.querySelector('#intro-controls').open = showRibbonSettings;
+// Rendering setup
+// ------------
+// Compiles one shader; throws the info log on failure.
 function shader(type, source) {
 	const s = gl.createShader(type);
 	gl.shaderSource(s, source);
@@ -771,6 +891,7 @@ function shader(type, source) {
 	if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(s));
 	return s;
 }
+// Entrance animation (intro.js). Its callback returns the view to the ribbon and settles `position` on `target`.
 const introduction = new RibbonIntroduction(requestRender, () => {
 	if (gridView?.target || gridView?.mix) {
 		setProjectView(false);
@@ -782,6 +903,7 @@ const introduction = new RibbonIntroduction(requestRender, () => {
 	}
 	position = target;
 });
+// Any scroll, press, arrow/Escape key or nav click skips the intro.
 for (const event of ['wheel', 'pointerdown'])
 	canvas.addEventListener(event, () => introduction.finish(), { capture: true, passive: true });
 window.addEventListener(
@@ -796,21 +918,26 @@ window.addEventListener(
 	{ capture: true }
 );
 document.querySelector('nav').addEventListener('click', () => introduction.finish(), true);
+// Idle drift (idle.js); any input re-arms it.
 const idleMotion = new IdleMotion(requestRender);
 for (const event of ['pointermove', 'pointerdown', 'pointerup', 'wheel', 'keydown'])
 	window.addEventListener(event, () => idleMotion.activity(), { capture: true, passive: true });
 document.addEventListener('visibilitychange', () => idleMotion.reset());
+
+// GL objects created by `setup()`.
 let program,
 	uniforms = {},
 	ribbonBuffer,
 	ribbonIndices,
 	ribbonAttrib,
 	gridView = null;
+// Ribbon-to-case-study transition (project-transition.js), drawing on the same GL context.
 const projectTransition = new ProjectTransition(gl);
 // A two-sided subdivided cylinder, with an upright texture mapping for either axis.
 // Twist leaves the central 1.24 slides flat.
 const meshSegments = mobile ? 320 : 1200,
 	meshRows = mobile ? 4 : 8;
+// Compiles the ribbon program, builds the mesh and caches the uniform locations.
 function setup() {
 	program = gl.createProgram();
 	gl.attachShader(
@@ -824,10 +951,14 @@ function setup() {
 				uniform float uReveal, uEffect, uIntensity, uBand, uVertical, uStackExit;
 				varying vec2 vUV;
 				varying float vLight;
+				// Point on the ribbon for an angle around the cylinder (-PI..PI) and height (-1..1), in view space.
 				vec3 surface(float angle, float height) {
+					// Curvature shrinks the radius from 14 to 3.6; the viewing distance runs from 2.5 to 7.
 					float radius = mix(14.0, 3.6, uCurve);
 					float distance = mix(2.5, 7.0, uDistance);
+					// Angle of one slide: PI/3 horizontal, PI/4.8 vertical.
 					float pitch = mix(1.0471975512, .6544984695, uVertical);
+					// Twist ramps in beyond .62 slides from the centre (over uSpread) and fades out towards the back.
 					float slides = abs(angle) / pitch;
 					float ramp = smoothstep(.62, .62 + uSpread, slides);
 					float closure = 1.0 - smoothstep(2.5, 3.14159265359, abs(angle));
@@ -835,35 +966,45 @@ function setup() {
 					// Keep upright 16:10 slides: arc width in horizontal mode, arc height in vertical mode.
 					float halfHeight = radius * pitch * mix(.3125, .8, uVertical);
 					float vertical = height * halfHeight;
+					// Twist rotates the strip about its centre line: height and radial offset follow the twist angle.
 					float radial = radius + vertical * sin(twist);
 					vec2 xy = vec2(radial * sin(angle), vertical * cos(twist));
+					// Vertical mode is the horizontal layout with x and y swapped.
 					if (uVertical > .5)xy = xy.yx;
 					return vec3(xy, radius - distance - radial * cos(angle));
 				}
 
 				void main() {
 					float angle = aPosition.x;
+					// Cubic ease-out of the reveal; remaining is what is left of it.
 					float eased = 1.0 - pow(1.0 - uReveal, 3.0);
 					float remaining = 1.0 - eased;
 					vec3 p = surface(angle, aPosition.y);
+					// Stacked bands sit one band height away (the 2.08 includes a small gap).
 					float bandOffset = uBand * mix(14.0, 3.6, uCurve) * mix(1.0471975512 * .3125, .6544984695 * .8, uVertical) * 2.08;
 					if (uVertical > .5)p.x += bandOffset;
 					else p.y += bandOffset;
 					vLight = 1.0;
+					// Twisted surfaces are lit from their normal (cross product of the surface tangents) so folds read as shading.
 					if (uTwist > .001) {
 						vec3 tangent = surface(angle + .001, aPosition.y) - surface(angle - .001, aPosition.y);
 						vec3 across = surface(angle, aPosition.y + .001) - surface(angle, aPosition.y - .001);
 						vec3 normal = normalize(cross(tangent, across));
 						vLight = mix(1.0, .72 + .28 * abs(dot(normal, normalize(vec3(-.2, .6, 1.0)))), uTwist);
 					}
+					// Head tilt, then the uniform scale below.
 					float c = cos(uRotation), s = sin(uRotation);
 					// Scale the projected view uniformly; never stretch the slide height alone.
 					vec2 xy = (mat2(c, s, -s, c) * p.xy) * uScale;
+					// Effect 1 starts up to 15% smaller and grows to full size.
 					if (uEffect == 1.0)xy *= 1.0 - remaining * .15 * uIntensity;
+					// Perspective projection written out by hand: depth from p.z, w = -p.z, .77 focal factor, x corrected by aspect.
 					float near = .04, far = 100.0;
 					gl_Position = vec4(xy.x / (.77 * uAspect), xy.y / .77, -(far + near) / (far - near) * p.z - 2.0 * far * near / (far - near), -p.z);
+					// Stacked bands slide off along the tilted axis as uStackExit goes 0 to 1 (3 clip-space widths).
 					vec2 departureDirection = uVertical > .5 ? vec2(c, s) : vec2(-s, c);
 					gl_Position.xy += departureDirection * sign(uBand) * uStackExit * 3.0 * gl_Position.w;
+					// x is the slide coordinate / 6 (the fragment shader multiplies it back); y runs top to bottom.
 					vUV = vec2(angle / mix(1.0471975512, .6544984695, uVertical) / 6.0, .5 - aPosition.y * .5);
 				}
 			`
@@ -882,20 +1023,26 @@ function setup() {
 				uniform vec2 uResolution;
 				varying vec2 vUV;
 				varying float vLight;
+				// Samples one atlas tile: wraps the slide into the image count, optionally reverses it, and clamps the UV
+				// just inside the tile so neighbours do not bleed in.
 				vec4 sampleSlide(float slide, float y) {
 					float index = mod(floor(slide), uCount);
 					if (uReverse > .5)index = uCount - 1.0 - index;
+					// Vertical mode runs the strip downwards, so the tile axes are swapped and flipped.
 					vec2 imageUV = uVertical > .5 ? vec2(1.0 - y, 1.0 - fract(slide)) : vec2(fract(slide), y);
 					return texture2D(uTexture, (vec2(mod(index, uAtlasSize.x), floor(index / uAtlasSize.x)) + clamp(imageUV, vec2(.001), vec2(.999))) / uAtlasSize);
 				}
 
 				void main() {
+					// Continuous slide coordinate; uOffset is the scroll position in slides.
 					float slide = vUV.x * 6.0 + uOffset + .5;
 					vec2 uv = vec2(fract(slide / uCount), vUV.y);
 					// The reverse keeps each image attached to its corresponding front slide.
 					vec2 backUV = vec2(uv.x, 1.0 - vUV.y);
+					// Vertical mode flips which face counts as the front.
 					bool front = uVertical > .5 ? !gl_FrontFacing : gl_FrontFacing;
 					vec4 colour = sampleSlide(slide, front ? vUV.y : 1.0 - vUV.y);
+					// Motion blur: nine taps along the scroll direction, spread over uMotionBlur slides.
 					if (uMotionBlur > .0001) {
 						vec2 base = front ? uv : backUV;
 						vec4 sum = vec4(0.0);
@@ -907,23 +1054,28 @@ function setup() {
 						}
 						colour = sum / 9.0;
 					}
+					// Intro reveal: effect 0 fades in over the first 35%; effect 1 eases with an intensity-shaped power curve.
 					float reveal = smoothstep(0.0, .35, uReveal);
 					if (uEffect == 1.0)reveal = pow(smoothstep(0.0, 1.0, uReveal), uIntensity);
+					// Cascade: each slide is revealed by a rounded clip that opens from its centre outwards.
 					if (uEffect == 9.0) {
 						// Stagger out from the visible centre, not the repeating atlas indices.
 						float order = min(4.0, abs(floor(slide) - floor(uOffset + .5)));
 						float progress = clamp((uReveal - order * uCascadeStagger) / (1.0 - 4.0 * uCascadeStagger), 0.0, 1.0);
 						// Zero velocity and acceleration at both ends avoids a hard clip start/stop.
 						float arrival = progress * progress * progress * (progress * (progress * 6.0 - 15.0) + 10.0);
+						// Alternative easings: 1 cubic out, 2 quartic out, 3 sine, 4 linear (0 keeps the smootherstep above).
 						if (uCascadeEase == 1.0)arrival = 1.0 - pow(1.0 - progress, 3.0);
 						if (uCascadeEase == 2.0)arrival = 1.0 - pow(1.0 - progress, 4.0);
 						if (uCascadeEase == 3.0)arrival = .5 - .5 * cos(progress * 3.14159265359);
 						if (uCascadeEase == 4.0)arrival = progress;
+						// Distance from the slide centre in its larger axis; the clip opens until it covers the half extent (.5).
 						float inset = max(abs(fract(slide) - .5), abs(vUV.y - .5));
 						float clipFeather = .006 + .008 * uIntensity;
 						float opening = mix(-clipFeather, .5 + clipFeather, arrival);
 						reveal = 1.0 - smoothstep(opening - clipFeather, opening + clipFeather, inset);
 					}
+					// Once revealed, skip the clip entirely.
 					if (uReveal >= 1.0)reveal = 1.0;
 					// Fade the entire surface into the scene, including the image's dark areas.
 					gl_FragColor = vec4(colour.rgb * vLight, uOpacity * reveal * uFade);
@@ -934,6 +1086,7 @@ function setup() {
 	gl.linkProgram(program);
 	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
 	gl.useProgram(program);
+	// Mesh: (meshSegments + 1) by (meshRows + 1) vertices over angle -PI..PI and height -1..1, two triangles per quad.
 	const vertices = [],
 		indices = [];
 	for (let i = 0; i <= meshSegments; i++)
@@ -955,6 +1108,7 @@ function setup() {
 	ribbonAttrib = a;
 	gl.enableVertexAttribArray(a);
 	gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
+	// Cache every uniform location as `uniforms.<Name>` for `u<Name>`.
 	for (const n of [
 		'Rotation',
 		'Distance',
@@ -985,17 +1139,23 @@ function setup() {
 	uniforms.CascadeStagger = gl.getUniformLocation(program, 'uCascadeStagger');
 	gl.enable(gl.DEPTH_TEST);
 	gl.disable(gl.CULL_FACE);
+	// Clear colour is the page background (computed rgb) so the opaque canvas blends with the host.
 	const background = getComputedStyle(document.documentElement)
 		.backgroundColor.match(/[\d.]+/g)
 		.map(Number);
 	gl.clearColor(background[0] / 255, background[1] / 255, background[2] / 255, 1);
 }
+
+// Rendering
+// ------------
 // Threshold is measured against slide velocity, independent of frame rate.
 // A soft knee keeps the onset smooth while remaining exactly sharp below it.
 function featuredBlur(velocity, threshold, strength) {
 	const excess = Math.max(0, Math.abs(velocity) - threshold / 10);
 	return (Math.min(0.75, (0.045 * excess * excess) / (excess + 1)) * strength) / 100;
 }
+// Draws the main strip, faded out by the grid handoff, then (stacked mode) the two reversed bands that fly away
+// as `stackedDeparture` rises. The band `shift` is the same formula as in pickFeatured and videoIsVisible.
 function drawFeaturedRibbons() {
 	gl.uniform1f(uniforms.CascadeEase, introduction.settings.cascadeEase);
 	gl.uniform1f(
@@ -1025,6 +1185,7 @@ function drawFeaturedRibbons() {
 		gl.disable(gl.BLEND);
 	}
 	if (state.stacked && stackedDeparture < 1) {
+		// Smoothstep of `stackedDeparture`.
 		const departure = stackedDeparture * stackedDeparture * (3 - 2 * stackedDeparture);
 		gl.uniform1f(uniforms.Reverse, 1);
 		gl.uniform1f(uniforms.Fade, 1);
@@ -1043,15 +1204,20 @@ function drawFeaturedRibbons() {
 		gl.disable(gl.BLEND);
 	}
 }
+// Schedules at most one frame; does nothing until the atlas is ready or while the host has the ribbon suspended.
 function requestRender() {
 	if (ready && !raf && canRender()) raf = requestAnimationFrame(render);
 }
+// Eases `stackedDeparture` towards 1 while the grid is (or is becoming) visible, else 0. Exponential, so independent of
+// frame rate: rate 16 per second going out, 10 coming back.
 function updateStackedDeparture(dt) {
 	const destination = gridView && (gridView.target || gridView.mix > 0.12) ? 1 : 0;
 	stackedDeparture += (destination - stackedDeparture) * (reduced ? 1 : 1 - Math.exp(-dt * (destination ? 16 : 10)));
 	if (Math.abs(destination - stackedDeparture) < 0.0005) stackedDeparture = destination;
 	if (state.stacked && stackedDeparture !== destination) requestRender();
 }
+// requestAnimationFrame callback. Sizes the canvas (DPR capped at 2, or 1.5 on phones), draws the scene through the
+// loader wave pass when active, and on the first frame tells the host the wave can start and warms the grid and heroes.
 function render(time) {
 	if (!canRender()) {
 		raf = 0;
@@ -1086,6 +1252,8 @@ function render(time) {
 		projectTransition.prefetch(featured);
 	}
 }
+// One frame: advance intro, idle drift, tilt, scroll easing and the grid, upload video frames, set the uniforms and
+// draw. An open case study takes over drawing. Requests another frame while anything is still moving.
 function renderScene(time) {
 	if (projectTransition.active) {
 		raf = 0;
@@ -1094,6 +1262,7 @@ function renderScene(time) {
 	}
 	frameMeter.begin(time);
 	raf = 0;
+	// Seconds since the last frame, capped at 50 ms (16 ms on the first) so a stalled tab does not jump.
 	const dt = Math.min((time - lastTime) / 1000 || 0.016, 0.05);
 	lastTime = time;
 	const introMoving = introduction.update(time);
@@ -1137,6 +1306,7 @@ function renderScene(time) {
 	gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, texture);
 	const previousPosition = position;
+	// Exponential ease of `position` towards `target` (rate 9 per second); velocity is in slides per second, then smoothed.
 	position = reduced ? target : position + (target - position) * (1 - Math.exp(-dt * 9));
 	if (Math.abs(target - position) < 0.0001) position = target;
 	const velocity = (position - previousPosition) / Math.max(dt, 0.001);
@@ -1151,6 +1321,7 @@ function renderScene(time) {
 	);
 	if (velocityShape.moving) requestRender();
 	const shaped = featuredView();
+	// Rebase both by whole loops when they drift far, to keep float precision. The picture is unchanged.
 	if (Math.abs(target) > count * 100) {
 		const shift = Math.trunc(target / count) * count;
 		position -= shift;
@@ -1164,6 +1335,8 @@ function renderScene(time) {
 		canvas.height = h;
 		gl.viewport(0, 0, w, h);
 	}
+
+	// Per-frame uniforms: angles in radians, percentages as 0..1 fractions.
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	gl.uniform1f(uniforms.Vertical, state.vertical);
 	gl.uniform1f(uniforms.Rotation, (shaped.rotation * Math.PI) / 180);
@@ -1180,6 +1353,7 @@ function renderScene(time) {
 	gl.uniform1f(uniforms.Effect, reduced ? 1 : introduction.settings.effect);
 	gl.uniform1f(uniforms.Intensity, introduction.settings.intensity / 100);
 	gl.uniform2f(uniforms.Resolution, w, h);
+	// Motion blur is off for reduced motion and while the intro plays.
 	gl.uniform1f(
 		uniforms.MotionBlur,
 		reduced || introMoving ? 0 : featuredBlur(scrollVelocity, state.blurThreshold, state.blur)
@@ -1188,6 +1362,7 @@ function renderScene(time) {
 	if (gridView && gridView.mix > 0) gridView.render(texture, count, shaped);
 	updateUI();
 	frameMeter.end();
+	// A click queued a transition: begin it from the view just drawn, and request no further ribbon frame.
 	if (projectTransition.pending) {
 		try {
 			projectTransition.begin(shaped);
@@ -1197,6 +1372,7 @@ function renderScene(time) {
 		}
 		return;
 	}
+	// Keep looping while anything is still moving.
 	if (
 		idle.moving ||
 		introMoving ||
@@ -1207,7 +1383,11 @@ function renderScene(time) {
 	)
 		requestRender();
 }
+// Resize
+// ------------
 window.addEventListener('resize', requestRender);
+// Crossing the phone breakpoint swaps in that layout's defaults and saved settings, re-runs the migrations and
+// rebuilds the catalogue (phones show featured projects only).
 mobileViewport.addEventListener('change', () => {
 	mobile = mobileViewport.matches;
 	mouseTilt.y = 0.5;
@@ -1235,6 +1415,9 @@ mobileViewport.addEventListener('change', () => {
 	if (allProjects.length) applyRibbonCatalog().catch(showCatalogError);
 	requestRender();
 });
+
+// Atlas and textures
+// ------------
 // Host integration: a poster that fails or stalls is swapped for the CMS placeholder (src/data/site.ts) so the ribbon never breaks.
 // Resolve only once decoded: WebKit can paint an image the host is still decoding (its poster preload) as nothing, leaving a black atlas tile
 function imageLoad(src, allowFallback = true) {
@@ -1258,12 +1441,16 @@ function imageLoad(src, allowFallback = true) {
 		im.src = src;
 	});
 }
+// Draws `img` into the rect like CSS object-fit: cover (centred crop).
 function cover(ctx, img, x, y, w, h) {
 	const s = Math.max(w / img.width, h / img.height),
 		sw = w / s,
 		sh = h / s;
 	ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, y, w, h);
 }
+// Packs the posters into one canvas of equal 16:10 tiles, uploads it as the ribbon texture and attaches it to the video
+// uploader. Desktop uses one row; phones wrap at 12 columns. Tile width is at most 1024 and shrinks so the atlas fits
+// the GPU and canvas limits, rounded down to a multiple of 16.
 function makeAtlas(images) {
 	stopVideos();
 	// Keep the backing canvas within mobile browser memory limits as well as
@@ -1298,6 +1485,7 @@ function makeAtlas(images) {
 	ready = !!texture;
 	requestRender();
 }
+// Tears down every video element (before the atlas is rebuilt).
 function stopVideos() {
 	for (const item of videoSlides) {
 		item.stopped = true;
@@ -1309,6 +1497,8 @@ function stopVideos() {
 	}
 	videoSlides = [];
 }
+// True if the slide is within 3.5 slides of the front, in either stacked band, or visible as a grid tile; other
+// videos are paused.
 function videoIsVisible(index) {
 	if (gridView && gridView.mix > 0.01 && gridView.visibleFeatured.has(index)) return true;
 	if (gridView?.mix === 1) return false;
@@ -1322,6 +1512,8 @@ function videoIsVisible(index) {
 	}
 	return false;
 }
+// Per frame: play or pause each video by visibility, then upload fresh frames into the slide's atlas tile.
+// Uploads wait for the frame callback (`dirty`) where supported, and are capped at 30 fps on phones.
 function updateVideoTextures() {
 	const now = performance.now();
 	let uploaded = false;
@@ -1358,6 +1550,7 @@ function updateVideoTextures() {
 	if (uploaded) videoUploader.finish();
 }
 
+// Creates a hidden muted, looping <video> per video slide. Decoded frames mark the slide dirty and stream into the atlas.
 function startFeaturedVideos() {
 	for (const entry of featured.filter(item => item.type === 'video')) {
 		const index = entry.index,
@@ -1423,6 +1616,7 @@ function startFeaturedVideos() {
 				});
 	}
 }
+// After a user gesture, retries videos whose play() was rejected.
 function resumeVideos() {
 	if (hostSuspended() || projectTransition.active) return;
 	for (const item of videoSlides) {
@@ -1441,6 +1635,10 @@ function resumeVideos() {
 canvas.addEventListener('pointerdown', resumeVideos);
 canvas.addEventListener('wheel', resumeVideos, { passive: true });
 document.addEventListener('visibilitychange', syncHostActivity);
+
+// Upload your own images
+// ------------
+// The tuning panel can replace the ribbon with up to 12 local images, held in this tab only.
 document.querySelector('#upload').onclick = () => document.querySelector('#files').click();
 document.querySelector('#files').onchange = async e => {
 	const files = [...e.target.files].filter(f => f.type.startsWith('image/')).slice(0, 12);
@@ -1466,12 +1664,16 @@ document.querySelector('#files').onchange = async e => {
 		e.target.value = '';
 	}
 };
+// Catalogue
+// ------------
 function showCatalogError(error) {
 	const status = document.querySelector('#error');
 	status.hidden = false;
 	status.textContent = error.message || 'Images could not load. Please reload the page.';
 	console.error(error);
 }
+// (Re)builds the ribbon from `featuredProjects`: resets the grid, loads posters (cached), builds the atlas and
+// videos and keeps the previously centred poster in view. A newer call supersedes an older one (`catalogRevision`).
 async function applyRibbonCatalog() {
 	// Host integration: phones show only the featured case studies — fewer posters to load before the first frame
 	const revision = ++catalogRevision,
@@ -1524,6 +1726,9 @@ async function applyRibbonCatalog() {
 	document.querySelector('#error').hidden = true;
 	requestRender();
 }
+
+// Boot: set up GL and the grid, fetch the catalogue (the host's preloaded promise if any), build the ribbon, then finish
+// the entrance and open a deep-linked `?project=`.
 (async () => {
 	const status = document.querySelector('#error');
 	status.hidden = false;
@@ -1572,6 +1777,8 @@ async function applyRibbonCatalog() {
 		window.parent.postMessage({ type: 'projects:error' }, location.origin);
 	}
 })();
+
+// There is no recovery path, so ask for a reload.
 canvas.addEventListener('webglcontextlost', e => {
 	e.preventDefault();
 	ready = false;
@@ -1580,6 +1787,8 @@ canvas.addEventListener('webglcontextlost', e => {
 		'The graphics connection was interrupted. Reload to restore the ribbon.';
 });
 
+// Navigation and shortcuts
+// ------------
 // Keep the tuning panel available without competing with the portfolio navigation.
 const projectsNav = document.querySelector('#nav-projects');
 if (projectsNav)
@@ -1588,6 +1797,7 @@ if (projectsNav)
 			projectTransition.page.querySelector('button').click();
 		else if (!projectTransition.returning) setProjectView(false);
 	};
+// S toggles the tuning panel when `?projectSettings` is set.
 window.addEventListener('keydown', e => {
 	if (
 		showRibbonSettings &&
@@ -1602,6 +1812,8 @@ window.addEventListener('keydown', e => {
 	}
 });
 
+// View switch pill
+// ------------
 // Measure the selected label so the pill also fits loaded fonts and mobile sizes.
 const projectSwitch = document.querySelector('.view-switch');
 function syncProjectPill() {
