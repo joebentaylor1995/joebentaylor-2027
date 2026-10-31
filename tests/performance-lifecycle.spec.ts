@@ -1,8 +1,15 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects two performance guarantees at each breakpoint: the root type size follows the breakpoint, and
+// WebGL sections stop drawing once scrolled out of view.
 for (const width of [390, 768, 1024, 1440]) {
 	test(`responsive type and off-screen WebGL suspension at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 1000 });
+		// Count draw calls per canvas so the test can tell whether a scene is still rendering
 		await page.addInitScript(() => {
 			const counts = new WeakMap<HTMLCanvasElement, number>();
 			Object.assign(window, { webglDrawCounts: counts });
@@ -17,6 +24,8 @@ for (const width of [390, 768, 1024, 1440]) {
 				}
 			}
 		});
+
+		// The map gradient image is not fetched until the globe is shown
 		await page.goto('/?modalSettings');
 		expect(
 			await page.evaluate(() =>
@@ -25,12 +34,15 @@ for (const width of [390, 768, 1024, 1440]) {
 					.some(entry => entry.name.includes('/images/map/blue-gradient.png'))
 			)
 		).toBe(false);
+
+		// Root font size: 16px at tablet widths, 10px elsewhere
 		expect(await page.locator('html').evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeCloseTo(
 			width >= 700 && width < 1024 ? 16 : 10,
 			2
 		);
 		const settings = page.getByRole('complementary', { name: 'Modal settings' });
 		const panel = page.locator('#profile-panel');
+		// Total draws across all canvases inside a section
 		const count = (selector: string) =>
 			page.locator(selector).evaluate(el => {
 				const counts = (window as unknown as { webglDrawCounts: WeakMap<HTMLCanvasElement, number> })
@@ -40,6 +52,7 @@ for (const width of [390, 768, 1024, 1440]) {
 					0
 				);
 			});
+		// [settings button, section selector]
 		for (const [button, selector] of [
 			['Show Recognition', '[data-recognition]'],
 			['Show rain', '[data-connect]'],
@@ -48,11 +61,15 @@ for (const width of [390, 768, 1024, 1440]) {
 		]) {
 			await settings.getByRole('button', { name: button, exact: true }).click();
 			await expect(page.locator(selector)).toHaveAttribute('data-state', 'ready');
+
+			// Recognition and Connect animate continuously, so their draw count must still be growing on screen
 			await page.waitForTimeout(400);
 			if (button === 'Show Recognition' || button === 'Show rain') {
 				const before = await count(selector);
 				await expect.poll(() => count(selector)).toBeGreaterThan(before);
 			}
+
+			// Scroll the Profile panel to the top so the section is off screen, then check that drawing stops
 			await panel.evaluate(el => {
 				el.scrollTop = 0;
 			});
@@ -61,9 +78,12 @@ for (const width of [390, 768, 1024, 1440]) {
 			await page.waitForTimeout(500);
 			expect(await count(selector)).toBe(paused);
 		}
+
+		// No horizontal overflow in the panel
 		expect(await panel.evaluate(el => el.scrollWidth)).toBeLessThanOrEqual(
 			await panel.evaluate(el => el.clientWidth)
 		);
+		// Tablet only: the Connect nav is not width-capped
 		if (width === 768) {
 			await settings.getByRole('button', { name: 'Show rain', exact: true }).click();
 			await expect(page.locator('[data-connect] nav')).toHaveCSS('max-width', 'none');

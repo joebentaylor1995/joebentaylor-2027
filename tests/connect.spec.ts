@@ -1,11 +1,20 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects the Connect footer end to end: social links and resume download work, images load
+// and holding the canvas runs the whole matrix charge cycle.
 test('connect footer renders its assets, links and complete charge cycle', async ({ page, request }) => {
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
 	const section = page.locator('[data-connect]');
 	await section.scrollIntoViewIfNeeded();
+	// Wait for the section to report ready before interacting with it
 	await expect(section).toHaveAttribute('data-state', 'ready', { timeout: 20_000 });
+
+	// Links
 	const nav = section.getByRole('navigation');
 	for (const [name, href] of [
 		['Linkedin', 'https://www.linkedin.com/in/joebentaylor/'],
@@ -15,14 +24,19 @@ test('connect footer renders its assets, links and complete charge cycle', async
 	])
 		await expect(nav.getByRole('link', { name, exact: true })).toHaveAttribute('href', href);
 	await expect(nav.getByRole('link', { name: 'Resume' })).toHaveAttribute('download', 'Joe Ben Taylor Resume.pdf');
+	// The resume must be a real PDF, not a 404 page served as one
 	const pdf = await request.get('/downloads/joe-ben-taylor-resume.pdf');
 	expect(pdf.ok()).toBe(true);
 	expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
+
+	// Assets
 	for (const image of await section.locator('img').all()) {
 		await expect(image).toHaveJSProperty('complete', true);
 		expect(await image.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
 	}
 	await page.screenshot({ path: 'test-results/connect-desktop.png' });
+
+	// Hold the canvas to charge, then release to disintegrate and return to the idle rain
 	const canvas = section.locator('canvas');
 	const box = await canvas.boundingBox();
 	if (!box) throw new Error('Canvas is missing');
@@ -36,6 +50,8 @@ test('connect footer renders its assets, links and complete charge cycle', async
 	await expect(section).toHaveAttribute('data-matrix-phase', 'rain', { timeout: 12_000 });
 });
 
+// Protects the Connect footer on a phone with reduced motion: no horizontal overflow, a tap
+// jumps straight to the rain state and the legal links remain.
 test('connect fits mobile and remains usable with reduced motion', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -56,6 +72,8 @@ test('connect fits mobile and remains usable with reduced motion', async ({ page
 	await expect(section.getByRole('link', { name: 'LLMs', exact: true })).toHaveAttribute('href', '/llms');
 });
 
+// Protects the narrow-screen layout against the mobile design frame (32px gutters, 376px nav)
+// and checks it still fits down to 320px.
 test('connect matches the mobile frame and fits narrow screens', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.setViewportSize({ width: 440, height: 1211 });
@@ -67,6 +85,8 @@ test('connect matches the mobile frame and fits narrow screens', async ({ page }
 	await expect(section).toHaveCSS('padding-left', '32px');
 	await expect(section.getByRole('navigation')).toHaveCSS('width', '376px');
 	await page.screenshot({ path: 'test-results/connect-mobile-figma.png' });
+
+	// Resize through narrow widths: no overflow, CTA centred, time sits under the country
 	for (const width of [320, 390, 440]) {
 		await page.setViewportSize({ width, height: 844 });
 		await section.scrollIntoViewIfNeeded();
@@ -82,12 +102,15 @@ test('connect matches the mobile frame and fits narrow screens', async ({ page }
 	}
 });
 
+// Protects the Connect interactions: headline reveals, the cursor reacts to each link type,
+// the CTA lights its lines and opens the booking dialog without closing Profile.
 test('connect reveals its copy, attracts the cursor and opens contact without closing Profile', async ({ page }) => {
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
 	const section = page.locator('[data-connect]');
 	await section.scrollIntoViewIfNeeded();
 	const cta = section.getByRole('button', { name: /Ready.*Let’s grow/ });
+	// Reveal
 	await expect(section.getByRole('heading', { name: 'Connect', exact: true })).toHaveAttribute(
 		'data-revealed',
 		'true'
@@ -109,6 +132,8 @@ test('connect reveals its copy, attracts the cursor and opens contact without cl
 				.evaluate(el => new DOMMatrix(getComputedStyle(el).transform).a)
 		)
 		.toBe(1);
+
+	// Cursor mode on the Profile wrapper changes per link type
 	const profile = page.locator('#profile-panel').locator('..');
 	const linkedin = section.getByRole('link', { name: 'Linkedin', exact: true });
 	await linkedin.hover();
@@ -117,6 +142,8 @@ test('connect reveals its copy, attracts the cursor and opens contact without cl
 	await legal.hover();
 	await expect(profile).toHaveAttribute('data-cursor', 'soft');
 	await expect(legal).toHaveCSS('color', 'rgb(255, 255, 255)');
+
+	// Hovering the CTA shifts and fills the title lines; moving off it drains the hover fill again
 	await cta.hover();
 	await expect(profile).toHaveAttribute('data-cursor', 'cta');
 	await expect
@@ -160,6 +187,8 @@ test('connect reveals its copy, attracts the cursor and opens contact without cl
 				.evaluate(el => Number(getComputedStyle(el).getPropertyValue('--tfw-fill')))
 		)
 		.toBeGreaterThan(110);
+
+	// Opening and closing the dialog returns focus to the CTA and leaves Profile open
 	await cta.click();
 	await expect(page.getByRole('dialog', { name: 'Book a call with Joe Ben Taylor' })).toBeVisible();
 	await page.keyboard.press('Escape');

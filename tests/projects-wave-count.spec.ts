@@ -1,8 +1,15 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects the Projects entrance: a direct visit plays the wave, and the ribbon settings only appear (and
+// persist) with the ?projectSettings URL flag.
 test('direct projects entry uses the wave and settings require the projectSettings URL', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', error => errors.push(error.message));
+	// Flag the canvas the first time the wave progress uniform is between 0 and 1, i.e. the wave really rendered
 	await page.addInitScript(() => {
 		const locations = new WeakMap<WebGLUniformLocation, string>();
 		const getUniform = WebGLRenderingContext.prototype.getUniformLocation;
@@ -31,10 +38,14 @@ test('direct projects entry uses the wave and settings require the projectSettin
 	await expect(ribbon.locator('#stage')).toHaveAttribute('data-wave-rendered', 'true', { timeout: 15000 });
 	await expect(ribbon.locator('#toggle')).toBeHidden();
 	await expect(ribbon.locator('#settings')).toHaveClass(/hidden/);
+
+	// Settings panel only exists behind the flag
 	await page.goto('/projects/?projectSettings');
 	await expect(ribbon.locator('#stage')).toBeVisible({ timeout: 15000 });
 	await expect(ribbon.locator('#toggle')).toBeHidden();
 	await expect(ribbon.locator('#settings')).not.toHaveClass(/hidden/);
+
+	// Edit two settings (Home then ArrowRight lands the stagger slider on 5ms) and reload
 	await ribbon.getByLabel('Cascade easing', { exact: true }).selectOption('2');
 	await ribbon.getByLabel('Cascade stagger', { exact: true }).press('Home');
 	await ribbon.getByLabel('Cascade stagger', { exact: true }).press('ArrowRight');
@@ -46,7 +57,10 @@ test('direct projects entry uses the wave and settings require the projectSettin
 	expect(errors).toEqual([]);
 });
 
+// Protects the Home to Projects navigation: the transition wave is played exactly once before the ribbon
+// cascade starts.
 test('home to projects runs a single wave before the cascade', async ({ page }) => {
+	// Count navigation-surface view transition animations
 	await page.addInitScript(() => {
 		const animate = Element.prototype.animate;
 		Element.prototype.animate = function (frames, options) {

@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects deep links to modals: /profile/ and /contact/ open after the loader on a direct visit and
+// again after a reload.
 for (const route of ['profile', 'contact']) {
 	test(`${route} opens after the loader on a direct visit and survives reload`, async ({ page }) => {
 		await page.goto(`/${route}/`);
@@ -15,6 +21,8 @@ for (const route of ['profile', 'contact']) {
 	});
 }
 
+// Protects history for modals: opening Profile adds a /profile/ entry, Back closes it to the home URL and
+// Forward reopens it.
 test('header modal URLs support browser back and forward', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 20000 });
@@ -29,6 +37,8 @@ test('header modal URLs support browser back and forward', async ({ page }) => {
 	await expect(page.getByRole('button', { name: 'Open Profile' })).toHaveAttribute('aria-expanded', 'true');
 });
 
+// Protects closing Contact: it returns to the page it was opened from, with the scene underneath kept
+// mounted throughout.
 test('contact closes to its original page and preserves the underlying scene', async ({ page }) => {
 	await page.goto('/projects/pocketchange/');
 	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 20000 });

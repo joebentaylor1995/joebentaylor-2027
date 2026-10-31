@@ -1,14 +1,23 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects the darkening gradient over the case study hero: the top 59% is untouched and it eases to 40%
+// black at the bottom, in both the WebGL hero and the native image used for reduced motion.
 for (const width of [390, 1440]) {
 	test(`case-study shade darkens the bottom 41% to 40% black at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
+		// Serve a plain white image so any darkening in the output is the shade alone
 		await page.route('**/_next/image/**', route =>
 			route.fulfill({
 				contentType: 'image/svg+xml',
 				body: '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1600"><path fill="white" d="M0 0h1600v1600H0z"/></svg>',
 			})
 		);
+		// After each draw with a shade uniform, read the red channel at the right edge at four depths down the
+		// hero (2%, 50%, 80%, 100%) and store them on window
 		await page.addInitScript(() => {
 			const draw = WebGLRenderingContext.prototype.drawArrays;
 			WebGLRenderingContext.prototype.drawArrays = function (...args: Parameters<typeof draw>) {

@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects case study spacing across breakpoints: below 1024px the media tiles run edge to edge with a 16px
+// gutter and the objectives label is hidden; the hero copy sits inset equally from its bottom-left corner.
 for (const width of [375, 440, 768, 1440]) {
 	test(`case study content spacing at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
@@ -22,6 +28,7 @@ for (const width of [375, 440, 768, 1440]) {
 		// The hero copy is one viewport tall, with the label and title set into its bottom-left corner
 		// (on phones the hero section runs a viewport longer, for the panel to rise over its held image)
 		const hero = page.locator('[data-project-hero]');
+		// Measures the hero copy box against the title and label inside it
 		const layout = await hero.evaluate(e => {
 			const copy = e.querySelector('[data-project-hero-copy]');
 			const title = e.querySelector('h1')?.getBoundingClientRect();
@@ -39,6 +46,8 @@ for (const width of [375, 440, 768, 1440]) {
 				labelGap: title.top - label.bottom,
 			};
 		});
+
+		// All four insets match the grid margin
 		expect(layout.height).toBeCloseTo(900, 0);
 		// The grid margin: 32px on phones and 40px on desktop at the design widths
 		expect(layout.inset).toBeGreaterThan(0);

@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects the header colour across client-side navigation: legal pages use a light header on
+// their dark background, going home flips it dark, and Back restores the light version.
 test('legal header returns to dark on client navigation home and stays correct on back', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	for (const route of ['/cookies/', '/terms-privacy/', '/llms/']) {

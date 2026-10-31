@@ -1,7 +1,15 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects the desktop reveal against slow shader compilation: the loader holds until the program has
+// compiled, so the wave plays from 0 to 1 instead of popping in half way.
 test('desktop reveal waits for slow shader compilation and renders the whole wave', async ({ page }) => {
 	await page.addInitScript(() => {
+		// After the loader lands, report shaders as still compiling for 1.4s.
+		// 0x91b1 is COMPLETION_STATUS_KHR (the parallel shader compile extension).
 		let readyAfter = Infinity;
 		window.addEventListener('site-loader:landed', () => {
 			readyAfter = performance.now() + 1400;
@@ -11,6 +19,7 @@ test('desktop reveal waits for slow shader compilation and renders the whole wav
 			if (name === 0x91b1 && performance.now() < readyAfter) return false;
 			return parameter.call(this, program, name);
 		};
+		// Audit: was the scene ready at reveal, and every waterReveal value written
 		const state = { readyAtReveal: false, values: [] as number[] };
 		Object.assign(window, { waveAudit: state });
 		window.addEventListener('site-loader:reveal', () => {
@@ -34,6 +43,8 @@ test('desktop reveal waits for slow shader compilation and renders the whole wav
 	const audit = await page.evaluate(
 		() => (window as unknown as { waveAudit: { readyAtReveal: boolean; values: number[] } }).waveAudit
 	);
+
+	// The scene was ready at reveal, the wave starts at 0, passes through the middle and reaches 1
 	expect(audit.readyAtReveal).toBe(true);
 	expect(audit.values[0]).toBe(0);
 	expect(audit.values.some(value => value > 0.2 && value < 0.8)).toBe(true);

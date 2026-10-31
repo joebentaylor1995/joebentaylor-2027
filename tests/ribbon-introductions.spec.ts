@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects the ten Projects ribbon intro effects (?ribbonSettings): each plays to completion with motion blur
+// off and no GL errors, and the chosen effect is remembered after a reload.
 for (const width of [1440, 440]) {
 	test(`ten sharp ribbon introductions at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
@@ -12,16 +18,21 @@ for (const width of [1440, 440]) {
 		await expect(ribbon.locator('#intro-status')).toContainText('Ready.', { timeout: 30000 });
 		const frame = page.frames().find(item => item.url().includes('/projects-ribbon/index.html'));
 		if (!frame) throw new Error('Ribbon frame missing');
+		// Select each effect, check mid-play state, then wait for it to finish. The frame is the ribbon iframe, so GL
+		// state is read with string expressions evaluated inside it.
 		for (let effect = 1; effect <= 10; effect++) {
 			await ribbon.locator('#intro-effect').selectOption(String(effect));
 			await expect(ribbon.locator('#intro-status')).toContainText('Playing');
 			await frame.waitForFunction('introduction.progress > .15 && introduction.progress < 1');
 			expect(await frame.evaluate('gl.getUniform(program,uniforms.MotionBlur)')).toBe(0);
 			expect(await frame.evaluate('gl.getError()')).toBe(0);
+			// Keep a screenshot of one effect for visual review
 			if (effect === 8) await page.screenshot({ path: `/tmp/ribbon-introduction-${width}.png` });
 			await expect(ribbon.locator('#intro-status')).toContainText('Ready.');
 			expect(await frame.evaluate('introduction.progress')).toBe(1);
 		}
+
+		// The last selection persists
 		await page.reload();
 		await expect(ribbon.locator('#intro-effect')).toHaveValue('10');
 		await expect(ribbon.locator('#error')).toBeHidden();
