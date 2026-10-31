@@ -1,5 +1,10 @@
+// Events
+// ------------
 export const MEDIA_SETTINGS_CHANGED = 'media-reveal:settings';
 export const MEDIA_REPLAY = 'media-reveal:replay';
+
+// Settings
+// ------------
 export const mediaEasings = {
 	'Cubic ease-out': 'cubic-bezier(0.215, 0.61, 0.355, 1)',
 	'Quart ease-out': 'cubic-bezier(0.165, 0.84, 0.44, 1)',
@@ -8,6 +13,7 @@ export const mediaEasings = {
 	'Ease-in-out': 'ease-in-out',
 	Linear: 'linear',
 };
+
 export const defaultMediaSettings = {
 	delay: 0,
 	duration: 0.55,
@@ -15,4 +21,5 @@ export const defaultMediaSettings = {
 	trigger: 100,
 	easing: 'Cubic ease-out' as keyof typeof mediaEasings,
 };
+
 export const mediaSettings = { ...defaultMediaSettings };
