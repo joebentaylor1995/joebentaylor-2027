@@ -1,12 +1,12 @@
 'use client';
 
+// Imports
+// ------------
 import { GlobalContext } from '@parts/Contexts';
 import { HERO_DESKTOP_QUERY } from '@parts/Hero/layout';
 import ProjectHero from '@parts/ProjectHero';
 import { heroFrame } from '@parts/ProjectHero/framing';
 import type { ProjectHeroProps } from '@parts/ProjectHero/interface';
-// Imports
-// ------------
 import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { mq } from '@tackl';
 import { afterHeroEntrance } from '@utils/afterHeroEntrance';
@@ -35,20 +35,32 @@ const warmHero = (src: string) => {
 
 // Component
 // ------------
+// Hosts the interactive projects ribbon, a standalone app in an iframe (public/projects-ribbon/).
+// The iframe stays mounted ("cached") while you are elsewhere on the site so /projects opens
+// instantly; this component talks to it with same-origin postMessage:
+//   ribbon -> site: projects:wave-ready, :error, :prefetch, :prepare, :modal, :open
+//   site -> ribbon: projects:active, :route, :prepared, :fill-preview, :fill-scrub
 const ProjectsRibbon = () => {
+	// Context
 	const { lenisRef, pagePath } = use(GlobalContext);
 	const active = /^\/projects\/?$/.test(pagePath);
+
 	// Refs
 	const frame = useRef<HTMLIFrameElement>(null);
 	const measure = useRef<HTMLDivElement>(null);
 	const startRibbon = useRef<() => void>(null);
-	const [preview, setPreview] = useState<{ request: number; project: ProjectHeroProps['project'] } | null>(null);
+
 	// State
+	// `preview` is a project hero rendered offscreen so its real height can be measured for the handoff
+	const [preview, setPreview] = useState<{ request: number; project: ProjectHeroProps['project'] } | null>(null);
+
+	// Derived
 	const searchParams = useSearchParams();
 	const router = useRouter();
 	const project = searchParams.get('project');
 
 	// Handlers
+	// Tells the ribbon whether /projects is showing, once its own page has loaded (not about:blank)
 	const syncRoute = () => {
 		if (frame.current?.contentWindow?.location.pathname !== '/projects-ribbon/index.html') return;
 		frame.current?.contentWindow?.postMessage({ type: 'projects:active', active }, window.location.origin);
@@ -56,6 +68,8 @@ const ProjectsRibbon = () => {
 	};
 
 	// Effects
+	// Measure the offscreen hero once its image decodes, then tell the ribbon the final
+	// height/top so its tile can grow into exactly where the project page's hero will sit
 	useEffect(() => {
 		if (!preview) return;
 		let cancelled = false;
@@ -66,11 +80,13 @@ const ProjectsRibbon = () => {
 			try {
 				await image.decode();
 				if (cancelled) return;
+
 				const framing = heroFrame(
 					image.getBoundingClientRect().height,
 					window.innerHeight,
 					matchMedia(`${mq.up.l} and (prefers-reduced-motion: no-preference)`).matches
 				);
+
 				frame.current?.contentWindow?.postMessage(
 					{
 						type: 'projects:prepared',
@@ -96,6 +112,7 @@ const ProjectsRibbon = () => {
 		};
 	}, [preview]);
 
+	// Forward header pointer moves into the iframe's canvas (the header sits above the iframe)
 	useEffect(() => {
 		// Header links stay interactive while their pointer motion reaches the canvas below.
 		const forward = (event: PointerEvent) => {
@@ -120,6 +137,7 @@ const ProjectsRibbon = () => {
 		return () => window.removeEventListener('pointermove', forward);
 	}, [active]);
 
+	// Handle messages from the ribbon: readiness, prefetching, and opening a project or link
 	useEffect(() => {
 		const openProject = async (event: MessageEvent) => {
 			// NOTE • Same origin is the trust boundary: WebKit can report this window, not the frame, as the source
@@ -130,11 +148,13 @@ const ProjectsRibbon = () => {
 				frame.current?.setAttribute('data-ready', 'true');
 				return;
 			}
+
 			if (event.data?.type === 'projects:wave-ready') {
 				frame.current?.setAttribute('data-ready', 'true');
 				frame.current?.setAttribute('data-ribbon-ready', 'true');
 				return;
 			}
+
 			// NOTE • The ribbon prefetches each featured case study in idle time: warm its route and
 			// the exact hero image its page will request, so a tap starts the transition at once
 			if (
@@ -147,6 +167,8 @@ const ProjectsRibbon = () => {
 				warmHero(event.data.hero);
 				return;
 			}
+
+			// A tile was pressed: show its hero offscreen so the effect above can measure it
 			if (
 				event.data?.type === 'projects:prepare' &&
 				typeof event.data.href === 'string' &&
@@ -165,6 +187,7 @@ const ProjectsRibbon = () => {
 				}
 				return;
 			}
+
 			// NOTE • A non-featured case study: open the profile panel on it (@modal slot), no hero handoff
 			if (
 				event.data?.type === 'projects:modal' &&
@@ -176,6 +199,8 @@ const ProjectsRibbon = () => {
 				router.push(href, { transitionTypes: ['project-modal'], scroll: false });
 				return;
 			}
+
+			// The fill finished: hold the cover over the page, then navigate. External links open in a new tab.
 			if (event.data?.type !== 'projects:open') return;
 			if (typeof event.data.href !== 'string') return;
 			const href = event.data.href;
@@ -198,6 +223,7 @@ const ProjectsRibbon = () => {
 		return () => window.removeEventListener('message', openProject);
 	}, [router, lenisRef]);
 
+	// Relay the fill-settings panel's preview and scrub events into the iframe
 	useEffect(() => {
 		const preview = () =>
 			frame.current?.contentWindow?.postMessage({ type: 'projects:fill-preview' }, window.location.origin);
@@ -214,9 +240,12 @@ const ProjectsRibbon = () => {
 		};
 	}, []);
 
+	// Boot the ribbon: immediately on /projects, otherwise in the background once the loader
+	// has settled and the homepage entrance is done
 	useEffect(() => {
 		const element = frame.current;
 		if (!element) return;
+
 		// Prepare the canvas behind the first-visit loader so its wave can refract it.
 		let started = false;
 		const start = () => {
@@ -233,6 +262,7 @@ const ProjectsRibbon = () => {
 			);
 		};
 		startRibbon.current = start;
+
 		// Elsewhere the ribbon boots in the background, after the homepage's text entrance
 		let stopWaiting = () => {};
 		const prepare = () => {
@@ -252,6 +282,7 @@ const ProjectsRibbon = () => {
 		};
 	}, []);
 
+	// Keep the ribbon in step with the route: active flag, and which project is open (?project=)
 	useEffect(() => {
 		// Visiting /projects before the background boot starts it straight away
 		if (active) startRibbon.current?.();

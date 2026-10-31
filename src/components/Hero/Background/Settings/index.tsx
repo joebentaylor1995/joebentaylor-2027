@@ -7,11 +7,17 @@ import { createPortal } from 'react-dom';
 import { type BooleanSetting, defaultSettings, type NumericSetting } from '../effect-settings';
 import { type IntroSettings, introDefaults, introEasings, mobileIntroDefaults } from '../scene-intro';
 import IntroTimings from './IntroTimings';
+
 // Styles + Interfaces
 // ------------
 import type { SettingsProps } from './interface';
 import s from './styles.module.scss';
 
+// Constants
+// ------------
+// Slider definitions: [setting key, label, min, max, step].
+// NOTE • The groups in the render slice this list by position (the [title, start, end]
+// table at the bottom, end exclusive), so keep each group's entries together and update that table.
 const ranges: [NumericSetting, string, number, number, number][] = [
 	['gestureGap', 'Gesture reset gap (seconds)', 0.1, 1.5, 0.05],
 	['fastRate', 'Fast scroll speed (pixels/second)', 500, 20000, 100],
@@ -47,6 +53,8 @@ const ranges: [NumericSetting, string, number, number, number][] = [
 	['tabletZoom', 'Tablet scale', 0.3, 2.5, 0.01],
 	['tabletRotation', 'Tablet rotation', -45, 45, 1],
 ];
+
+// Checkbox definitions: [setting key, label]
 const toggles: [BooleanSetting, string][] = [
 	['colourOn', 'Scroll colour switching'],
 	['chromaOn', 'Blue cursor edges'],
@@ -61,6 +69,9 @@ const toggles: [BooleanSetting, string][] = [
 
 // Component
 // ------------
+// The "Hero studio" tuning panel, only loaded with ?heroSettings. Edits flow up through
+// onChange / onIntroChange / onLiquidChange and are live; "Copy all hero settings" exports
+// them as JSON, and "Save wave settings" stores the intro profiles in this browser.
 export default function Settings({
 	intro,
 	introTarget,
@@ -80,11 +91,17 @@ export default function Settings({
 	const [open, setOpen] = useState(true);
 	const [copyStatus, setCopyStatus] = useState('');
 	const [saveStatus, setSaveStatus] = useState('');
+
+	// Refs
 	const panelRef = useRef<HTMLElement>(null);
+
+	// Handlers
+	// Opens or closes every <details> group in the panel
 	const expand = (value: boolean) =>
 		panelRef.current?.querySelectorAll('details').forEach(detail => {
 			detail.open = value;
 		});
+
 	// Render
 	// NOTE • In the body, or the hero's stacking context lets its copy cover the panel on tablets
 	return createPortal(

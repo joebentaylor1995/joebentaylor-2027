@@ -1,9 +1,9 @@
 'use client';
 
-import ContactModal from '@parts/ContactModal';
-import { GlobalContext } from '@parts/Contexts';
 // Imports
 // ------------
+import ContactModal from '@parts/ContactModal';
+import { GlobalContext } from '@parts/Contexts';
 import Logo from '@parts/Logo';
 import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { prepareNavigationScene } from '@utils/navigationScene';
@@ -18,22 +18,31 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
+// The site header: logo, availability line and the Profile / Projects / Let's Talk links.
+// It also owns the contact modal, and fades in once the site loader has settled.
 const Header = () => {
 	// Context
 	const { profileOpen, setProfileOpen, contactOpen, setContactOpen, pagePath: pathname } = use(GlobalContext);
+
+	// Derived
+	// `data-tone` flips the header's text colour on pages with a dark background
 	const isDarkPage = /^\/(cookies|terms-privacy|llms)\/?$/.test(pathname) || /^\/projects(?:\/|$)/.test(pathname);
 	// Case studies scroll under the header without the progressive blur
 	const isCaseStudy = /^\/projects\/[^/]+\/?$/.test(pathname);
-	// State
+
 	// Refs
 	const ref = useRef<HTMLElement>(null);
+	// Set once the entrance has played, so later remounts skip it
 	const entered = useRef(false);
 
 	// Effects
+	// Drives the progressive blur: --header-blur-opacity goes 0 -> 1 (smoothstep) over the first 96px of scroll
 	// biome-ignore lint/correctness/useExhaustiveDependencies: resync when navigation replaces the page scroller.
 	useEffect(() => {
 		const header = ref.current;
 		if (!header) return;
+
+		// Reads the Lenis scroller when present, else the window; ignores scrolls outside #page
 		const update = (event?: Event) => {
 			const target = event?.target;
 			if (target instanceof Element && !target.closest('#page')) return;
@@ -42,6 +51,7 @@ const Header = () => {
 			const progress = Math.max(0, Math.min(1, scroll / 96));
 			header.style.setProperty('--header-blur-opacity', String(progress * progress * (3 - 2 * progress)));
 		};
+
 		update();
 		// Capture native scroll from the nested Lenis wrapper as well as reduced-motion window scrolling.
 		document.addEventListener('scroll', update, { capture: true, passive: true });
@@ -49,16 +59,20 @@ const Header = () => {
 	}, [pathname]);
 
 	// Animations
+	// Slide/fade the header in after the loader. `data-header-entrance` reports progress:
+	// waiting -> entering -> complete (shown immediately for reduced motion or a repeat visit)
 	useAnimation(
 		({ reduced }) => {
 			const header = ref.current;
 			if (!header) return;
+
 			if (reduced || entered.current || isLoaderSettled()) {
 				gsap.set(header, { y: 0, autoAlpha: 1 });
 				header.dataset.headerEntrance = 'complete';
 				entered.current = true;
 				return;
 			}
+
 			header.dataset.headerEntrance = 'waiting';
 			const entrance = gsap.fromTo(
 				header,
@@ -78,12 +92,15 @@ const Header = () => {
 					},
 				}
 			);
+
+			// Held paused until the loader finishes
 			const reveal = () => {
 				entrance.play();
 			};
 			window.addEventListener(LOADER_SETTLED, reveal);
 			// Match the loader's fail-open limit if its initialization is interrupted.
 			const fallback = window.setTimeout(reveal, 6000);
+
 			return () => {
 				window.removeEventListener(LOADER_SETTLED, reveal);
 				window.clearTimeout(fallback);
