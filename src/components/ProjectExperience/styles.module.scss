@@ -13,7 +13,7 @@
 	background: var(--brand-c4);
 
 	// Rise over the hero's held image (ProjectHero's second row) rather than after it
-	@include bpd(l) {
+	@include touchLayout {
 		@media (prefers-reduced-motion: no-preference) { margin-top: -100svh; }
 	}
 }

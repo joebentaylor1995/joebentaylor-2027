@@ -14,10 +14,11 @@
 
 	h2 span { color: alpha(--global-white, 40); }
 
-	@include bp(l) {
-		min-height: 100svh;
-		padding: var(--gap-xl);
-	}
+	@include bp(l) { padding: var(--gap-xl); }
+
+	// Fills the desktop's sideways panel. Touch screens scroll into it from below the hero,
+	// where this height would only be a gap.
+	@include desktopHover { min-height: 100svh; }
 }
 
 .content {

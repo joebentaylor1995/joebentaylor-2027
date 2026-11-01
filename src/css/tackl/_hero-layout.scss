@@ -1,3 +1,4 @@
+@use 'sass:map';
 @use 'breakpoints' as *;
 
 // Keep in sync with DESKTOP_HOVER_QUERY in utils/desktopHover.ts.
@@ -5,6 +6,11 @@
 	@include bp(l) {
 		@media (hover: hover) and (pointer: fine) { @content; }
 	}
+}
+
+// Everything desktopHover isn't. Keep in sync with TOUCH_LAYOUT_QUERY in utils/desktopHover.ts.
+@mixin touchLayout {
+	@media (width <= #{map.get($breakpoints-down, l)}), (hover: none), (pointer: coarse) { @content; }
 }
 
 // Keep in sync with HERO_DESKTOP_QUERY in Hero/layout.ts.

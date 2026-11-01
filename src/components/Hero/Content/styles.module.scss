@@ -12,11 +12,6 @@
 	width: 100%;
 	height: auto;
 
-	@include bp(m) {
-		justify-self: flex-start;
-		height: 100%;
-	}
-
 	hgroup {
 		display: flex;
 		flex-direction: column;
@@ -24,6 +19,8 @@
 		max-width: 50rem;
 
 		@include bp(m) { max-width: 40rem; }
+        
+		@include bp(l) { max-width: 50rem; }
 	}
 
 	> * {
@@ -62,14 +59,13 @@
 				text-wrap: balance;
 			}
 		}
-
-        
 	}
 
 	@include heroDesktop {
 		[data-liquid-ready="true"] & { opacity: 0; }
 		z-index: 1;
 		padding-bottom: var(--gap-xl);
+		align-items: flex-end;
 		height: 50vh;
 		height: 50svh;
 

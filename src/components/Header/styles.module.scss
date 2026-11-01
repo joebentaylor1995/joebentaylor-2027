@@ -44,8 +44,12 @@
 		padding: var(--gap-l);
 	}
 
-	@include bp(xl) {
+	@include bp(l) {
 		padding: var(--gap-l);
+	}
+
+	@include bp(xl) {
+		padding: var(--gap-xl);
 	}
 
 }
