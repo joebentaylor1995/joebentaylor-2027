@@ -3,9 +3,19 @@
 import { mq } from '@tackl';
 import { observeScenePause } from '@utils/observeScenePause';
 import { splitStega } from '@utils/stega';
+import { setClampedLinear } from '@utils/webgl';
 import { gsap } from 'gsap';
 import type { MatrixSettings } from './interface';
 import { fragment, vertex } from './shaders';
+
+// Constants
+// ------------
+// Glyph atlas: one square cell per character of the title, capped
+const ATLAS_CELL = 32;
+const MAX_GLYPHS = 128;
+
+const MAX_FRAME_SECONDS = 0.05;
+const MAX_PIXEL_RATIO = 1.5;
 
 // Engine
 // ------------
@@ -95,11 +105,11 @@ export function createMatrixFooter(
 		].map(name => [name, gl.getUniformLocation(program, name)])
 	);
 
-	// Glyph atlas: each character of the title (capped at 128) in a 32px cell, drawn side by side
+	// Glyph atlas: each character of the title, drawn side by side
 	const atlas = document.createElement('canvas');
-	const letters = Array.from(`${splitStega(title).clean.trim().toUpperCase()} `).slice(0, 128);
-	atlas.width = letters.length * 32;
-	atlas.height = 32;
+	const letters = Array.from(`${splitStega(title).clean.trim().toUpperCase()} `).slice(0, MAX_GLYPHS);
+	atlas.width = letters.length * ATLAS_CELL;
+	atlas.height = ATLAS_CELL;
 	const ink = atlas.getContext('2d');
 	if (!ink) {
 		release();
@@ -111,7 +121,7 @@ export function createMatrixFooter(
 	ink.textAlign = 'center';
 	ink.textBaseline = 'middle';
 	letters.forEach((letter, i) => {
-		ink.fillText(letter, i * 32 + 16, 16);
+		ink.fillText(letter, i * ATLAS_CELL + ATLAS_CELL / 2, ATLAS_CELL / 2);
 	});
 
 	gl.uniform1f(gl.getUniformLocation(program, 'glyphCount'), letters.length);
@@ -121,10 +131,7 @@ export function createMatrixFooter(
 	gl.bindTexture(gl.TEXTURE_2D, texture);
 	gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+	setClampedLinear(gl);
 
 	// Animation state: target/hover ease the pointer influence, clock drives the fall, codeClock drives glyph swaps
 	let target = 0,
@@ -137,7 +144,7 @@ export function createMatrixFooter(
 	const hoverMedia = matchMedia(`${mq.up.l} and (hover: hover) and (pointer: fine)`);
 	let scenePaused = false;
 
-	// Frame: advance clocks (dt capped at 50ms so tab switches don't jump), upload uniforms, draw
+	// Frame: advance clocks (dt capped so tab switches don't jump), upload uniforms, draw
 	const draw = (_time: number, milliseconds: number) => {
 		if (document.hidden || gl.isContextLost()) return;
 		const state = settings();
@@ -146,7 +153,7 @@ export function createMatrixFooter(
 			return;
 		}
 
-		const dt = Math.min(milliseconds / 1000, 0.05);
+		const dt = Math.min(milliseconds / 1000, MAX_FRAME_SECONDS);
 		hover = hoverMedia.matches
 			? hover + ((state.hoverEnabled ? target : 0) - hover) * (1 - Math.exp(-dt / state.hoverDuration))
 			: 0;
@@ -169,9 +176,9 @@ export function createMatrixFooter(
 		gl.drawArrays(gl.TRIANGLES, 0, 3);
 	};
 
-	// Backing store follows the CSS size at up to 1.5x pixel ratio
+	// Backing store follows the CSS size, up to a capped pixel ratio
 	const resize = () => {
-		const ratio = Math.min(devicePixelRatio || 1, 1.5);
+		const ratio = Math.min(devicePixelRatio || 1, MAX_PIXEL_RATIO);
 		canvas.width = Math.max(1, Math.round(canvas.clientWidth * ratio));
 		canvas.height = Math.max(1, Math.round(canvas.clientHeight * ratio));
 		gl.viewport(0, 0, canvas.width, canvas.height);

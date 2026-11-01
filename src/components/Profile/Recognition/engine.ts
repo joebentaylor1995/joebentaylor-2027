@@ -20,13 +20,76 @@ const PER_TURN = 10;
 const CARD_WIDTH = 2.4;
 const CARD_HEIGHT = (CARD_WIDTH * 595) / 420;
 
-// How much larger an inspected poster is than one on the spiral
+// How much larger an inspected poster is than one on the spiral, and how far in front of it it sits
 const FOCUS_SCALE = 1.75;
+const FOCUS_GAP = 0.8;
 const TAU = Math.PI * 2;
+
+// Starting phase, in turns
+const INITIAL_PHASE = 0.035;
+
+// Camera: vertical field of view, the half-width it keeps in frame, and how close it may get
+const CAMERA_FOV = 42;
+const CAMERA_HALF_FOV_RADIANS = THREE.MathUtils.degToRad(CAMERA_FOV / 2);
+const CAMERA_FRAMED_HALF_WIDTH = 4.7;
+const CAMERA_MIN_DISTANCE = 16;
+
+const MOBILE_PIXEL_RATIO = 1.5;
+const DESKTOP_PIXEL_RATIO = 2;
+const MAX_ANISOTROPY = 8;
+
+// Pointer rests off screen, where it hits nothing
+const POINTER_REST = 10;
+
+// A card is pickable when it faces the front and sits within the visible band
+const PICK_MIN_Z = 1.5;
+const PICK_MAX_Y = 3.5;
+
+// Drag: px before a press becomes a drag, horizontal gain, and fling limits
+const DRAG_THRESHOLD_PX = 6;
+const DRAG_X_GAIN = 0.6;
+const FLING_MIN_SECONDS = 0.008;
+const FLING_MAX_VELOCITY = 1.3;
+const FLING_MAX_IDLE_MS = 100;
+const FLING_DECAY_GAIN = 1.3;
+
+// Turns moved by an arrow key
+const KEY_NUDGE = 0.055;
+
+// Frame step limits, in seconds
+const MIN_FRAME_SECONDS = 0.001;
+const MAX_FRAME_SECONDS = 0.05;
+
+// Motion: base spiral speed (turns/s) and scroll speed mapping
+const SPIRAL_SPEED = 0.023;
+const SCROLL_DELTA_THRESHOLD = 0.5;
+const SCROLL_SPEED_LIMIT = 3;
+const SCROLL_SPEED_GAIN = 0.25;
+
+// Easing rates: card scale, tilt and glare
+const SCALE_EASE_RATE = 9;
+const TILT_EASE_RATE = 10;
+const GLARE_EASE_RATE = 8;
+
+// Inspected card tilt, per unit of hover strength
+const HOVER_INTENSITY_GAIN = 10;
+const MAX_HOVER_STRENGTH = 2;
+const TILT_PITCH = 0.1;
+const TILT_YAW = 0.12;
+
+const HOVERED_CARD_SCALE = 1.045;
+
+// Turns over which a card fades in at the ends of the spiral
+const EDGE_FADE_TURNS = 0.18;
+
+// Render layers: the spiral, and the inspected card drawn over it
+const SPIRAL_LAYER = 0;
+const FOCUS_LAYER = 1;
 
 // Types
 // ------------
 type Award = THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+type Settings = ReturnType<typeof getSettings>;
 
 // Helpers
 // ------------
@@ -61,14 +124,16 @@ export function createRecognition(
 
 	// Three.js objects
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
-	renderer.setPixelRatio(Math.min(devicePixelRatio, getSettingsTarget() === 'mobile' ? 1.5 : 2));
+	renderer.setPixelRatio(
+		Math.min(devicePixelRatio, getSettingsTarget() === 'mobile' ? MOBILE_PIXEL_RATIO : DESKTOP_PIXEL_RATIO)
+	);
 	renderer.setClearColor(0x000000, 0);
 	const scene = new THREE.Scene();
-	const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+	const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
 	const geometry = new THREE.PlaneGeometry(CARD_WIDTH, CARD_HEIGHT, 8, 10);
 	const cards: Award[] = [];
 	const textures: THREE.Texture[] = [];
-	const pointer = new THREE.Vector2(10, 10);
+	const pointer = new THREE.Vector2(POINTER_REST, POINTER_REST);
 	const raycaster = new THREE.Raycaster();
 	const tilt = new THREE.Vector2();
 	const tiltTarget = new THREE.Vector2();
@@ -83,7 +148,7 @@ export function createRecognition(
 	let ready = false;
 	let preparingFrame = false;
 	let playing = !reduced.matches;
-	let phase = 0.035;
+	let phase = INITIAL_PHASE;
 	let targetPhase = phase;
 	let lastScroll = scroller.scrollTop;
 	let scrollSpeed = 0;
@@ -128,7 +193,10 @@ export function createRecognition(
 		renderer.setSize(width, height, false);
 		camera.aspect = width / height;
 		camera.zoom = getSettings().awardZoom;
-		camera.position.z = Math.max(16, 4.7 / (Math.tan(THREE.MathUtils.degToRad(21)) * camera.aspect));
+		camera.position.z = Math.max(
+			CAMERA_MIN_DISTANCE,
+			CAMERA_FRAMED_HALF_WIDTH / (Math.tan(CAMERA_HALF_FOV_RADIANS) * camera.aspect)
+		);
 		camera.updateProjectionMatrix();
 	}
 	const observer = new ResizeObserver(resize);
@@ -149,10 +217,10 @@ export function createRecognition(
 		camera.updateMatrixWorld();
 		raycaster.setFromCamera(pointer, camera);
 		const hit = raycaster.intersectObjects(cards, false)[0]?.object as Award | undefined;
-		return hit && hit.position.z > 1.5 && Math.abs(hit.position.y) < 3.5 ? hit : null;
+		return hit && hit.position.z > PICK_MIN_Z && Math.abs(hit.position.y) < PICK_MAX_Y ? hit : null;
 	}
 
-	// Drag moves the spiral (a 6px threshold separates a drag from a tap); a tap on a card inspects it
+	// Drag moves the spiral (past a threshold that separates a drag from a tap); a tap on a card inspects it
 	function down(event: PointerEvent) {
 		if (pointerId !== null || (event.pointerType === 'mouse' && event.button !== 0)) return;
 		updatePointer(event);
@@ -169,13 +237,18 @@ export function createRecognition(
 	function move(event: PointerEvent) {
 		if (event.pointerId === pointerId || (canHover() && event.pointerType === 'mouse')) updatePointer(event);
 		if (event.pointerId !== pointerId) return;
-		if (Math.hypot(event.clientX - downX, event.clientY - downY) > 6) moved = true;
+		if (Math.hypot(event.clientX - downX, event.clientY - downY) > DRAG_THRESHOLD_PX) moved = true;
 		if (!moved || selected) return;
 		const now = performance.now();
 		const delta =
-			((event.pointerType === 'mouse' ? lastY - event.clientY : 0) - (event.clientX - lastX) * 0.6) / height;
+			((event.pointerType === 'mouse' ? lastY - event.clientY : 0) - (event.clientX - lastX) * DRAG_X_GAIN) /
+			height;
 		targetPhase += delta;
-		velocity = clamp(delta / Math.max((now - lastMove) / 1000, 0.008), -1.3, 1.3);
+		velocity = clamp(
+			delta / Math.max((now - lastMove) / 1000, FLING_MIN_SECONDS),
+			-FLING_MAX_VELOCITY,
+			FLING_MAX_VELOCITY
+		);
 		lastX = event.clientX;
 		lastY = event.clientY;
 		lastMove = now;
@@ -187,11 +260,22 @@ export function createRecognition(
 			if (focused) focus(null);
 			else if (pressed && !selected) focus(pressed);
 		}
-		if (event.type !== 'pointerup' || performance.now() - lastMove > 100 || reduced.matches || selected)
+		if (
+			event.type !== 'pointerup' ||
+			performance.now() - lastMove > FLING_MAX_IDLE_MS ||
+			reduced.matches ||
+			selected
+		)
 			velocity = 0;
 		pointerId = null;
 		pressed = null;
 		section.dataset.dragging = 'false';
+	}
+	// The front-facing card nearest the spiral's centre
+	function centralCard() {
+		return cards
+			.filter(card => card.position.z > PICK_MIN_Z)
+			.sort((a, b) => a.position.lengthSq() - b.position.lengthSq())[0];
 	}
 	// Keyboard: Enter inspects the most central card (or returns), Escape returns, Space pauses, arrows nudge
 	function key(event: KeyboardEvent) {
@@ -203,9 +287,7 @@ export function createRecognition(
 			event.preventDefault();
 			if (focused) focus(null);
 			else if (!selected) {
-				const central = cards
-					.filter(card => card.position.z > 1.5)
-					.sort((a, b) => a.position.lengthSq() - b.position.lengthSq())[0];
+				const central = centralCard();
 				if (central) focus(central);
 			}
 		}
@@ -215,7 +297,7 @@ export function createRecognition(
 		}
 		if (!selected && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
 			event.preventDefault();
-			targetPhase += event.key === 'ArrowRight' ? 0.055 : -0.055;
+			targetPhase += event.key === 'ArrowRight' ? KEY_NUDGE : -KEY_NUDGE;
 		}
 	}
 
@@ -226,7 +308,7 @@ export function createRecognition(
 	canvas.addEventListener('pointerup', release, events);
 	canvas.addEventListener('pointercancel', release, events);
 	canvas.addEventListener('lostpointercapture', release, events);
-	canvas.addEventListener('pointerleave', () => pointer.set(10, 10), events);
+	canvas.addEventListener('pointerleave', () => pointer.set(POINTER_REST, POINTER_REST), events);
 	canvas.addEventListener('keydown', key, events);
 	canvas.addEventListener(
 		'webglcontextlost',
@@ -254,38 +336,28 @@ export function createRecognition(
 		events
 	);
 
-	// Frame: update spiral phase, inspect animation and card uniforms, then render.
-	// Layer 1 holds the inspected card, drawn in a second pass over a cleared depth buffer so it never clips into the spiral.
-	function tick(_time: number, deltaTime: number) {
-		const scrollDelta = scroller.scrollTop - lastScroll;
-		lastScroll = scroller.scrollTop;
-		if ((!visible && !preparingFrame) || disposed || !ready || document.hidden) {
-			scrollSpeed = 0;
-			return;
-		}
-
-		const dt = clamp(deltaTime / 1000, 0.001, 0.05);
-		const settings = getSettings();
+	function syncCameraZoom(settings: Settings) {
 		if (camera.zoom !== settings.awardZoom) {
 			camera.zoom = settings.awardZoom;
 			camera.updateProjectionMatrix();
 		}
 		section.dataset.spiralZoom = String(camera.zoom);
+	}
 
-		const size = settings.awardSize / 100;
-		const ease = reduced.matches ? 1 : 1 - Math.exp(-9 * dt);
-
-		// Scroll sets the spiral's direction and adds a speed boost
-		if (Math.abs(scrollDelta) > 0.5 && !reduced.matches) direction = Math.sign(scrollDelta);
+	// Spiral motion: scroll sets the direction and adds a speed boost; phase eases towards targetPhase
+	function advanceSpiral(dt: number, scrollDelta: number, ease: number, settings: Settings) {
+		if (Math.abs(scrollDelta) > SCROLL_DELTA_THRESHOLD && !reduced.matches) direction = Math.sign(scrollDelta);
 		const scrollTarget = reduced.matches
 			? 0
-			: clamp(scrollDelta / dt / height, -3, 3) * 0.25 * settings.awardScrollBoost;
+			: clamp(scrollDelta / dt / height, -SCROLL_SPEED_LIMIT, SCROLL_SPEED_LIMIT) *
+				SCROLL_SPEED_GAIN *
+				settings.awardScrollBoost;
 		scrollSpeed = THREE.MathUtils.lerp(scrollSpeed, scrollTarget, ease);
 
-		const speed = playing ? direction * 0.023 * settings.awardSpeed + scrollSpeed : 0;
+		const speed = playing ? direction * SPIRAL_SPEED * settings.awardSpeed + scrollSpeed : 0;
 		if (!selected && pointerId === null) {
 			targetPhase += (speed + velocity) * dt;
-			velocity *= Math.exp(-dt / (settings.awardDragEasing * 1.3));
+			velocity *= Math.exp(-dt / (settings.awardDragEasing * FLING_DECAY_GAIN));
 		}
 
 		phase = THREE.MathUtils.lerp(
@@ -301,7 +373,10 @@ export function createRecognition(
 		section.dataset.spiralSpeed = speed.toFixed(4);
 		section.dataset.awardSize = String(settings.awardSize);
 		section.dataset.dragEasing = String(settings.awardDragEasing);
+	}
 
+	// Inspect progress; clears the selection once a return has finished
+	function advanceFocus(dt: number, settings: Settings) {
 		focusProgress = reduced.matches
 			? focused
 				? 1
@@ -318,14 +393,16 @@ export function createRecognition(
 			focusProgress = 0;
 			selected = null;
 		}
+	}
 
-		// Inspection target: just in front of the spiral; the pointer tilts the card while it is hovered
-		focusPosition.set(0, 0, RADIUS + 0.8);
+	// Inspection target: just in front of the spiral; the pointer tilts the card while it is hovered
+	function updateInspectPose(dt: number, size: number, settings: Settings) {
+		focusPosition.set(0, 0, RADIUS + FOCUS_GAP);
 		tiltTarget.set(0, 0);
 		let overSelected = false;
 		if (focused && (canHover() || pointerId !== null)) {
 			const halfHeight =
-				((camera.position.z - focusPosition.z) * Math.tan(THREE.MathUtils.degToRad(21))) / camera.zoom;
+				((camera.position.z - focusPosition.z) * Math.tan(CAMERA_HALF_FOV_RADIANS)) / camera.zoom;
 			const x = (pointer.x * halfHeight * camera.aspect) / ((CARD_WIDTH * FOCUS_SCALE * size) / 2);
 			const y = (pointer.y * halfHeight) / ((CARD_HEIGHT * FOCUS_SCALE * size) / 2);
 			overSelected = Math.abs(x) < 1 && Math.abs(y) < 1;
@@ -333,32 +410,33 @@ export function createRecognition(
 		}
 		// Damp the rigid card tilt without paper wobble or surface ripples.
 		if (reduced.matches) tilt.set(0, 0);
-		else tilt.lerp(tiltTarget, 1 - Math.exp(-dt * 10));
+		else tilt.lerp(tiltTarget, 1 - Math.exp(-dt * TILT_EASE_RATE));
 
-		const hoverStrength = Math.min(settings.awardHoverIntensity * 10, 2);
+		const hoverStrength = Math.min(settings.awardHoverIntensity * HOVER_INTENSITY_GAIN, MAX_HOVER_STRENGTH);
 		section.dataset.cardTilt = tilt.length().toFixed(3);
 		glare = THREE.MathUtils.lerp(
 			glare,
 			overSelected && !reduced.matches ? Math.min(hoverStrength, 1) : 0,
-			1 - Math.exp(-dt * 8)
+			1 - Math.exp(-dt * GLARE_EASE_RATE)
 		);
 		section.dataset.cardGlare = glare.toFixed(3);
-		rotation.setFromEuler(euler.set(-tilt.y * 0.1 * hoverStrength, tilt.x * 0.12 * hoverStrength, 0));
+		rotation.setFromEuler(euler.set(-tilt.y * TILT_PITCH * hoverStrength, tilt.x * TILT_YAW * hoverStrength, 0));
+	}
 
-		const hovered = canHover() && !selected && pointerId === null ? pick() : null;
-		section.dataset.hover = String(Boolean(hovered));
-
-		// Place every card on the helix, t = its offset in turns from the middle of the spiral
+	// Place every card on the helix, t = its offset in turns from the middle of the spiral
+	function placeCards(size: number, ease: number, hovered: Award | null) {
 		cards.forEach((card, index) => {
 			const t = THREE.MathUtils.euclideanModulo(index / PER_TURN + phase, TURNS) - TURNS / 2;
 			const angle = -t * TAU;
 			card.position.set(Math.sin(angle) * RADIUS, t * PITCH, Math.cos(angle) * RADIUS);
 			card.rotation.set(0, angle, 0);
-			card.traverse(object => object.layers.set(card === selected ? 1 : 0));
-			card.scale.setScalar(THREE.MathUtils.lerp(card.scale.x, size * (card === hovered ? 1.045 : 1), ease));
+			card.traverse(object => object.layers.set(card === selected ? FOCUS_LAYER : SPIRAL_LAYER));
+			card.scale.setScalar(
+				THREE.MathUtils.lerp(card.scale.x, size * (card === hovered ? HOVERED_CARD_SCALE : 1), ease)
+			);
 			const depth = (Math.cos(angle) + 1) / 2;
 			card.material.uniforms.depth.value = depth;
-			card.material.uniforms.fade.value = THREE.MathUtils.smoothstep(TURNS / 2 - Math.abs(t), 0, 0.18);
+			card.material.uniforms.fade.value = THREE.MathUtils.smoothstep(TURNS / 2 - Math.abs(t), 0, EDGE_FADE_TURNS);
 			card.material.uniforms.glareAmount.value = card === selected ? glare * focusBlend : 0;
 			card.material.uniforms.lightPosition.value.copy(tilt);
 			if (card === selected) {
@@ -368,17 +446,47 @@ export function createRecognition(
 				card.material.uniforms.depth.value = THREE.MathUtils.lerp(depth, 1, focusBlend);
 			}
 		});
+	}
 
-		camera.layers.set(0);
+	// The focus layer holds the inspected card, drawn in a second pass over a cleared depth buffer so it never clips into the spiral.
+	function renderLayers() {
+		camera.layers.set(SPIRAL_LAYER);
 		renderer.render(scene, camera);
 		if (selected) {
 			renderer.autoClear = false;
 			renderer.clearDepth();
-			camera.layers.set(1);
+			camera.layers.set(FOCUS_LAYER);
 			renderer.render(scene, camera);
-			camera.layers.set(0);
+			camera.layers.set(SPIRAL_LAYER);
 			renderer.autoClear = true;
 		}
+	}
+
+	// Frame: update spiral phase, inspect animation and card uniforms, then render.
+	function tick(_time: number, deltaTime: number) {
+		const scrollDelta = scroller.scrollTop - lastScroll;
+		lastScroll = scroller.scrollTop;
+		if ((!visible && !preparingFrame) || disposed || !ready || document.hidden) {
+			scrollSpeed = 0;
+			return;
+		}
+
+		const dt = clamp(deltaTime / 1000, MIN_FRAME_SECONDS, MAX_FRAME_SECONDS);
+		const settings = getSettings();
+		syncCameraZoom(settings);
+
+		const size = settings.awardSize / 100;
+		const ease = reduced.matches ? 1 : 1 - Math.exp(-SCALE_EASE_RATE * dt);
+
+		advanceSpiral(dt, scrollDelta, ease, settings);
+		advanceFocus(dt, settings);
+		updateInspectPose(dt, size, settings);
+
+		const hovered = canHover() && !selected && pointerId === null ? pick() : null;
+		section.dataset.hover = String(Boolean(hovered));
+
+		placeCards(size, ease, hovered);
+		renderLayers();
 	}
 
 	// Run the ticker only while visible, loaded and the tab is showing
@@ -391,23 +499,43 @@ export function createRecognition(
 	}
 	document.addEventListener('visibilitychange', syncTicker, { signal });
 
-	// Load every poster in parallel, then build one card each (one task per card so the main thread stays responsive)
+	// Loads one poster, or resolves null if the scene went away meanwhile
 	const loader = new THREE.TextureLoader();
+	const loadPoster = async (poster: string) => {
+		const texture = await loader.loadAsync(poster);
+		if (signal.aborted) {
+			texture.dispose();
+			return null;
+		}
+		textures.push(texture);
+		texture.colorSpace = THREE.SRGBColorSpace;
+		texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), MAX_ANISOTROPY);
+		return texture;
+	};
+
+	const addCard = (poster: THREE.Texture) => {
+		const material = new THREE.ShaderMaterial({
+			vertexShader: posterVertexShader,
+			fragmentShader,
+			transparent: true,
+			side: THREE.DoubleSide,
+			uniforms: {
+				poster: { value: poster },
+				depth: { value: 1 },
+				fade: { value: 1 },
+				glareAmount: { value: 0 },
+				lightPosition: { value: new THREE.Vector2() },
+			},
+		});
+		const mesh = new THREE.Mesh(geometry, material);
+		cards.push(mesh);
+		scene.add(mesh);
+	};
+
+	// Load every poster in parallel, then build one card each (one task per card so the main thread stays responsive)
 	const loadAwards = async () => {
 		if (signal.aborted) return;
-		const results = await Promise.allSettled(
-			posters.map(async poster => {
-				const texture = await loader.loadAsync(poster);
-				if (signal.aborted) {
-					texture.dispose();
-					return null;
-				}
-				textures.push(texture);
-				texture.colorSpace = THREE.SRGBColorSpace;
-				texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
-				return texture;
-			})
-		);
+		const results = await Promise.allSettled(posters.map(poster => loadPoster(poster)));
 		if (signal.aborted) return;
 
 		for (const result of results) {
@@ -416,22 +544,7 @@ export function createRecognition(
 			if (result.status !== 'fulfilled' || !result.value) continue;
 			// Upload one poster per task rather than all textures on the first scroll frame.
 			renderer.initTexture(result.value);
-			const material = new THREE.ShaderMaterial({
-				vertexShader: posterVertexShader,
-				fragmentShader,
-				transparent: true,
-				side: THREE.DoubleSide,
-				uniforms: {
-					poster: { value: result.value },
-					depth: { value: 1 },
-					fade: { value: 1 },
-					glareAmount: { value: 0 },
-					lightPosition: { value: new THREE.Vector2() },
-				},
-			});
-			const mesh = new THREE.Mesh(geometry, material);
-			cards.push(mesh);
-			scene.add(mesh);
+			addCard(result.value);
 		}
 
 		if (!cards.length) {
