@@ -8,8 +8,8 @@ import type { ProjectHeroProps } from '@parts/ProjectHero/interface';
 // Imports
 // ------------
 import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
-import { mq } from '@tackl';
 import { afterHeroEntrance } from '@utils/afterHeroEntrance';
+import { DESKTOP_HOVER_QUERY } from '@utils/desktopHover';
 import { markProjectModalEntry } from '@utils/projectModal';
 import { getImageProps } from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -69,7 +69,7 @@ const ProjectsRibbon = () => {
 				const framing = heroFrame(
 					image.getBoundingClientRect().height,
 					window.innerHeight,
-					matchMedia(`${mq.up.l} and (prefers-reduced-motion: no-preference)`).matches
+					matchMedia(`${DESKTOP_HOVER_QUERY} and (prefers-reduced-motion: no-preference)`).matches
 				);
 				frame.current?.contentWindow?.postMessage(
 					{

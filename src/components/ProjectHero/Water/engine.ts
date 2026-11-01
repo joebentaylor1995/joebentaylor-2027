@@ -1,4 +1,4 @@
-import { mq } from '@tackl';
+import { DESKTOP_HOVER_QUERY } from '@utils/desktopHover';
 import { gsap } from 'gsap';
 import { drawHeroContent } from '../../Hero/Background/hero-content-texture';
 import { createLiquidLayer, type LiquidLayer } from '../../Hero/Background/liquid';
@@ -57,10 +57,10 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 	const entrance = { portrait: 1, marqueeBoost: 0, waterReveal: 1, colour: 0 };
 	let previousReveal = Number.NaN;
 	const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
-	// NOTE • Only desktop bakes the title into the water. Phones run no fluid, and their title
-	// scrolls natively over the held image, so the DOM text stays visible above the canvas.
+	// NOTE • Only desktop bakes the title into the water. Phones and touch tablets run no fluid, and
+	// their title scrolls natively over the held image, so the DOM text stays visible above the canvas.
 	// Water remounts when the breakpoint changes, so this is read once.
-	const bakeText = matchMedia(mq.up.l).matches;
+	const bakeText = matchMedia(DESKTOP_HOVER_QUERY).matches;
 	const draw = (_time: number, delta: number) => {
 		if (!layer || disposed || !visible || document.hidden || profileScene?.dataset.scenePaused === 'true') return;
 		if (!canvas.clientWidth || !canvas.clientHeight || gl.isContextLost()) return;
@@ -250,7 +250,15 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 		resize();
-		layer = await createLiquidLayer(gl, canvas, host, { ...liquidSettings }, () => disposed, true, mq.up.l);
+		layer = await createLiquidLayer(
+			gl,
+			canvas,
+			host,
+			{ ...liquidSettings },
+			() => disposed,
+			true,
+			DESKTOP_HOVER_QUERY
+		);
 		if (disposed) {
 			layer.destroy();
 			return;

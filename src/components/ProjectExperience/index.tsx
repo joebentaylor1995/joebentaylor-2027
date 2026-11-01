@@ -2,7 +2,7 @@
 
 import { HERO_PARALLAX_COMPENSATION } from '@parts/ProjectHero/framing';
 
-import { mq } from '@tackl';
+import { DESKTOP_HOVER_QUERY, TOUCH_LAYOUT_QUERY } from '@utils/desktopHover';
 // Imports
 // ------------
 import { useAnimation } from '@utils/useAnimation';
@@ -39,27 +39,34 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 			if (!root || !lenis) return;
 			const media = gsap.matchMedia();
 			const outro = root.querySelector<HTMLElement>('[data-project-outro]');
-			// NOTE • Phones need no script for the hero: its image sticks in CSS and the title
-			// scrolls natively over it (ProjectHero styles)
-			media.add(`${mq.down.l} and (prefers-reduced-motion: no-preference)`, () => {
-				if (!outro) return;
-				gsap.fromTo(
-					outro,
-					{ '--project-outro-progress': 0 },
-					{
-						'--project-outro-progress': 1,
-						ease: 'none',
-						scrollTrigger: {
-							trigger: outro,
-							scroller: lenis.rootElement,
-							start: () => `bottom bottom+=${lenis.rootElement.clientHeight * 0.35}`,
-							end: 'bottom bottom',
-							scrub: true,
-						},
-					}
-				);
-			});
-			media.add(`${mq.up.l} and (prefers-reduced-motion: no-preference)`, () => {
+			// NOTE • Phones and touch tablets need no script for the hero: its image sticks in CSS and
+			// the title scrolls natively over it (ProjectHero styles). The pin below can't work with a
+			// finger: touch scrolls natively, off the main thread, so the pin's correction lands a
+			// frame late and the page jumps.
+			media.add(
+				TOUCH_LAYOUT_QUERY.split(', ')
+					.map(query => `${query} and (prefers-reduced-motion: no-preference)`)
+					.join(', '),
+				() => {
+					if (!outro) return;
+					gsap.fromTo(
+						outro,
+						{ '--project-outro-progress': 0 },
+						{
+							'--project-outro-progress': 1,
+							ease: 'none',
+							scrollTrigger: {
+								trigger: outro,
+								scroller: lenis.rootElement,
+								start: () => `bottom bottom+=${lenis.rootElement.clientHeight * 0.35}`,
+								end: 'bottom bottom',
+								scrub: true,
+							},
+						}
+					);
+				}
+			);
+			media.add(`${DESKTOP_HOVER_QUERY} and (prefers-reduced-motion: no-preference)`, () => {
 				const stage = root.querySelector<HTMLElement>('[data-project-stage]');
 				const heroLayer = root.querySelector<HTMLElement>('[data-project-hero-layer]');
 				const heroMedia = root.querySelector<HTMLElement>('[data-project-hero-media]');

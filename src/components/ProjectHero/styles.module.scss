@@ -18,9 +18,10 @@
 		opacity: 0.4;
 	}
 
-	// NOTE • Phones: the image, shade and water stick to the viewport while the title is a plain
-	// section that scrolls natively over them. The second row is the scroll the panel covers.
-	@include bpd(l) {
+	// NOTE • Phones and touch tablets: the image, shade and water stick to the viewport while the
+	// title is a plain section that scrolls natively over them. The second row is the scroll the
+	// panel covers.
+	@include touchLayout {
 		@media (prefers-reduced-motion: no-preference) {
 			display: grid;
 			grid-template-rows: auto 100svh;

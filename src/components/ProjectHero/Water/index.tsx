@@ -3,7 +3,7 @@
 // Imports
 // ------------
 import { whenLoaderLanded } from '@parts/SiteLoader/events';
-import { mq } from '@tackl';
+import { DESKTOP_HOVER_QUERY } from '@utils/desktopHover';
 import { useEffect, useRef } from 'react';
 import s from './styles.module.scss';
 
@@ -17,7 +17,7 @@ export default function Water() {
 		const photo = canvas?.parentElement?.querySelector('img');
 		if (!canvas || !host || !photo) return;
 		const motion = matchMedia('(prefers-reduced-motion: reduce)');
-		const desktop = matchMedia(mq.up.l);
+		const desktop = matchMedia(DESKTOP_HOVER_QUERY);
 		let generation = 0;
 		let dispose: (() => void) | undefined;
 		const start = async () => {
