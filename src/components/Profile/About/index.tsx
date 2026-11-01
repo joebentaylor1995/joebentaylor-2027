@@ -23,6 +23,16 @@ import s from './styles.module.scss';
 const FRAME_SIZES =
 	'(min-width: 1600px) max(75.9vw, 115svh), (min-width: 971px) max(1214px, 115svh), max(125vw, 115svh)';
 
+// Helpers
+// ------------
+// Scroll-scrubbed trigger inside the profile panel, recalculated on refresh
+const scrubTrigger = (scroller: Element, vars: ScrollTrigger.Vars): ScrollTrigger.Vars => ({
+	scroller,
+	scrub: true,
+	invalidateOnRefresh: true,
+	...vars,
+});
+
 // Component
 // ------------
 // NOTE • The portraits are stacked frames: scrolling zooms each new frame in over the last, then the final one fades out
@@ -65,14 +75,7 @@ const About = ({ paragraphs, images }: { paragraphs: string[]; images: AboutImag
 				{
 					yPercent: 0,
 					ease: 'none',
-					scrollTrigger: {
-						trigger: section,
-						scroller,
-						start: 'top bottom',
-						end: 'top top',
-						scrub: true,
-						invalidateOnRefresh: true,
-					},
+					scrollTrigger: scrubTrigger(scroller, { trigger: section, start: 'top bottom', end: 'top top' }),
 				}
 			);
 
@@ -81,28 +84,26 @@ const About = ({ paragraphs, images }: { paragraphs: string[]; images: AboutImag
 
 			const timeline = gsap.timeline({
 				defaults: { ease: 'none' },
-				scrollTrigger: {
+				scrollTrigger: scrubTrigger(scroller, {
 					trigger: section,
-					scroller,
 					start: 'top top',
 					end: () => `+=${height() * (aboutScrollDistance / 100)}`,
-					scrub: true,
-					invalidateOnRefresh: true,
-				},
+				}),
 			});
+			const frameDuration = aboutScrollDistance / 400;
 
 			for (let index = 1; index < frames.length; index++) {
-				timeline.to(frames[index], { scale: 1, duration: aboutScrollDistance / 400 });
+				timeline.to(frames[index], { scale: 1, duration: frameDuration });
 				timeline.fromTo(
 					frames[index].querySelector('[data-about-zoom]'),
 					{ scale: aboutStartZoom / 100 },
-					{ scale: 1, duration: aboutScrollDistance / 400 },
+					{ scale: 1, duration: frameDuration },
 					'<'
 				);
 				timeline.fromTo(
 					frames[index - 1].querySelector('[data-about-zoom]'),
 					{ scale: 1 },
-					{ scale: 1 + aboutPreviousZoom / 100, duration: aboutScrollDistance / 400, immediateRender: false },
+					{ scale: 1 + aboutPreviousZoom / 100, duration: frameDuration, immediateRender: false },
 					'<'
 				);
 				// Remove covered layers so the final portrait can fade against the dark background.
@@ -116,14 +117,11 @@ const About = ({ paragraphs, images }: { paragraphs: string[]; images: AboutImag
 				{
 					opacity: aboutFinalOpacity / 100,
 					ease: 'none',
-					scrollTrigger: {
+					scrollTrigger: scrubTrigger(scroller, {
 						trigger: section.querySelector('[data-about-text]'),
-						scroller,
 						start: 'top bottom',
 						end: 'bottom bottom',
-						scrub: true,
-						invalidateOnRefresh: true,
-					},
+					}),
 				}
 			);
 
@@ -134,14 +132,11 @@ const About = ({ paragraphs, images }: { paragraphs: string[]; images: AboutImag
 				{
 					yPercent: aboutExitParallax,
 					ease: 'none',
-					scrollTrigger: {
+					scrollTrigger: scrubTrigger(scroller, {
 						trigger: section,
-						scroller,
 						start: 'bottom bottom',
 						end: 'bottom top',
-						scrub: true,
-						invalidateOnRefresh: true,
-					},
+					}),
 				}
 			);
 		},

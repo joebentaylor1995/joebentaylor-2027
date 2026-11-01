@@ -15,6 +15,17 @@ import type { ProfilePanelContent } from '@/data/site';
 // ------------
 import s from './styles.module.scss';
 
+// Constants
+// ------------
+// A row's title and image are dimmed/hidden outside the middle of the screen, peaking halfway through its scrub
+const ROW_DIMMED_OPACITY = 0.4;
+const ROW_SCRUB_HALF = 0.5;
+const ROW_SCRUB_SMOOTHING = 0.5;
+
+// Highlighted intro phrases fade up from the same dimmed level
+const MARK_DURATION = 0.65;
+const MARK_STAGGER = 0.18;
+
 // Types
 // ------------
 interface ServicesProps {
@@ -47,34 +58,34 @@ const Services = ({ intro, services }: ServicesProps) => {
 				const offset = () =>
 					-((image as HTMLElement).offsetWidth + parseFloat(getComputedStyle(row).columnGap));
 
-				gsap.set(title, { x: offset, opacity: 0.4 });
+				gsap.set(title, { x: offset, opacity: ROW_DIMMED_OPACITY });
 				gsap.set(image, { scale: 0 });
 
 				gsap.timeline({
-					defaults: { duration: 0.5, ease: 'none' },
+					defaults: { duration: ROW_SCRUB_HALF, ease: 'none' },
 					scrollTrigger: {
 						trigger: row,
 						scroller,
 						start: 'top 65%',
 						end: 'bottom 55%',
-						scrub: 0.5,
+						scrub: ROW_SCRUB_SMOOTHING,
 						invalidateOnRefresh: true,
 					},
 				})
 					.to(title, { x: 0, opacity: 1 }, 0)
 					.to(image, { scale: 1 }, 0)
-					.to(title, { x: offset, opacity: 0.4 }, 0.5)
-					.to(image, { scale: 0 }, 0.5);
+					.to(title, { x: offset, opacity: ROW_DIMMED_OPACITY }, ROW_SCRUB_HALF)
+					.to(image, { scale: 0 }, ROW_SCRUB_HALF);
 			}
 
 			// SECTION • Highlighted phrases in the intro fade up once, staggered
 			gsap.fromTo(
 				section.querySelectorAll('mark'),
-				{ opacity: 0.4 },
+				{ opacity: ROW_DIMMED_OPACITY },
 				{
 					opacity: 1,
-					duration: 0.65,
-					stagger: 0.18,
+					duration: MARK_DURATION,
+					stagger: MARK_STAGGER,
 					ease: 'power2.out',
 					scrollTrigger: {
 						trigger: section.querySelector('[data-services-intro]'),

@@ -28,6 +28,14 @@ const CONTACT_LINES = ['Ready?', 'Let’s grow.'];
 // Text the glyph-rain footer is built from in the contact ending
 const CONTACT_MATRIX = 'Let’s grow';
 
+// Portrait pop-in: share of it in view before it plays, and duration
+const PORTRAIT_REVEAL_RATIO = 0.3;
+const PORTRAIT_REVEAL_DURATION = 0.8;
+
+// Call-to-action hover fill
+const HOVER_FILL_END = 111;
+const HOVER_FILL_DURATION = 0.8;
+
 // NOTE • Matches ProjectExperience: the call to action fills over the last
 // 35% of a screen before the outro's bottom reaches the bottom of the view
 const OUTRO_FILL_RANGE = 0.35;
@@ -94,7 +102,7 @@ const ProjectOutro = ({ review, nextProject, cta = 'next' }: ProjectOutroProps) 
 	}, []);
 
 	// Animations
-	// The reviewer's portrait pops in once 30% visible; the call to action fills on hover/focus (desktop only)
+	// The reviewer's portrait pops in once enough of it is visible; the call to action fills on hover/focus (desktop only)
 	useAnimation(
 		({ reduced }) => {
 			const root = ref.current;
@@ -105,21 +113,26 @@ const ProjectOutro = ({ review, nextProject, cta = 'next' }: ProjectOutroProps) 
 			const reveal = gsap.fromTo(
 				portrait,
 				{ scale: 0 },
-				{ scale: 1, duration: 0.8, ease: 'power3.out', paused: true }
+				{ scale: 1, duration: PORTRAIT_REVEAL_DURATION, ease: 'power3.out', paused: true }
 			);
 
 			const observer = new IntersectionObserver(
 				([entry]) => {
-					if (!entry.isIntersecting || entry.intersectionRatio < 0.3) return;
+					if (!entry.isIntersecting || entry.intersectionRatio < PORTRAIT_REVEAL_RATIO) return;
 					reveal.play();
 					observer.disconnect();
 				},
-				{ threshold: 0.3 }
+				{ threshold: PORTRAIT_REVEAL_RATIO }
 			);
 			// Observe the untransformed wrapper so scale zero can still enter view.
 			observer.observe(portrait.parentElement as HTMLElement);
 
-			const hover = gsap.to(next, { '--hover-fill': 111, duration: 0.8, ease: 'power2.inOut', paused: true });
+			const hover = gsap.to(next, {
+				'--hover-fill': HOVER_FILL_END,
+				duration: HOVER_FILL_DURATION,
+				ease: 'power2.inOut',
+				paused: true,
+			});
 			const enter = () => {
 				if (matchMedia(`${mq.up.l} and (hover: hover) and (pointer: fine)`).matches) hover.play();
 			};

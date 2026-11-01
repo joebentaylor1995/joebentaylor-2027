@@ -7,6 +7,7 @@ import { preload } from 'react-dom';
 // The ribbon is a separate document, so Next's route prefetch cannot warm its assets.
 const RIBBON_URL = '/projects-ribbon/index.html';
 const CATALOG_LIFETIME = 60_000;
+const CATALOG_FETCH_TIMEOUT_MS = 10_000;
 
 // State
 // ------------
@@ -28,10 +29,12 @@ export function preloadProjects() {
 	started = true;
 
 	const created = Date.now();
-	const catalog = fetch('/api/projects-ribbon/', { signal: AbortSignal.timeout(10_000) }).then(response => {
-		if (!response.ok) throw new Error('Projects preload unavailable');
-		return response.json() as Promise<unknown>;
-	});
+	const catalog = fetch('/api/projects-ribbon/', { signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS) }).then(
+		response => {
+			if (!response.ok) throw new Error('Projects preload unavailable');
+			return response.json() as Promise<unknown>;
+		}
+	);
 
 	// NOTE • The ribbon page reads the catalog back through this hook while it is still fresh
 	window.getPreloadedProjects = () => (Date.now() - created < CATALOG_LIFETIME ? catalog : undefined);

@@ -34,6 +34,33 @@ type IconName = keyof typeof ICONS;
 
 const RESUME_FILENAME = 'Joe Ben Taylor Resume.pdf';
 
+// Range of the title lines' --tfw-fill and --hover-fill
+const TITLE_FILL_START = -16;
+const TITLE_FILL_END = 111;
+
+// Scroll-in title fill and hover sweep (seconds)
+const TITLE_FILL_DURATION = 1.1;
+const TITLE_FILL_STAGGER = 0.25;
+const HOVER_FILL_DURATION = 0.8;
+const HOVER_FILL_STAGGER = 0.12;
+
+// Copyright timeline start times and digit rise (seconds, %)
+const RULES_START = 0.12;
+const DIGITS_START = 0.3;
+const DIGIT_DURATION = 0.5;
+const DIGIT_RISE_PERCENT = 110;
+
+// Digits on the left of the ©, which the wave radiates out from
+const DIGITS_BEFORE_ICON = 4;
+
+// Share of an element in view before its timeline plays
+const REVEAL_THRESHOLD = 0.2;
+
+// Scroll distance (px) from the panel's end over which --connect-bottom-progress runs
+const BOTTOM_PROGRESS_DISTANCE = 160;
+
+const CLOCK_REFRESH_MS = 30_000;
+
 // Narrows a platform string to one that has icon artwork
 const hasIcon = (platform: string): platform is IconName => platform in ICONS;
 
@@ -91,18 +118,18 @@ const CallToAction = () => {
 			const icon = copyright.querySelector('[data-year-icon]');
 
 			if (reduced) {
-				gsap.set(lines, { '--tfw-fill': 111 });
+				gsap.set(lines, { '--tfw-fill': TITLE_FILL_END });
 				return;
 			}
 
 			// Scroll-in: both timelines start paused and are played by the observer below
 			const fill = gsap.fromTo(
 				lines,
-				{ '--tfw-fill': -16 },
+				{ '--tfw-fill': TITLE_FILL_START },
 				{
-					'--tfw-fill': 111,
-					duration: 1.1,
-					stagger: 0.25,
+					'--tfw-fill': TITLE_FILL_END,
+					duration: TITLE_FILL_DURATION,
+					stagger: TITLE_FILL_STAGGER,
 					ease: 'expo.out',
 					paused: true,
 				}
@@ -120,20 +147,22 @@ const CallToAction = () => {
 					rules,
 					{ scaleX: 0, transformOrigin: i => (i === 0 ? 'right center' : 'left center') },
 					{ scaleX: 1, duration: introDefaults.copyrightLineDuration, ease: 'power3.inOut' },
-					0.12
+					RULES_START
 				);
 
 			// Digits rise in a wave radiating outwards from the © (the digits next to it go first)
 			digits.forEach((digit, index) => {
 				years.fromTo(
 					digit,
-					{ yPercent: 110 },
-					{ yPercent: 0, duration: 0.5, ease: 'power3.out' },
-					0.3 + (index < 4 ? 3 - index : index - 4) * introDefaults.copyrightDigitStagger
+					{ yPercent: DIGIT_RISE_PERCENT },
+					{ yPercent: 0, duration: DIGIT_DURATION, ease: 'power3.out' },
+					DIGITS_START +
+						(index < DIGITS_BEFORE_ICON ? DIGITS_BEFORE_ICON - 1 - index : index - DIGITS_BEFORE_ICON) *
+							introDefaults.copyrightDigitStagger
 				);
 			});
 
-			// Play each timeline once, the first time its element is 20% visible in the profile panel
+			// Play each timeline once, the first time its element is in view in the profile panel
 			const observer = new IntersectionObserver(
 				entries => {
 					for (const entry of entries) {
@@ -142,16 +171,16 @@ const CallToAction = () => {
 						observer.unobserve(entry.target);
 					}
 				},
-				{ root: section.closest('#profile-panel'), threshold: 0.2 }
+				{ root: section.closest('#profile-panel'), threshold: REVEAL_THRESHOLD }
 			);
 			observer.observe(title);
 			observer.observe(copyright);
 
 			// Hover: a second fill sweeps over the title lines (mouse and keyboard focus only, not touch)
 			const hoverWave = gsap.to(lines, {
-				'--hover-fill': 111,
-				duration: 0.8,
-				stagger: 0.12,
+				'--hover-fill': TITLE_FILL_END,
+				duration: HOVER_FILL_DURATION,
+				stagger: HOVER_FILL_STAGGER,
 				ease: 'power2.inOut',
 				paused: true,
 			});
@@ -192,7 +221,7 @@ const CallToAction = () => {
 
 		const update = () => {
 			const remaining = panel.scrollHeight - panel.clientHeight - panel.scrollTop;
-			const progress = Math.max(0, Math.min(1, 1 - remaining / 160));
+			const progress = Math.max(0, Math.min(1, 1 - remaining / BOTTOM_PROGRESS_DISTANCE));
 			section.style.setProperty('--connect-bottom-progress', String(progress));
 		};
 
@@ -209,7 +238,7 @@ const CallToAction = () => {
 		};
 	}, [present]);
 
-	// London time and year, refreshed every 30 seconds
+	// London time and year, refreshed periodically
 	useEffect(() => {
 		if (!present) return;
 
@@ -226,7 +255,7 @@ const CallToAction = () => {
 		};
 
 		update();
-		const timer = setInterval(update, 30_000);
+		const timer = setInterval(update, CLOCK_REFRESH_MS);
 		return () => clearInterval(timer);
 	}, [present]);
 
