@@ -767,13 +767,8 @@ class ProjectGrid {
 	}
 
 	// Returns { index, project, col, row } for the tile under (x, y) in viewport px, or null for a gap or
-	// before the grid has fully opened. An optional `mapPointer` hook remaps the coordinates first.
+	// before the grid has fully opened.
 	hitTest(x, y) {
-		if (this.mapPointer) {
-			const point = this.mapPointer(x, y);
-			x = point.x;
-			y = point.y;
-		}
 		if (this.mix < 0.96 || !this.target || !this.projects.length) return null;
 		const p = this.inversePoint(x, y),
 			d = this.dimensions(),
@@ -811,11 +806,13 @@ class ProjectGrid {
 	// so the first switch to All projects doesn't decode and upload every tile in a single frame. Video tiles
 	// are skipped so their loops aren't all downloaded up front.
 	prewarm() {
+		const PREWARM_IDLE_TIMEOUT_MS = 1000,
+			PREWARM_POLL_MS = 50;
 		if (this.prewarming) return;
 		this.prewarming = true;
 		const idle = window.requestIdleCallback
-			? callback => window.requestIdleCallback(callback, { timeout: 1000 })
-			: callback => setTimeout(callback, 50);
+			? callback => window.requestIdleCallback(callback, { timeout: PREWARM_IDLE_TIMEOUT_MS })
+			: callback => setTimeout(callback, PREWARM_POLL_MS);
 		let index = this.featured.length;
 		const next = () => {
 			while (index < this.projects.length) {
@@ -827,7 +824,7 @@ class ProjectGrid {
 					settled = () => {
 						if (!entry || entry.texture || entry.failed || this.cache.get(project.poster) !== entry)
 							idle(next);
-						else setTimeout(settled, 50);
+						else setTimeout(settled, PREWARM_POLL_MS);
 					};
 				settled();
 				return;

@@ -7,6 +7,10 @@
 
 // Keep the saved manual tilt separate from the animated presentation angle.
 class MouseTilt {
+	static EASE_RATE = 10;
+	// Degrees from the goal at which the rotation snaps to it.
+	static SETTLE_DEGREES = 0.001;
+
 	constructor(rotation) {
 		this.rotation = rotation;
 		// Pointer height as 0 (top) to 1 (bottom); 0.5 is neutral.
@@ -24,9 +28,9 @@ class MouseTilt {
 		// Independent limits retain a neutral centre even with asymmetric angles.
 		const goal = enabled ? (y < 0.5 ? min * (1 - y * 2) : max * (y * 2 - 1)) : manual;
 
-		// Frame-rate independent exponential ease: the gap closes by 1 - e^(-10 dt) each frame.
-		this.rotation += (goal - this.rotation) * (reduced ? 1 : 1 - Math.exp(-dt * 10));
-		this.moving = Math.abs(goal - this.rotation) > 0.001;
+		// Frame-rate independent exponential ease: the gap closes by 1 - e^(-rate dt) each frame.
+		this.rotation += (goal - this.rotation) * (reduced ? 1 : 1 - Math.exp(-dt * MouseTilt.EASE_RATE));
+		this.moving = Math.abs(goal - this.rotation) > MouseTilt.SETTLE_DEGREES;
 
 		// Snap the last sliver so the render loop can settle.
 		if (!this.moving) this.rotation = goal;

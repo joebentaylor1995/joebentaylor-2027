@@ -8,6 +8,14 @@
 // `#intro-replay`, and persists the user's tweaks to localStorage under `ribbon-introduction`.
 
 class RibbonIntroduction {
+	static STORAGE_KEY = 'ribbon-introduction';
+	// Only stored settings of this version restore the duration and intensity.
+	static SETTINGS_VERSION = 2;
+	// The cascade effect, the extra stagger steps it adds to the length, and the flat fade used for reduced motion.
+	static CASCADE_EFFECT = 9;
+	static CASCADE_STAGGER_STEPS = 4;
+	static REDUCED_FADE_MS = 250;
+
 	// `requestFrame` asks app.js for a render; `prepare` runs at the start of each `play()`.
 	constructor(requestFrame, prepare) {
 		this.requestFrame = requestFrame;
@@ -21,8 +29,8 @@ class RibbonIntroduction {
 		// Defaults. `duration` is seconds; `intensity` and `transitionStart` are percentages;
 		// `cascadeStagger` is milliseconds between slides.
 		this.settings = {
-			version: 2,
-			effect: 9,
+			version: RibbonIntroduction.SETTINGS_VERSION,
+			effect: RibbonIntroduction.CASCADE_EFFECT,
 			duration: 1.1,
 			intensity: 90,
 			cascadeEase: 1,
@@ -32,15 +40,14 @@ class RibbonIntroduction {
 
 		// Restore saved duration and intensity, clamped to the slider limits.
 		// Ignored unless the stored settings carry the current version.
-		try {
-			const saved = JSON.parse(localStorage.getItem('ribbon-introduction') || '{}');
-			if (saved.version === 2)
+		this.restoreSaved(saved => {
+			if (saved.version === RibbonIntroduction.SETTINGS_VERSION)
 				for (const [key, min, max] of [
 					['duration', 0.4, 3],
 					['intensity', 25, 150],
 				])
 					if (Number.isFinite(saved[key])) this.settings[key] = Math.min(max, Math.max(min, saved[key]));
-		} catch {}
+		});
 
 		// Cascade controls are injected here rather than written in index.html.
 		const cascade = document.createElement('div');
@@ -62,8 +69,7 @@ class RibbonIntroduction {
 		document.querySelector('#intro-replay').before(cascade);
 
 		// Restore the cascade settings, clamped to 0..max (the easing is a whole-number option index).
-		try {
-			const saved = JSON.parse(localStorage.getItem('ribbon-introduction') || '{}');
+		this.restoreSaved(saved => {
 			for (const [key, max] of [
 				['cascadeEase', 4],
 				['cascadeStagger', 200],
@@ -74,7 +80,7 @@ class RibbonIntroduction {
 						0,
 						Math.min(max, key === 'cascadeEase' ? Math.round(saved[key]) : saved[key])
 					);
-		} catch {}
+		});
 
 		// Bind each control: edits save as you drag, and releasing the control replays the intro.
 		for (const key of ['duration', 'intensity', 'cascadeEase', 'cascadeStagger', 'transitionStart']) {
@@ -84,7 +90,7 @@ class RibbonIntroduction {
 				this.settings[key] = +input.value;
 				this.sync();
 				try {
-					localStorage.setItem('ribbon-introduction', JSON.stringify(this.settings));
+					localStorage.setItem(RibbonIntroduction.STORAGE_KEY, JSON.stringify(this.settings));
 				} catch {}
 			});
 			input.addEventListener('change', () => this.play());
@@ -92,6 +98,13 @@ class RibbonIntroduction {
 
 		document.querySelector('#intro-replay').onclick = () => this.play();
 		this.sync();
+	}
+
+	// Hands `apply` the stored settings. Missing, corrupt or blocked storage leaves the defaults as they are.
+	restoreSaved(apply) {
+		try {
+			apply(JSON.parse(localStorage.getItem(RibbonIntroduction.STORAGE_KEY) || '{}'));
+		} catch {}
 	}
 
 	// Refreshes the value read-outs beside the sliders.
@@ -160,17 +173,19 @@ class RibbonIntroduction {
 			this.waitForPage = false;
 		}
 
-		// Elapsed time over total length. Reduced motion is a flat 250 ms fade; otherwise the
-		// duration plus, for the cascade effect (9), 4 x the stagger in ms.
+		// Elapsed time over total length: the duration plus, for the cascade effect, the stagger steps in ms.
+		const { CASCADE_EFFECT, CASCADE_STAGGER_STEPS, REDUCED_FADE_MS } = RibbonIntroduction;
 		this.progress = Math.max(
 			0,
 			Math.min(
 				1,
 				(time - this.start) /
 					(reduced
-						? 250
+						? REDUCED_FADE_MS
 						: this.settings.duration * 1000 +
-							(this.settings.effect === 9 ? 4 * this.settings.cascadeStagger : 0))
+							(this.settings.effect === CASCADE_EFFECT
+								? CASCADE_STAGGER_STEPS * this.settings.cascadeStagger
+								: 0))
 			)
 		);
 

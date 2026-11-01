@@ -82,6 +82,34 @@ const projectCover = (imageAspect, boxAspect) => [
 	Math.min(1, imageAspect / boxAspect),
 ];
 
+// Ribbon geometry
+// ------------
+// One copy for the CPU, shared by projectSurface below and pickFeatured in app.js. The ribbon's vertex shader in app.js
+// (surface() and bandOffset) keeps its own copy because GLSL can't call JS, so change the two together.
+// The shader's focal factor, and how far apart stacked bands sit in half-heights (2, plus a small gap).
+const RIBBON_FOCAL = 0.77,
+	RIBBON_BAND_SPACING = 2.08;
+// Angle of one slide.
+function ribbonPitch(vertical) {
+	return vertical ? Math.PI / 4.8 : Math.PI / 3;
+}
+// Cylinder radius for a 0..100 curve setting: 14 down to 3.6.
+function ribbonRadius(curve) {
+	return 14 - (10.4 * curve) / 100;
+}
+// Viewing distance for a 0..100 distance setting: 2.5 up to 7.
+function ribbonDistance(distance) {
+	return 2.5 + (4.5 * distance) / 100;
+}
+// Half the strip's height, which keeps slides upright 16:10: arc width when horizontal, arc height when vertical.
+function ribbonHalfHeight(radius, pitch, vertical) {
+	return radius * pitch * (vertical ? 0.8 : 0.3125);
+}
+// Distance of a stacked band's centre line from the main strip's (band is -1, 0 or 1).
+function ribbonBandOffset(band, halfHeight) {
+	return band * halfHeight * RIBBON_BAND_SPACING;
+}
+
 // Source surface
 // ------------
 // Snapshot the selected surface in homogeneous coordinates, preserving perspective.
@@ -97,10 +125,9 @@ function projectSurface(u, v, source, view, width, height) {
 		const lens = 1 + bend * (x * x + 0.4 * y * y);
 		return [x * lens, y * lens, 1];
 	}
-	// Same constants as the ribbon shader: angle per slide, cylinder radius and viewing distance.
-	const pitch = view.vertical ? Math.PI / 4.8 : Math.PI / 3,
-		radius = 14 - (10.4 * view.curve) / 100,
-		distance = 2.5 + (4.5 * view.distance) / 100;
+	const pitch = ribbonPitch(view.vertical),
+		radius = ribbonRadius(view.curve),
+		distance = ribbonDistance(view.distance);
 	// Angle around the cylinder, relative to the slide at the current scroll offset.
 	const angle = (source.slide + (view.vertical ? 1 - v : u) - source.offset - 0.5) * pitch;
 	const acrossHeight = view.vertical ? 2 * u - 1 : 1 - 2 * v;
@@ -111,23 +138,23 @@ function projectSurface(u, v, source, view, width, height) {
 		view.twist *
 		smooth(0.62, 0.62 + view.spread / 100, Math.abs(angle) / pitch) *
 		(1 - smooth(2.5, Math.PI, Math.abs(angle)));
-	const half = radius * pitch * (view.vertical ? 0.8 : 0.3125),
+	const half = ribbonHalfHeight(radius, pitch, view.vertical),
 		across = acrossHeight * half,
 		radial = radius + across * Math.sin(twist);
 	let x = radial * Math.sin(angle),
 		y = across * Math.cos(twist);
-	// Vertical mode swaps the axes; stacked bands sit 2.08 half-heights away.
+	// Vertical mode swaps the axes, so stacked bands move along x instead of y.
 	if (view.vertical) [x, y] = [y, x];
-	if (view.vertical) x += source.band * half * 2.08;
-	else y += source.band * half * 2.08;
-	// Head tilt and scale, then the shader's .77 focal factor with the aspect correction; the last entry is depth.
+	if (view.vertical) x += ribbonBandOffset(source.band, half);
+	else y += ribbonBandOffset(source.band, half);
+	// Head tilt and scale, then the focal factor with the aspect correction; the last entry is depth.
 	const a = (view.rotation * Math.PI) / 180,
 		c = Math.cos(a),
 		s = Math.sin(a),
 		scale = view.scale / 100;
 	return [
-		((c * x - s * y) * scale) / ((0.77 * width) / height),
-		((s * x + c * y) * scale) / 0.77,
+		((c * x - s * y) * scale) / ((RIBBON_FOCAL * width) / height),
+		((s * x + c * y) * scale) / RIBBON_FOCAL,
 		distance - radius + radial * Math.cos(angle),
 	];
 }
@@ -136,6 +163,24 @@ function projectSurface(u, v, source, view, width, height) {
 // State flags: `pending` (queued by open, consumed by begin), `loading` (open in progress), `active` (flight or case-study page
 // on screen), `returning` (reverse flight or fade), `settled` (flight finished).
 class ProjectTransition {
+	// How long the host gets to prepare its page, and the idle-slot timings for the hero prefetch.
+	static PREPARE_TIMEOUT_MS = 15000;
+	static PREFETCH_IDLE_TIMEOUT_MS = 1500;
+	static PREFETCH_IDLE_FALLBACK_MS = 120;
+	// Flight length under reduced motion, then the pause before a finished flight hands over.
+	static REDUCED_FLIGHT_MS = 200;
+	static PREVIEW_HOLD_MS = 400;
+	static HANDOFF_DELAY_MS = 100;
+	// The cover used by the fade fallback.
+	static FADE_IN_MS = 260;
+	static FADE_OUT_MS = 380;
+	static REDUCED_FADE_MS = 100;
+	// Page content fades in over the last 35% of the eased flight.
+	static CONTENT_FADE_START = 0.65;
+	static CONTENT_FADE_SPAN = 0.35;
+	// Ribbon slides and grid tiles are 16:10.
+	static SLIDE_ASPECT = 1.6;
+
 	constructor(gl) {
 		this.gl = gl;
 		this.pending = null;
@@ -232,8 +277,8 @@ class ProjectTransition {
 	// Host integration: once the ribbon is ready, fetch each featured case study's hero details in idle slots and hand them to the host, which warms the exact hero image variant its page uses — so a tap starts the transition without waiting on the network
 	prefetch(projects) {
 		const idle = window.requestIdleCallback
-			? callback => window.requestIdleCallback(callback, { timeout: 1500 })
-			: callback => setTimeout(callback, 120);
+			? callback => window.requestIdleCallback(callback, { timeout: ProjectTransition.PREFETCH_IDLE_TIMEOUT_MS })
+			: callback => setTimeout(callback, ProjectTransition.PREFETCH_IDLE_FALLBACK_MS);
 		idle(() => this.warm());
 		if (window.parent === window) return;
 		const queue = projects.filter(
@@ -329,7 +374,7 @@ class ProjectTransition {
 					const timeout = setTimeout(() => {
 						cleanup();
 						reject(Error('Project preparation timed out'));
-					}, 15000);
+					}, ProjectTransition.PREPARE_TIMEOUT_MS);
 					const cleanup = () => {
 						clearTimeout(timeout);
 						window.removeEventListener('message', listener);
@@ -434,10 +479,8 @@ class ProjectTransition {
 				},
 			};
 		} else {
-			// Same band and shift formula as drawFeaturedRibbons and pickFeatured.
-			const band = hit?.band || 0,
-				shift = Math.max(1, Math.floor((count * (band === 1 ? 1 : 2)) / 3));
-			const offset = band ? mod(-position + count - 1 - shift + 0.5, count) : mod(position, count);
+			const band = hit?.band || 0;
+			const offset = band ? ribbonBandScroll(ribbonBandShift(band)) : mod(position, count);
 			const slide = hit?.slide ?? Math.floor(offset + 0.5);
 			source = { band, offset, slide };
 		}
@@ -671,19 +714,33 @@ class ProjectTransition {
 		if (!this.program || (this.settled && !this.returning)) return;
 		if (this.start === null) this.start = time;
 		const fill = this.fill,
-			duration = reduced ? 200 : this.returning ? fill.returnDuration : fill.duration;
+			duration = reduced
+				? ProjectTransition.REDUCED_FLIGHT_MS
+				: this.returning
+					? fill.returnDuration
+					: fill.duration;
 		const holding = this.scrubbing != null && !this.returning;
 		this.progress = holding ? this.scrubbing : Math.min(1, (time - this.start) / duration);
 		const flight = this.returning ? this.returnFrom * (1 - projectEase(this.progress)) : this.progress,
-			t = fill.ease(flight),
-			gl = this.gl,
-			u = this.uniforms;
+			t = fill.ease(flight);
 		this.meshProgress = flight;
-		// The page content fades in over the last 35% of the eased flight.
+		const { CONTENT_FADE_START, CONTENT_FADE_SPAN } = ProjectTransition;
 		this.page.style.setProperty(
 			'--project-content',
-			String(projectEase(Math.max(0, Math.min(1, (t - 0.65) / 0.35))))
+			String(projectEase(Math.max(0, Math.min(1, (t - CONTENT_FADE_START) / CONTENT_FADE_SPAN))))
 		);
+		this.prepareFrame();
+		this.drawBackdrop();
+		this.drawSheet(fill, flight, t);
+		// Scrubbing holds a fixed frame.
+		if (holding) return;
+		this.advanceFlight();
+	}
+	// Sizes the canvas and resets the GL state, mesh and hero texture that both passes of the frame share.
+	// Unlike the ribbon's resizeCanvas, this ignores exportPixelRatio and always sets the viewport.
+	prepareFrame() {
+		const gl = this.gl,
+			u = this.uniforms;
 		const dpr = Math.min(devicePixelRatio || 1, mobile ? 1.5 : 2),
 			width = Math.round(innerWidth * dpr),
 			height = Math.round(innerHeight * dpr);
@@ -713,11 +770,31 @@ class ProjectTransition {
 		gl.activeTexture(gl.TEXTURE1);
 		gl.bindTexture(gl.TEXTURE_2D, this.destination);
 		gl.activeTexture(gl.TEXTURE0);
+	}
+	// First pass: the captured ribbon frame, flat and full screen.
+	drawBackdrop() {
+		const gl = this.gl,
+			u = this.uniforms;
 		gl.uniform1f(u.Background, 1);
 		gl.uniform1f(u.Opacity, 1);
 		gl.bindTexture(gl.TEXTURE_2D, this.background);
 		gl.drawElements(gl.TRIANGLES, this.vertexCount, gl.UNSIGNED_SHORT, 0);
+	}
+	// Second pass: the flying sheet, depth tested so its lead stays on top of the edges still waiting on the ribbon.
+	drawSheet(fill, flight, t) {
+		const gl = this.gl;
 		gl.enable(gl.DEPTH_TEST);
+		this.setFlightUniforms(fill, flight);
+		this.setCropUniforms(t);
+		gl.bindTexture(gl.TEXTURE_2D, this.sourceTexture);
+		gl.drawElements(gl.TRIANGLES, this.vertexCount, gl.UNSIGNED_SHORT, 0);
+		gl.disable(gl.DEPTH_TEST);
+		gl.disable(gl.BLEND);
+	}
+	// The vertex shader's stagger, easing and ripple. Reduced motion drops the stagger and the billow.
+	setFlightUniforms(fill, flight) {
+		const gl = this.gl,
+			u = this.uniforms;
 		gl.uniform1f(u.Background, 0);
 		gl.uniform1f(u.Opacity, 1);
 		gl.uniform1f(u.Progress, flight);
@@ -734,59 +811,61 @@ class ProjectTransition {
 		gl.uniform1f(u.Motion, reduced ? 0 : 1);
 		gl.uniform2f(u.Wave, (2 * wave) / innerWidth, (2 * wave) / innerHeight);
 		gl.uniform4fv(u.Atlas, this.sourceAtlas);
-		// The visible box grows from the source slide (16:10, hence 1.6) to the full viewport as `t` rises. Both the slide
-		// and the hero are cropped to cover it, and the hero moves towards its height and top offset on the host page.
-		const cropProgress = t,
-			boxHeight = this.sourceHeight + (innerHeight - this.sourceHeight) * cropProgress,
-			boxWidth = this.sourceHeight * 1.6 + (innerWidth - this.sourceHeight * 1.6) * cropProgress,
+	}
+	// The visible box grows from the source slide to the full viewport as `t` rises. Both the slide and the hero are
+	// cropped to cover it, and the hero moves towards its height and top offset on the host page.
+	setCropUniforms(t) {
+		const gl = this.gl,
+			u = this.uniforms,
+			slideWidth = this.sourceHeight * ProjectTransition.SLIDE_ASPECT;
+		const boxHeight = this.sourceHeight + (innerHeight - this.sourceHeight) * t,
+			boxWidth = slideWidth + (innerWidth - slideWidth) * t,
 			aspect = boxWidth / boxHeight;
-		gl.uniform2fv(u.SourceCrop, projectCover(1.6, aspect));
+		gl.uniform2fv(u.SourceCrop, projectCover(ProjectTransition.SLIDE_ASPECT, aspect));
 		const heroHeight = boxHeight + ((this.heroHeight || innerHeight) - innerHeight) * t;
 		gl.uniform2fv(u.Crop, projectCover(this.image.width / this.image.height, boxWidth / heroHeight));
 		gl.uniform1f(u.HeroViewport, boxHeight / heroHeight);
 		gl.uniform1f(u.HeroOffset, (-(this.heroTop || 0) * t) / heroHeight);
-		gl.bindTexture(gl.TEXTURE_2D, this.sourceTexture);
-		gl.drawElements(gl.TRIANGLES, this.vertexCount, gl.UNSIGNED_SHORT, 0);
-		gl.disable(gl.DEPTH_TEST);
-		gl.disable(gl.BLEND);
-		// Scrubbing holds a fixed frame.
-		if (holding) return;
-		// Keep flying; when a return finishes, restore the page. When a flight finishes, settle: a preview flies back after 400 ms,
-		// an embedded page tells the host to open the real case study after 100 ms, and standalone reveals its own page.
+	}
+	// Keeps flying, restores the page when a return finishes, or settles when a flight finishes.
+	advanceFlight() {
 		if (this.progress < 1) requestRender();
 		else if (this.returning) {
 			this.close();
 			this.cancelReturn();
-		} else {
-			this.settled = true;
-			if (this.previewing) {
-				const serial = this.serial;
-				this.handoffTimer = setTimeout(() => {
-					if (serial === this.serial && this.active && !this.returning) this.returnToGallery();
-				}, 400);
-				return;
-			}
-			if (this.embedded) {
-				const serial = this.serial;
-				this.handoffTimer = setTimeout(() => {
-					if (serial !== this.serial || !this.active || this.returning) return;
-					window.parent.postMessage(
-						{
-							type: 'projects:open',
-							href: this.href,
-							hero: this.image.src,
-							heroHeight: this.heroHeight,
-							heroTop: this.heroTop,
-							completed: true,
-						},
-						location.origin
-					);
-				}, 100);
-				return;
-			}
-			document.body.classList.add('project-arrived');
-			this.page.querySelector('button').focus({ preventScroll: true });
+		} else this.settle();
+	}
+	// The flight has landed: a preview flies back, an embedded page tells the host to open the real case study, and
+	// standalone reveals its own page.
+	settle() {
+		this.settled = true;
+		if (this.previewing) {
+			const serial = this.serial;
+			this.handoffTimer = setTimeout(() => {
+				if (serial === this.serial && this.active && !this.returning) this.returnToGallery();
+			}, ProjectTransition.PREVIEW_HOLD_MS);
+			return;
 		}
+		if (this.embedded) {
+			const serial = this.serial;
+			this.handoffTimer = setTimeout(() => {
+				if (serial !== this.serial || !this.active || this.returning) return;
+				window.parent.postMessage(
+					{
+						type: 'projects:open',
+						href: this.href,
+						hero: this.image.src,
+						heroHeight: this.heroHeight,
+						heroTop: this.heroTop,
+						completed: true,
+					},
+					location.origin
+				);
+			}, ProjectTransition.HANDOFF_DELAY_MS);
+			return;
+		}
+		document.body.classList.add('project-arrived');
+		this.page.querySelector('button').focus({ preventScroll: true });
 	}
 	// Releases this flight's GL textures, buffers and program.
 	dispose() {
@@ -859,7 +938,7 @@ class ProjectTransition {
 		this.fade.hidden = false;
 		try {
 			this.fadeAnimation = this.fade.animate([{ opacity: 0 }, { opacity: 1 }], {
-				duration: reduced ? 100 : 260,
+				duration: reduced ? ProjectTransition.REDUCED_FADE_MS : ProjectTransition.FADE_IN_MS,
 				easing: 'ease-in-out',
 				fill: 'forwards',
 			});
@@ -871,7 +950,7 @@ class ProjectTransition {
 			if (serial !== this.fadeSerial) return;
 			this.fadeAnimation.cancel();
 			this.fadeAnimation = this.fade.animate([{ opacity: 1 }, { opacity: 0 }], {
-				duration: reduced ? 100 : 380,
+				duration: reduced ? ProjectTransition.REDUCED_FADE_MS : ProjectTransition.FADE_OUT_MS,
 				easing: 'ease-out',
 				fill: 'forwards',
 			});

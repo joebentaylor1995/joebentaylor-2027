@@ -7,6 +7,17 @@
 // `wake` is the callback that restarts the render loop.
 
 class IdleMotion {
+	// How long the ribbon must be left alone before it drifts. The wake timer fires just after, so the frame it asks
+	// for is past the grace period.
+	static GRACE_MS = 3000;
+	static WAKE_MARGIN_MS = 10;
+	// Constant drift speeds in scroll units per second (slides for the ribbon, pixels for the grid).
+	static FEATURED_DRIFT = 0.08;
+	static GRID_DRIFT = 3;
+	// Once idle ends, the drift decays exponentially at this rate per second and snaps to zero below the floor.
+	static DECAY_RATE = 6;
+	static STOP_SPEED = 0.002;
+
 	constructor(wake) {
 		this.wake = wake;
 		// Current drift speed in scroll units per second.
@@ -18,12 +29,12 @@ class IdleMotion {
 	}
 
 	// Records user input and re-arms the timer that calls `wake` once the idle delay
-	// (3 s plus a 10 ms margin) has passed. No timer is set for hidden tabs or reduced motion.
+	// has passed. No timer is set for hidden tabs or reduced motion.
 	activity(wake = true) {
 		this.lastActivity = performance.now();
 		clearTimeout(this.timer);
 		if (!document.hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches)
-			this.timer = setTimeout(() => this.wake(), 3010);
+			this.timer = setTimeout(() => this.wake(), IdleMotion.GRACE_MS + IdleMotion.WAKE_MARGIN_MS);
 		if (wake) this.wake();
 	}
 
@@ -36,7 +47,7 @@ class IdleMotion {
 	// Host integration: arriving on the page counts as already idle, so the ribbon is drifting when it appears
 	drift() {
 		this.speed = 0;
-		this.lastActivity = performance.now() - 3000;
+		this.lastActivity = performance.now() - IdleMotion.GRACE_MS;
 		clearTimeout(this.timer);
 		this.wake();
 	}
@@ -55,17 +66,16 @@ class IdleMotion {
 			this.reset(false);
 		}
 
-		// Seconds spent idle beyond the 3 s grace period.
-		const idle = Math.max(0, (time - this.lastActivity - 3000) / 1000);
+		// Seconds spent idle beyond the grace period.
+		const idle = Math.max(0, (time - this.lastActivity - IdleMotion.GRACE_MS) / 1000);
 
 		// Constant drift: leaving the page alone must never build up scroll speed.
-		const desired = idle > 0 ? (mode === 'featured' ? 0.08 : 3) : 0;
+		const desired = idle > 0 ? (mode === 'featured' ? IdleMotion.FEATURED_DRIFT : IdleMotion.GRID_DRIFT) : 0;
 		const before = this.speed;
 
-		// Drift jumps straight to the desired speed; once idle ends it decays exponentially
-		// (rate 6 per second) and snaps to zero below 0.002.
-		this.speed = desired > 0 ? desired : this.speed * Math.exp(-dt * 6);
-		if (desired === 0 && this.speed < 0.002) this.speed = 0;
+		// Drift jumps straight to the desired speed, then decays once idle ends.
+		this.speed = desired > 0 ? desired : this.speed * Math.exp(-dt * IdleMotion.DECAY_RATE);
+		if (desired === 0 && this.speed < IdleMotion.STOP_SPEED) this.speed = 0;
 
 		return { delta: this.speed * dt, moving: idle > 0 || this.speed > 0, stopped: before > 0 && this.speed === 0 };
 	}

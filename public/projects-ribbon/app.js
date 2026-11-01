@@ -572,11 +572,11 @@ window.addEventListener('keydown', e => {
 		}
 	}
 	if (gridView?.isActive()) {
-		const step = 150;
-		if (e.key === 'ArrowLeft') gridView.goal.x += step;
-		else if (e.key === 'ArrowRight') gridView.goal.x -= step;
-		else if (e.key === 'ArrowUp') gridView.goal.y += step;
-		else if (e.key === 'ArrowDown') gridView.goal.y -= step;
+		const GRID_KEY_STEP_PX = 150;
+		if (e.key === 'ArrowLeft') gridView.goal.x += GRID_KEY_STEP_PX;
+		else if (e.key === 'ArrowRight') gridView.goal.x -= GRID_KEY_STEP_PX;
+		else if (e.key === 'ArrowUp') gridView.goal.y += GRID_KEY_STEP_PX;
+		else if (e.key === 'ArrowDown') gridView.goal.y -= GRID_KEY_STEP_PX;
 		else return;
 		e.preventDefault();
 		requestRender();
@@ -591,15 +591,16 @@ window.addEventListener('keydown', e => {
 		move(e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1);
 	}
 });
-// With Snap on, rounds `target` to a whole slide 160 ms after scrolling stops.
+// With Snap on, rounds `target` to a whole slide shortly after scrolling stops.
 function scheduleSnap() {
+	const SNAP_DELAY_MS = 160;
 	clearTimeout(snapTimer);
 	if (projectTransition.loading || projectTransition.active) return;
 	if (document.querySelector('#snap').checked)
 		snapTimer = setTimeout(() => {
 			target = Math.round(target);
 			requestRender();
-		}, 160);
+		}, SNAP_DELAY_MS);
 }
 // Wheel: delta is normalised from lines (x16) or pages (x viewport height) to pixels, clamped to +-250 and
 // converted to slides at 0.0025 per pixel, scaled by the speed setting.
@@ -752,43 +753,42 @@ function refreshFeaturedTooltip() {
 	if (!project)
 		canvas.setAttribute('aria-label', 'Featured projects. Scroll, drag, or use the arrow keys to explore.');
 }
-// Hit-test for the featured ribbon: the CPU mirror of the vertex shader's `surface()`. Returns the project
-// under a client position plus `ribbonHit` ({ band, slide }), or null.
-// 1. Map the pixel to view space: NDC scaled by the shader's .77 focal factor and aspect, divided by scale.
+// Hit-test for the featured ribbon: the CPU mirror of the vertex shader's `surface()`, sharing the geometry helpers in
+// project-transition.js. Returns the project under a client position plus `ribbonHit` ({ band, slide }), or null.
+// 1. Map the pixel to view space: NDC scaled by the shader's focal factor and aspect, divided by scale.
 // 2. Undo the head tilt, and swap axes in vertical mode.
 // 3. Intersect the pointer ray with the cylinder (a quadratic in `t`; `A` is its leading coefficient).
-// 4. `pitch` is the angle of one slide (PI/3, or PI/4.8 vertical). Past the strip's half height only a stacked
-//    band can be hit (bands sit 2.08 half-heights away, as in the shader).
+// 4. `pitch` is the angle of one slide. Past the strip's half height only a stacked band can be hit.
 // 5. The hit angle divided by `pitch` gives a slide; `shift` picks the same image as drawFeaturedRibbons.
 function pickFeatured(clientX, clientY) {
 	const shaped = featuredView();
-	const x = ((((((clientX / innerWidth) * 2 - 1) * innerWidth) / innerHeight) * 0.77) / shaped.scale) * 100,
-		y = (((1 - (clientY / innerHeight) * 2) * 0.77) / shaped.scale) * 100,
+	const x = ((((((clientX / innerWidth) * 2 - 1) * innerWidth) / innerHeight) * RIBBON_FOCAL) / shaped.scale) * 100,
+		y = (((1 - (clientY / innerHeight) * 2) * RIBBON_FOCAL) / shaped.scale) * 100,
 		a = (shaped.rotation * Math.PI) / 180;
 	const unrolledX = Math.cos(a) * x + Math.sin(a) * y,
 		unrolledY = -Math.sin(a) * x + Math.cos(a) * y;
 	const rx = state.vertical ? unrolledY : unrolledX,
 		ry = state.vertical ? unrolledX : unrolledY;
-	const pitch = state.vertical ? Math.PI / 4.8 : Math.PI / 3;
-	const radius = 14 - (10.4 * shaped.curve) / 100,
-		distance = 2.5 + (4.5 * state.distance) / 100,
+	const pitch = ribbonPitch(state.vertical);
+	const radius = ribbonRadius(shaped.curve),
+		distance = ribbonDistance(state.distance),
 		z = radius - distance,
 		A = rx * rx + 1;
 	const t = (-z + Math.sqrt(z * z + A * (radius * radius - z * z))) / A;
-	const halfHeight = radius * pitch * (state.vertical ? 0.8 : 1 / 3.2),
+	const halfHeight = ribbonHalfHeight(radius, pitch, state.vertical),
 		vertical = t * ry;
 	let band = 0;
 	if (Math.abs(vertical) > halfHeight) {
 		if (!state.stacked) return null;
 		band = Math.sign(vertical);
-		if (Math.abs(vertical - band * halfHeight * 2.08) > halfHeight) return null;
+		if (Math.abs(vertical - ribbonBandOffset(band, halfHeight)) > halfHeight) return null;
 	}
 	const angle = Math.atan2(t * rx, z + t),
-		shift = Math.max(1, Math.floor((count * (band === 1 ? 1 : 2)) / 3));
+		shift = ribbonBandShift(band);
 	const index = band
 		? mod(count - 1 - Math.floor(angle / pitch - position + count - 1 - shift + 1.0), count)
 		: mod(Math.floor(angle / pitch + position + 0.5), count);
-	const offset = band ? mod(-position + count - 1 - shift + 0.5, count) : mod(position, count);
+	const offset = band ? ribbonBandScroll(shift) : mod(position, count);
 	return {
 		...(featured[index] || { name: names[index], index }),
 		ribbonHit: { band, slide: Math.floor(angle / pitch + offset + 0.5) },
@@ -952,6 +952,7 @@ function setup() {
 				varying vec2 vUV;
 				varying float vLight;
 				// Point on the ribbon for an angle around the cylinder (-PI..PI) and height (-1..1), in view space.
+				// JS twin: projectSurface and the ribbon helpers in project-transition.js. Keep the numbers in step.
 				vec3 surface(float angle, float height) {
 					// Curvature shrinks the radius from 14 to 3.6; the viewing distance runs from 2.5 to 7.
 					float radius = mix(14.0, 3.6, uCurve);
@@ -980,7 +981,7 @@ function setup() {
 					float eased = 1.0 - pow(1.0 - uReveal, 3.0);
 					float remaining = 1.0 - eased;
 					vec3 p = surface(angle, aPosition.y);
-					// Stacked bands sit one band height away (the 2.08 includes a small gap).
+					// Stacked bands sit one band height away (the 2.08 includes a small gap). JS twin: ribbonBandOffset.
 					float bandOffset = uBand * mix(14.0, 3.6, uCurve) * mix(1.0471975512 * .3125, .6544984695 * .8, uVertical) * 2.08;
 					if (uVertical > .5)p.x += bandOffset;
 					else p.y += bandOffset;
@@ -1154,8 +1155,16 @@ function featuredBlur(velocity, threshold, strength) {
 	const excess = Math.max(0, Math.abs(velocity) - threshold / 10);
 	return (Math.min(0.75, (0.045 * excess * excess) / (excess + 1)) * strength) / 100;
 }
+// How many slides a band's images are shifted from the main strip, so stacked bands don't line up with it.
+function ribbonBandShift(band) {
+	return Math.max(1, Math.floor((count * (band === 1 ? 1 : 2)) / 3));
+}
+// Scroll offset of a stacked band, which runs in reverse and sits half a slide out of step.
+function ribbonBandScroll(shift) {
+	return mod(-position + count - 1 - shift + 0.5, count);
+}
 // Draws the main strip, faded out by the grid handoff, then (stacked mode) the two reversed bands that fly away
-// as `stackedDeparture` rises. The band `shift` is the same formula as in pickFeatured and videoIsVisible.
+// as `stackedDeparture` rises.
 function drawFeaturedRibbons() {
 	gl.uniform1f(uniforms.CascadeEase, introduction.settings.cascadeEase);
 	gl.uniform1f(
@@ -1195,9 +1204,8 @@ function drawFeaturedRibbons() {
 		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 		gl.depthMask(false);
 		for (const band of [-1, 1]) {
-			const shift = Math.max(1, Math.floor((count * (band === 1 ? 1 : 2)) / 3));
 			gl.uniform1f(uniforms.Band, band);
-			gl.uniform1f(uniforms.Offset, mod(-position + count - 1 - shift + 0.5, count));
+			gl.uniform1f(uniforms.Offset, ribbonBandScroll(ribbonBandShift(band)));
 			gl.drawElements(gl.TRIANGLES, meshSegments * meshRows * 6, gl.UNSIGNED_SHORT, 0);
 		}
 		gl.depthMask(true);
@@ -1216,13 +1224,9 @@ function updateStackedDeparture(dt) {
 	if (Math.abs(destination - stackedDeparture) < 0.0005) stackedDeparture = destination;
 	if (state.stacked && stackedDeparture !== destination) requestRender();
 }
-// requestAnimationFrame callback. Sizes the canvas (DPR capped at 2, or 1.5 on phones), draws the scene through the
-// loader wave pass when active, and on the first frame tells the host the wave can start and warms the grid and heroes.
-function render(time) {
-	if (!canRender()) {
-		raf = 0;
-		return;
-	}
+// Matches the canvas to the viewport (DPR capped at 2, or 1.5 on phones, unless exporting). Assigning canvas.width clears
+// the drawing buffer, so it only happens on a real change.
+function resizeCanvas() {
 	const dpr = exportPixelRatio || Math.min(devicePixelRatio || 1, mobile ? 1.5 : 2);
 	const w = Math.round(innerWidth * dpr),
 		h = Math.round(innerHeight * dpr);
@@ -1231,6 +1235,15 @@ function render(time) {
 		canvas.height = h;
 		gl.viewport(0, 0, w, h);
 	}
+}
+// requestAnimationFrame callback. Sizes the canvas, draws the scene through the loader wave pass when active, and on the
+// first frame tells the host the wave can start and warms the grid and heroes.
+function render(time) {
+	if (!canRender()) {
+		raf = 0;
+		return;
+	}
+	resizeCanvas();
 	let wavePass = false;
 	try {
 		wavePass = !!loaderWave?.begin();
@@ -1252,21 +1265,17 @@ function render(time) {
 		projectTransition.prefetch(featured);
 	}
 }
-// One frame: advance intro, idle drift, tilt, scroll easing and the grid, upload video frames, set the uniforms and
-// draw. An open case study takes over drawing. Requests another frame while anything is still moving.
-function renderScene(time) {
-	if (projectTransition.active) {
-		raf = 0;
-		projectTransition.draw(time);
-		return;
-	}
-	frameMeter.begin(time);
-	raf = 0;
-	// Seconds since the last frame, capped at 50 ms (16 ms on the first) so a stalled tab does not jump.
-	const dt = Math.min((time - lastTime) / 1000 || 0.016, 0.05);
+// Seconds since the last frame, capped so a stalled tab does not jump. A zero gap counts as 16 ms.
+function advanceFrameClock(time) {
+	const FALLBACK_DT = 0.016,
+		MAX_DT = 0.05;
+	const dt = Math.min((time - lastTime) / 1000 || FALLBACK_DT, MAX_DT);
 	lastTime = time;
-	const introMoving = introduction.update(time);
-	const idle = idleMotion.update(
+	return dt;
+}
+// Steps the idle drift, which waits while a project loads, the intro plays, or the user or grid is moving.
+function updateIdleDrift(time, dt, introMoving) {
+	return idleMotion.update(
 		time,
 		dt,
 		gridView?.target ? 'all' : 'featured',
@@ -1276,6 +1285,8 @@ function renderScene(time) {
 			!!gridView?.drag ||
 			!!(gridView && gridView.mix !== gridView.target)
 	);
+}
+function updateMouseTilt(dt, introMoving) {
 	mouseTilt.update(
 		dt,
 		!introMoving && !mobile && !!state.mouseTilt,
@@ -1285,7 +1296,9 @@ function renderScene(time) {
 		state.mouseTiltMax
 	);
 	if (mouseTilt.moving) requestRender();
-	updateStackedDeparture(dt);
+}
+// Feeds the drift into the grid's pan or the ribbon's scroll target, and snaps once the ribbon's drift has stopped.
+function applyIdleDrift(idle) {
 	if (idle.delta) {
 		if (gridView?.target) {
 			gridView.goal.x += idle.delta;
@@ -1296,8 +1309,8 @@ function renderScene(time) {
 		}
 	}
 	if (idle.stopped && !gridView?.target) scheduleSnap();
-	const gridMoving = gridView?.update(dt);
-	updateVideoTextures();
+}
+function bindRibbonProgram() {
 	gl.useProgram(program);
 	gl.bindBuffer(gl.ARRAY_BUFFER, ribbonBuffer);
 	gl.enableVertexAttribArray(ribbonAttrib);
@@ -1305,13 +1318,21 @@ function renderScene(time) {
 	gl.enable(gl.DEPTH_TEST);
 	gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, texture);
+}
+// Exponential ease of `position` towards `target`, then `scrollVelocity` (slides per second) smoothed from the step taken.
+function easeScrollPosition(dt) {
+	const POSITION_EASE_RATE = 9,
+		VELOCITY_EASE_RATE = 14,
+		MIN_DT = 0.001;
 	const previousPosition = position;
-	// Exponential ease of `position` towards `target` (rate 9 per second); velocity is in slides per second, then smoothed.
-	position = reduced ? target : position + (target - position) * (1 - Math.exp(-dt * 9));
+	position = reduced ? target : position + (target - position) * (1 - Math.exp(-dt * POSITION_EASE_RATE));
 	if (Math.abs(target - position) < 0.0001) position = target;
-	const velocity = (position - previousPosition) / Math.max(dt, 0.001);
-	scrollVelocity += (velocity - scrollVelocity) * (1 - Math.exp(-dt * 14));
+	const velocity = (position - previousPosition) / Math.max(dt, MIN_DT);
+	scrollVelocity += (velocity - scrollVelocity) * (1 - Math.exp(-dt * VELOCITY_EASE_RATE));
 	if (Math.abs(scrollVelocity) < 0.001) scrollVelocity = 0;
+}
+// Speed-driven bend and tilt: only for a user scrolling the resting ribbon on desktop.
+function updateVelocityShape(dt, introMoving, idle) {
 	velocityShape.update(
 		dt,
 		scrollVelocity,
@@ -1320,24 +1341,20 @@ function renderScene(time) {
 		reduced
 	);
 	if (velocityShape.moving) requestRender();
-	const shaped = featuredView();
-	// Rebase both by whole loops when they drift far, to keep float precision. The picture is unchanged.
-	if (Math.abs(target) > count * 100) {
+}
+// Rebases `position` and `target` by whole loops when they drift far, to keep float precision. The picture is unchanged.
+function rebaseScroll() {
+	const REBASE_AFTER_LOOPS = 100;
+	if (Math.abs(target) > count * REBASE_AFTER_LOOPS) {
 		const shift = Math.trunc(target / count) * count;
 		position -= shift;
 		target -= shift;
 	}
-	const dpr = exportPixelRatio || Math.min(devicePixelRatio || 1, mobile ? 1.5 : 2),
-		w = Math.round(innerWidth * dpr),
-		h = Math.round(innerHeight * dpr);
-	if (canvas.width !== w || canvas.height !== h) {
-		canvas.width = w;
-		canvas.height = h;
-		gl.viewport(0, 0, w, h);
-	}
-
-	// Per-frame uniforms: angles in radians, percentages as 0..1 fractions.
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+}
+// Per-frame uniforms: angles in radians, percentages as 0..1 fractions.
+function setRibbonUniforms(shaped, introMoving) {
+	const w = canvas.width,
+		h = canvas.height;
 	gl.uniform1f(uniforms.Vertical, state.vertical);
 	gl.uniform1f(uniforms.Rotation, (shaped.rotation * Math.PI) / 180);
 	gl.uniform1f(uniforms.Distance, state.distance / 100);
@@ -1358,30 +1375,63 @@ function renderScene(time) {
 		uniforms.MotionBlur,
 		reduced || introMoving ? 0 : featuredBlur(scrollVelocity, state.blurThreshold, state.blur)
 	);
-	drawFeaturedRibbons();
-	if (gridView && gridView.mix > 0) gridView.render(texture, count, shaped);
-	updateUI();
-	frameMeter.end();
-	// A click queued a transition: begin it from the view just drawn, and request no further ribbon frame.
-	if (projectTransition.pending) {
-		try {
-			projectTransition.begin(shaped);
-		} catch (error) {
-			projectTransition.close();
-			showCatalogError(error);
-		}
-		return;
+}
+// A click queued a transition: begin it from the view just drawn.
+function beginQueuedTransition(shaped) {
+	try {
+		projectTransition.begin(shaped);
+	} catch (error) {
+		projectTransition.close();
+		showCatalogError(error);
 	}
-	// Keep looping while anything is still moving.
-	if (
+}
+function ribbonStillMoving(idle, introMoving, gridMoving) {
+	return (
 		idle.moving ||
 		introMoving ||
 		gridMoving ||
 		scrollVelocity !== 0 ||
 		position !== target ||
 		videoSlides.some(item => !item.video.requestVideoFrameCallback && !item.video.paused && !document.hidden)
-	)
-		requestRender();
+	);
+}
+// One frame of the ribbon, or of the open case study, which takes over drawing. Each step reads what the one before it
+// wrote and GL state carries across them, so keep the order. Requests another frame while anything is still moving.
+function renderScene(time) {
+	if (projectTransition.active) {
+		raf = 0;
+		projectTransition.draw(time);
+		return;
+	}
+	frameMeter.begin(time);
+	raf = 0;
+	const dt = advanceFrameClock(time);
+	const introMoving = introduction.update(time);
+	const idle = updateIdleDrift(time, dt, introMoving);
+	updateMouseTilt(dt, introMoving);
+	updateStackedDeparture(dt);
+	applyIdleDrift(idle);
+	const gridMoving = gridView?.update(dt);
+	updateVideoTextures();
+	bindRibbonProgram();
+	easeScrollPosition(dt);
+	updateVelocityShape(dt, introMoving, idle);
+	const shaped = featuredView();
+	rebaseScroll();
+	resizeCanvas();
+
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	setRibbonUniforms(shaped, introMoving);
+	drawFeaturedRibbons();
+	if (gridView && gridView.mix > 0) gridView.render(texture, count, shaped);
+	updateUI();
+	frameMeter.end();
+	// Beginning a transition requests no further ribbon frame.
+	if (projectTransition.pending) {
+		beginQueuedTransition(shaped);
+		return;
+	}
+	if (ribbonStillMoving(idle, introMoving, gridMoving)) requestRender();
 }
 // Resize
 // ------------
@@ -1506,8 +1556,7 @@ function videoIsVisible(index) {
 	if (near(position)) return true;
 	if (state.stacked && stackedDeparture < 1) {
 		for (const band of [-1, 1]) {
-			const shift = Math.max(1, Math.floor((count * (band === 1 ? 1 : 2)) / 3));
-			if (near(position + shift - 0.5)) return true;
+			if (near(position + ribbonBandShift(band) - 0.5)) return true;
 		}
 	}
 	return false;
