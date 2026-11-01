@@ -26,6 +26,22 @@ const CURSOR_SNAP_DURATION = 0.4;
 const CURSOR_STRETCH_DISTANCE = 400;
 // Applied as scale 1 + x along the motion and 1 - x across it
 const CURSOR_MAX_STRETCH = 0.25;
+// CTAs pull the cursor toward their centre by this share of the gap, up to a px limit
+const CTA_NUDGE_STRENGTH = 0.12;
+const CTA_NUDGE_LIMIT = 18;
+
+// Helpers
+// ------------
+const ctaPull = (gap: number) => Math.max(-CTA_NUDGE_LIMIT, Math.min(CTA_NUDGE_LIMIT, gap * CTA_NUDGE_STRENGTH));
+
+// Look priority: sticky, cta, soft, link, then follow (inside the panel) or close (outside it)
+const cursorLook = (target: Element, isSticky: boolean, overCta: Element | null, inside: boolean) => {
+	if (isSticky) return 'sticky';
+	if (overCta) return 'cta';
+	if (target.closest('[data-cursor-soft]')) return 'soft';
+	if (target.closest('[data-cursor-link]')) return 'link';
+	return inside ? 'follow' : 'close';
+};
 
 // Component
 // ------------
@@ -127,33 +143,20 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 			resetShape();
 		};
 
-		// Works out which cursor look applies under the pointer, then glides it there
-		const move = (event: PointerEvent) => {
-			lastPointer = event;
-			const target = document.elementFromPoint(event.clientX, event.clientY);
-			const projectPanel = target?.closest('[data-project-panel][data-open="true"]');
-			if ((!isOpen && !projectPanel) || target?.closest('[data-modal-settings], dialog[open]')) {
-				hide();
-				return;
-			}
-			if (!mouse.matches || event.pointerType !== 'mouse' || !target || !jacket.contains(target)) {
-				hide();
-				return;
-			}
-			// Sticky targets pull the cursor to their centre, and can ask it to fit their box
-			const stickyTarget = target.closest<HTMLElement>('[data-cursor-sticky]');
-			// Independent positioning keeps the glyph off the circle's eased animation path.
-			gsap.set(closeCursorRef.current, { x: event.clientX, y: event.clientY });
-			const wasSticky = jacket.dataset.cursor === 'sticky';
-			const inside = projectPanel || panelRef.current?.contains(target);
-			let x = event.clientX;
-			let y = event.clientY;
+		// The custom cursor only shows for a mouse, over an open panel, away from dialogs
+		const cursorApplies = (event: PointerEvent, target: Element, projectPanel: Element | null) => {
+			if ((!isOpen && !projectPanel) || target.closest('[data-modal-settings], dialog[open]')) return false;
+			return mouse.matches && event.pointerType === 'mouse' && jacket.contains(target);
+		};
+
+		// Sticky targets pull the cursor to their centre, and can ask it to fit their box
+		const applyStickyTarget = (stickyTarget: HTMLElement | null) => {
 			if (stickyTarget) {
 				const bounds = (
 					stickyTarget.querySelector('[data-cursor-anchor]') ?? stickyTarget
 				).getBoundingClientRect();
-				x = bounds.left + bounds.width / 2;
-				y = bounds.top + bounds.height / 2;
+				targetX = bounds.left + bounds.width / 2;
+				targetY = bounds.top + bounds.height / 2;
 				if (stickyTarget.hasAttribute('data-cursor-fit')) {
 					cursor.style.setProperty('--cursor-fit-width', `${bounds.width}px`);
 					cursor.style.setProperty('--cursor-fit-height', `${bounds.height}px`);
@@ -165,49 +168,57 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 				cursor.style.removeProperty('--cursor-fit-height');
 				cursor.style.removeProperty('--cursor-fit-radius');
 			}
+		};
 
-			const overLink = target.closest('[data-cursor-link]');
-			const overSoft = target.closest('[data-cursor-soft]');
-			const overCta = target.closest('[data-cursor-cta]');
+		const nudgeTowardCta = (cta: Element) => {
+			const bounds = cta.getBoundingClientRect();
+			targetX += ctaPull(bounds.left + bounds.width / 2 - targetX);
+			targetY += ctaPull(bounds.top + bounds.height / 2 - targetY);
+		};
 
-			// CTAs nudge the cursor slightly toward their centre, capped at 18px
-			if (overCta && !reduced.matches) {
-				const bounds = overCta.getBoundingClientRect();
-				x += Math.max(-18, Math.min(18, (bounds.left + bounds.width / 2 - x) * 0.12));
-				y += Math.max(-18, Math.min(18, (bounds.top + bounds.height / 2 - y) * 0.12));
-			}
-
-			// Look priority: sticky, cta, soft, link, then follow (inside the panel) or close (outside it)
-			jacket.dataset.cursor = stickyTarget
-				? 'sticky'
-				: overCta
-					? 'cta'
-					: overSoft
-						? 'soft'
-						: overLink
-							? 'link'
-							: inside
-								? 'follow'
-								: 'close';
-
-			targetX = x;
-			targetY = y;
+		// Glides to the target, or jumps there when appearing or with reduced motion
+		const moveCursor = (snap: boolean) => {
 			movement?.kill();
 			if (!visible || reduced.matches) {
-				position.x = x;
-				position.y = y;
+				position.x = targetX;
+				position.y = targetY;
 				deform();
 			} else {
 				movement = gsap.to(position, {
-					x,
-					y,
-					duration: stickyTarget || wasSticky ? CURSOR_SNAP_DURATION : CURSOR_SPEED,
-					ease: stickyTarget || wasSticky ? 'power2.out' : 'power3.out',
+					x: targetX,
+					y: targetY,
+					duration: snap ? CURSOR_SNAP_DURATION : CURSOR_SPEED,
+					ease: snap ? 'power2.out' : 'power3.out',
 					onUpdate: deform,
 				});
 			}
 			visible = true;
 			deform();
+		};
+
+		// Works out which cursor look applies under the pointer, then glides it there
+		const move = (event: PointerEvent) => {
+			lastPointer = event;
+			const target = document.elementFromPoint(event.clientX, event.clientY);
+			const projectPanel = target?.closest('[data-project-panel][data-open="true"]') ?? null;
+			if (!target || !cursorApplies(event, target, projectPanel)) {
+				hide();
+				return;
+			}
+			const stickyTarget = target.closest<HTMLElement>('[data-cursor-sticky]');
+			// Independent positioning keeps the glyph off the circle's eased animation path.
+			gsap.set(closeCursorRef.current, { x: event.clientX, y: event.clientY });
+			const wasSticky = jacket.dataset.cursor === 'sticky';
+			const inside = Boolean(projectPanel || panelRef.current?.contains(target));
+
+			targetX = event.clientX;
+			targetY = event.clientY;
+			applyStickyTarget(stickyTarget);
+			const overCta = target.closest('[data-cursor-cta]');
+			if (overCta && !reduced.matches) nudgeTowardCta(overCta);
+
+			jacket.dataset.cursor = cursorLook(target, Boolean(stickyTarget), overCta, inside);
+			moveCursor(Boolean(stickyTarget) || wasSticky);
 		};
 
 		window.addEventListener('pointermove', move);

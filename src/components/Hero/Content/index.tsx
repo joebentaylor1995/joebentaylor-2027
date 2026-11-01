@@ -11,13 +11,36 @@ import Grid from '@waffl';
 import { gsap } from 'gsap';
 import { useRouter } from 'next/navigation';
 import { Fragment, useLayoutEffect, useRef } from 'react';
-import { introDefaults, introReplays, introSettings, sceneIntros } from '../Background/scene-intro';
+import { type IntroSettings, introDefaults, introReplays, introSettings, sceneIntros } from '../Background/scene-intro';
 import { HERO_DESKTOP_QUERY } from '../layout';
 
 // Styles + Interfaces
 // ------------
 import type * as I from './interface';
 import s from './styles.module.scss';
+
+// Constants
+// ------------
+// Marquee speed added at the start of the wave intro, which the timeline tweens back to 0
+const MARQUEE_INTRO_BOOST = 5;
+// Cover circle: the distance to its far corner as viewport fractions, and how far past that it grows
+const COVER_REACH_X = 0.5;
+const COVER_REACH_Y = 0.52;
+const COVER_OVERSHOOT = 1.05;
+const DESKTOP_ENTRANCE_DELAY = 0.15;
+const PORTRAIT_AT = 0.3;
+const PORTRAIT_DURATION = 1.2;
+const MARQUEE_SETTLE_AT = 1.5;
+const MARQUEE_SETTLE_DURATION = 1.6;
+const STAR_START_ROTATION = -90;
+const STAR_START_SCALE = 0.6;
+// Words sit just below their overflow mask
+const WORD_START_Y_PERCENT = 105;
+// Copyright: four digits per side, and each step's offset from the heading start
+const COPYRIGHT_DIGITS = 4;
+const COPYRIGHT_LINE_OFFSET = 0.12;
+const COPYRIGHT_DIGIT_OFFSET = 0.3;
+const COPYRIGHT_DIGIT_DURATION = 0.5;
 
 // Component
 // ------------
@@ -57,20 +80,24 @@ const Content = ({ heading, description }: I.ContentProps) => {
 			const simpleIntro = reduced || !heroDesktop;
 			// Navigation has its own whole-page lens; first load and replay keep this wave.
 			let navigationIntro = !isLoaderPending();
-			// Shared with the renderer through sceneIntros; the timeline tweens each value to its final state
-			const intro = {
-				portrait: simpleIntro || navigationIntro ? 1 : 0,
-				marqueeBoost: simpleIntro || navigationIntro ? 0 : 5,
-				waterReveal: simpleIntro || navigationIntro ? 1 : 0,
+			// Where each intro value starts; with no wave, the wave's values begin at their end state
+			const introStart = (skipWave: boolean) => ({
+				portrait: skipWave ? 1 : 0,
+				marqueeBoost: skipWave ? 0 : MARQUEE_INTRO_BOOST,
+				waterReveal: skipWave ? 1 : 0,
 				colour: !reduced && !heroDesktop ? 1 : 0,
-			};
+			});
+			// Shared with the renderer through sceneIntros; the timeline tweens each value to its final state
+			const intro = introStart(simpleIntro || navigationIntro);
 			sceneIntros.set(host, intro);
 
 			// Per frame: bumps data-text-frame and sizes the cover circle (--reveal-radius) to reach the viewport corners as the wave grows
 			const tick = () => {
 				root.dataset.textFrame = String(Number(root.dataset.textFrame || 0) + 1);
 				const radius =
-					Math.hypot(window.innerWidth * 0.5, window.innerHeight * 0.52) * 1.05 * intro.waterReveal;
+					Math.hypot(window.innerWidth * COVER_REACH_X, window.innerHeight * COVER_REACH_Y) *
+					COVER_OVERSHOOT *
+					intro.waterReveal;
 				cover?.style.setProperty('--reveal-radius', `${radius}px`);
 			};
 
@@ -82,6 +109,13 @@ const Content = ({ heading, description }: I.ContentProps) => {
 			const copyrightIcon = host.querySelector('[data-copyright-icon]');
 			const copyrightLines = host.querySelectorAll('[data-copyright-line]');
 			const copyright = host.querySelector('[data-copyright]');
+			// Heading, star and words back to their hidden start; the first run also pins the star's origin
+			const hideEntrance = (starVars: gsap.TweenVars = {}) => {
+				gsap.set(title, { opacity: 0 });
+				gsap.set(star, { opacity: 0, rotation: STAR_START_ROTATION, scale: STAR_START_SCALE, ...starVars });
+				gsap.set(words, { y: 0, yPercent: WORD_START_Y_PERCENT, opacity: 0 });
+				gsap.set(wipe, { scaleX: 0, transformOrigin: 'left center' });
+			};
 			// Copyright: icon fades in, rule lines draw outward, and the year's digits slide in
 			const resetCopyright = () => {
 				gsap.set(copyrightIcon, { opacity: 0 });
@@ -90,7 +124,8 @@ const Content = ({ heading, description }: I.ContentProps) => {
 					transformOrigin: index => (index === 0 ? 'right center' : 'left center'),
 				});
 				for (const side of ['left', 'right']) {
-					for (let digit = 0; digit < 4; digit++) gsap.set(copyright, { [`--${side}-${digit}`]: '110%' });
+					for (let digit = 0; digit < COPYRIGHT_DIGITS; digit++)
+						gsap.set(copyright, { [`--${side}-${digit}`]: '110%' });
 				}
 			};
 
@@ -120,14 +155,11 @@ const Content = ({ heading, description }: I.ContentProps) => {
 			}
 			gsap.set(cover, { opacity: 1 });
 			cover?.style.setProperty('--reveal-radius', '0px');
-			gsap.set(title, { opacity: 0 });
-			gsap.set(star, { opacity: 0, rotation: -90, scale: 0.6, transformOrigin: '50% 50%' });
-			gsap.set(words, { y: 0, yPercent: 105, opacity: 0 });
-			gsap.set(wipe, { scaleX: 0, transformOrigin: 'left center' });
+			hideEntrance({ transformOrigin: '50% 50%' });
 			resetCopyright();
 
 			const tl = gsap.timeline({
-				delay: heroDesktop ? 0.15 : 0,
+				delay: heroDesktop ? DESKTOP_ENTRANCE_DELAY : 0,
 				onUpdate: tick,
 				onComplete: () => {
 					entered.current = true;
@@ -137,28 +169,31 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				},
 			});
 
-			// Adds every tween, reading the live timings so the settings panel can rebuild it
-			const buildTimeline = () => {
-				const timing = config();
-				const uncoverAt = timing.headingStart + timing.headingCoverDuration;
-				const copyrightStart = timing.headingStart;
-				// Begin with the loader exit; colour settles just after both scales land.
-				if (!heroDesktop) tl.to(intro, { colour: 0, duration: MOBILE_COLOUR_DURATION, ease: 'sine.inOut' }, 0);
-				if (heroDesktop && !navigationIntro)
-					tl.to(
-						intro,
-						{
-							waterReveal: 1,
-							duration: 1 / config().speed,
-							ease: config().ease,
-							onComplete: () => {
-								if (cover) cover.dataset.complete = 'true';
-							},
+			// Wave, portrait zoom and marquee settle: desktop first load and replay only
+			const addSceneTweens = (timing: IntroSettings) => {
+				tl.to(
+					intro,
+					{
+						waterReveal: 1,
+						duration: 1 / timing.speed,
+						ease: timing.ease,
+						onComplete: () => {
+							if (cover) cover.dataset.complete = 'true';
 						},
-						config().start
-					)
-						.to(intro, { portrait: 1, duration: 1.2, ease: 'power3.out' }, 0.3)
-						.to(intro, { marqueeBoost: 0, duration: 1.6, ease: 'power3.out' }, 1.5);
+					},
+					timing.start
+				)
+					.to(intro, { portrait: 1, duration: PORTRAIT_DURATION, ease: 'power3.out' }, PORTRAIT_AT)
+					.to(
+						intro,
+						{ marqueeBoost: 0, duration: MARQUEE_SETTLE_DURATION, ease: 'power3.out' },
+						MARQUEE_SETTLE_AT
+					);
+			};
+
+			// Wipe across the heading, then the star and the paragraph's words
+			const addTextTweens = (timing: IntroSettings) => {
+				const uncoverAt = timing.headingStart + timing.headingCoverDuration;
 				tl.to(
 					wipe,
 					{ scaleX: 1, duration: timing.headingCoverDuration, ease: 'power3.inOut' },
@@ -183,27 +218,44 @@ const Content = ({ heading, description }: I.ContentProps) => {
 							ease: 'power3.out',
 						},
 						timing.paragraphStart
-					)
-					.to(copyrightIcon, { opacity: 1, duration: timing.copyrightFade, ease: 'sine.out' }, copyrightStart)
-					.to(
-						copyrightLines,
-						{ scaleX: 1, duration: timing.copyrightLineDuration, ease: 'power3.inOut' },
-						copyrightStart + 0.12
 					);
+			};
+
+			const addCopyrightTweens = (timing: IntroSettings) => {
+				const copyrightStart = timing.headingStart;
+				tl.to(
+					copyrightIcon,
+					{ opacity: 1, duration: timing.copyrightFade, ease: 'sine.out' },
+					copyrightStart
+				).to(
+					copyrightLines,
+					{ scaleX: 1, duration: timing.copyrightLineDuration, ease: 'power3.inOut' },
+					copyrightStart + COPYRIGHT_LINE_OFFSET
+				);
 
 				// Inherited variables avoid mutating the streamed year before it hydrates.
-				for (let digit = 0; digit < 4; digit++) {
+				for (let digit = 0; digit < COPYRIGHT_DIGITS; digit++) {
 					tl.to(
 						copyright,
 						{
-							[`--left-${3 - digit}`]: '0%',
+							[`--left-${COPYRIGHT_DIGITS - 1 - digit}`]: '0%',
 							[`--right-${digit}`]: '0%',
-							duration: 0.5,
+							duration: COPYRIGHT_DIGIT_DURATION,
 							ease: 'power3.out',
 						},
-						copyrightStart + 0.3 + digit * timing.copyrightDigitStagger
+						copyrightStart + COPYRIGHT_DIGIT_OFFSET + digit * timing.copyrightDigitStagger
 					);
 				}
+			};
+
+			// Adds every tween, reading the live timings so the settings panel can rebuild it
+			const buildTimeline = () => {
+				const timing = config();
+				// Begin with the loader exit; colour settles just after both scales land.
+				if (!heroDesktop) tl.to(intro, { colour: 0, duration: MOBILE_COLOUR_DURATION, ease: 'sine.inOut' }, 0);
+				if (heroDesktop && !navigationIntro) addSceneTweens(timing);
+				addTextTweens(timing);
+				addCopyrightTweens(timing);
 			};
 			buildTimeline();
 
@@ -217,16 +269,10 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				tl.pause(0);
 				tl.clear();
 				resetCopyright();
-				intro.waterReveal = simpleIntro ? 1 : 0;
-				intro.portrait = simpleIntro ? 1 : 0;
-				intro.marqueeBoost = simpleIntro ? 0 : 5;
-				intro.colour = heroDesktop ? 0 : 1;
+				Object.assign(intro, introStart(simpleIntro));
 				root.dataset.entrance = 'running';
 				if (cover && heroDesktop) delete cover.dataset.complete;
-				gsap.set(title, { opacity: 0 });
-				gsap.set(star, { opacity: 0, rotation: -90, scale: 0.6 });
-				gsap.set(words, { y: 0, yPercent: 105, opacity: 0 });
-				gsap.set(wipe, { scaleX: 0, transformOrigin: 'left center' });
+				hideEntrance();
 				buildTimeline();
 				tick();
 				tl.restart();
