@@ -27,6 +27,10 @@
 	transition: opacity var(--time-m) var(--easing-bezzy);
 
 	&:active { cursor: grabbing; }
+
+	// NOTE • The site's own cursor shows the drag instead (ProfileReveal) — grab
+	// only remains where it doesn't run, such as a preview outside the case study
+	[data-cursor='drag'] & { cursor: none; }
 }
 
 // NOTE • Shared pill look for every control over the model
@@ -51,12 +55,14 @@
 	&:focus-visible span { outline: 2px solid var(--brand-c1); }
 }
 
+// NOTE • The whole poster presses, with the label sat in its corner
 .open {
 	position: absolute;
 	inset: 0;
 	display: grid;
-	place-items: center;
+	place-items: end start;
 	width: 100%;
+	padding: var(--gap-s);
 
 	span {
 		padding: 0.8rem 1.6rem;

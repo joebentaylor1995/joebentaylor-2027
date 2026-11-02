@@ -55,8 +55,10 @@ const ProjectOverview = ({ overview, eyebrow }: ProjectOverviewProps) => (
 										<Image
 											src={credit.image}
 											alt=''
-											width={48}
-											height={48}
+											// NOTE • Drawn at 48px: twice that so a face holds its detail on any screen
+											width={96}
+											height={96}
+											quality={90}
 											data-cursor-sticky
 											data-cursor-fit
 										/>

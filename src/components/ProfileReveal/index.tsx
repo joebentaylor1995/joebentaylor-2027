@@ -119,7 +119,14 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 			lastPointer = event;
 			const target = document.elementFromPoint(event.clientX, event.clientY);
 			const projectPanel = target?.closest('[data-project-panel][data-open="true"]');
-			if ((!isOpen && !projectPanel) || target?.closest('[data-modal-settings], dialog[open]')) {
+			// NOTE • A featured case study's open panel: the dimmed hero beside it closes, as a backdrop does
+			const projectBackdrop =
+				target?.closest('[data-project-backdrop]') &&
+				document.querySelector('[data-project-panel][data-open="true"]');
+			if (
+				(!isOpen && !projectPanel && !projectBackdrop) ||
+				target?.closest('[data-modal-settings], dialog[open]')
+			) {
 				hide();
 				return;
 			}
@@ -154,6 +161,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 			const overLink = target.closest('[data-cursor-link]');
 			const overSoft = target.closest('[data-cursor-soft]');
 			const overCta = target.closest('[data-cursor-cta]');
+			const overDrag = target.closest('[data-cursor-drag]');
 			if (overCta && !reduced.matches) {
 				const bounds = overCta.getBoundingClientRect();
 				x += Math.max(-18, Math.min(18, (bounds.left + bounds.width / 2 - x) * 0.12));
@@ -161,15 +169,17 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 			}
 			jacket.dataset.cursor = stickyTarget
 				? 'sticky'
-				: overCta
-					? 'cta'
-					: overSoft
-						? 'soft'
-						: overLink
-							? 'link'
-							: inside
-								? 'follow'
-								: 'close';
+				: overDrag
+					? 'drag'
+					: overCta
+						? 'cta'
+						: overSoft
+							? 'soft'
+							: overLink
+								? 'link'
+								: inside
+									? 'follow'
+									: 'close';
 			targetX = x;
 			targetY = y;
 			movement?.kill();
@@ -410,6 +420,16 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 						aria-hidden='true'
 					>
 						<path d='M5 15 15 5M5 5h10v10' stroke='currentColor' strokeWidth='1.5' />
+					</svg>
+					<svg
+						className={s.dragCursor}
+						width='28'
+						height='16'
+						viewBox='0 0 28 16'
+						fill='none'
+						aria-hidden='true'
+					>
+						<path d='M7 3 2 8l5 5M21 3l5 5-5 5M2 8h24' stroke='currentColor' strokeWidth='1.5' />
 					</svg>
 					<svg
 						className={s.linkCursor}

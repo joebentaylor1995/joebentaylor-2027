@@ -18,6 +18,13 @@ import s from './styles.module.scss';
 
 gsap.registerPlugin(ScrollTrigger);
 
+// Constants
+// ------------
+// NOTE • How far (percent of its width) the panel drifts in as the hero uncovers it
+const PANEL_DRIFT = 12;
+// NOTE • Lets a burst of media resizes settle into one re-measure of the scroll
+const CONTENT_RESIZE_SETTLE = 0.2;
+
 // Component
 // ------------
 const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
@@ -69,6 +76,7 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 			media.add(`${DESKTOP_HOVER_QUERY} and (prefers-reduced-motion: no-preference)`, () => {
 				const stage = root.querySelector<HTMLElement>('[data-project-stage]');
 				const heroLayer = root.querySelector<HTMLElement>('[data-project-hero-layer]');
+				const heroClip = root.querySelector<HTMLElement>('[data-project-hero-clip]');
 				const heroMedia = root.querySelector<HTMLElement>('[data-project-hero-media]');
 				const hero = root.querySelector<HTMLElement>('[data-project-hero]');
 				const panel = root.querySelector<HTMLElement>('[data-project-panel]');
@@ -76,12 +84,13 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 				const objectives = root.querySelector<HTMLElement>('[data-objectives-layout]');
 				const label = root.querySelector<HTMLElement>('[data-objectives-label]');
 				const shade = returnRef.current;
-				if (!stage || !heroLayer || !heroMedia || !panel || !content || !shade) return;
+				if (!stage || !heroLayer || !heroClip || !heroMedia || !panel || !content || !shade) return;
 				const parallaxCompensation = HERO_PARALLAX_COMPENSATION;
 				root.dataset.enhanced = 'true';
 				let heroTravel = 0,
 					revealTravel = 0,
-					contentTravel = 0;
+					contentTravel = 0,
+					panelWidth = 0;
 				let labelBottom = 0,
 					labelTravel = 0,
 					labelGap = 40;
@@ -90,6 +99,7 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 					// Extend above the hero so the slower image never reveals an empty edge.
 					gsap.set(heroMedia, { top: -heroTravel * parallaxCompensation });
 					revealTravel = stage.clientHeight * 0.9;
+					panelWidth = panel.offsetWidth;
 					contentTravel = Math.max(0, content.scrollHeight - stage.clientHeight);
 					if (objectives && label) {
 						const css = getComputedStyle(objectives);
@@ -132,7 +142,11 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 						xPercent: -12 * reveal,
 					});
 					gsap.set(heroMedia, { y: Math.min(scroll, heroTravel) * parallaxCompensation });
-					gsap.set(panel, { xPercent: 100 * (1 - reveal) });
+					// NOTE • The hero's edge wipes across to the panel's left edge, uncovering it
+					// from beneath. Closed, the panel waits off-stage: under the hero it would still
+					// count as in view, and its media would load and its reveals play unseen.
+					heroClip.style.clipPath = reveal > 0 ? `inset(0 ${panelWidth * reveal}px 0 0)` : '';
+					gsap.set(panel, { xPercent: reveal > 0 ? PANEL_DRIFT * (1 - reveal) : 100 });
 					gsap.set(content, { y: -contentScroll });
 					if (label)
 						gsap.set(label, {
@@ -170,7 +184,21 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 					onUpdate: self => update(self.progress * (self.end - self.start)),
 					onRefresh: self => update(self.progress * (self.end - self.start)),
 				});
+				// NOTE • Media can change height after this measures — a video with no poster takes
+				// its shape once its metadata loads — which would stop the scroll short of the outro
+				let contentHeight = content.scrollHeight;
+				let settle: gsap.core.Tween | undefined;
+				const contentResize = new ResizeObserver(() => {
+					if (content.scrollHeight === contentHeight) return;
+					contentHeight = content.scrollHeight;
+					settle?.kill();
+					settle = gsap.delayedCall(CONTENT_RESIZE_SETTLE, () => ScrollTrigger.refresh());
+				});
+				contentResize.observe(content);
 				return () => {
+					contentResize.disconnect();
+					settle?.kill();
+					heroClip.style.removeProperty('clip-path');
 					gsap.set([heroLayer, panel, content, shade], { clearProps: 'transform,opacity' });
 					gsap.set(heroMedia, { clearProps: 'transform,top' });
 					if (label) gsap.set(label, { clearProps: 'transform' });
@@ -192,16 +220,19 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 	return (
 		<div ref={ref} className={s.jacket} data-project-experience>
 			<div className={s.stage} data-project-stage>
-				<div className={s.hero} data-project-hero-layer>
-					{hero}
+				<div className={s.heroClip} data-project-hero-clip>
+					<div className={s.hero} data-project-hero-layer>
+						{hero}
+					</div>
+					<button
+						ref={returnRef}
+						type='button'
+						className={s.returnToTop}
+						aria-label='Return to the top of the project'
+						data-project-backdrop
+						onClick={returnToTop}
+					/>
 				</div>
-				<button
-					ref={returnRef}
-					type='button'
-					className={s.returnToTop}
-					aria-label='Return to the top of the project'
-					onClick={returnToTop}
-				/>
 				<section className={s.panel} aria-label='Project details' data-project-panel>
 					<div data-project-panel-content>{children}</div>
 				</section>

@@ -46,7 +46,7 @@ export default function Matrix({ title }: MatrixProps) {
 					const { createMatrixFooter } = await import('./engine');
 					if (!controller.signal.aborted) dispose = createMatrixFooter(element, host, title, () => DEFAULTS);
 				} catch {
-					/* Keep the plain gradient if the preview is unavailable. */
+					/* Keep the plain background if the preview is unavailable. */
 				}
 			};
 			observer = new IntersectionObserver(

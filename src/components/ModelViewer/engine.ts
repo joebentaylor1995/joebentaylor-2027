@@ -118,6 +118,8 @@ export const createModelViewer = async (
 	// NOTE • OrbitControls blocks all touch scrolling; let vertical swipes scroll
 	// the page past the block, so only sideways drags turn the model
 	canvas.style.touchAction = 'pan-y';
+	// NOTE • OrbitControls writes an inline cursor, which would beat the stylesheet's
+	canvas.style.removeProperty('cursor');
 
 	let wantsRotation = isRotating;
 	let resumeCall: gsap.core.Tween | null = null;

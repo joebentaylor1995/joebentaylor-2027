@@ -16,6 +16,12 @@ test('desktop project reveal follows scroll in both directions and returns to to
 		await scroller.evaluate((el, y) => el.scrollTo({ top: y, behavior: 'instant' }), top);
 	};
 	const x = () => panel.evaluate(el => el.getBoundingClientRect().left);
+	// The hero's right edge, as its clip-path closes over the panel beneath
+	const heroEdge = () =>
+		page.locator('[data-project-hero-clip]').evaluate(el => {
+			const inset = /inset\(0px (\S+)px/.exec(getComputedStyle(el).clipPath)?.[1];
+			return innerWidth - Number(inset ?? 0);
+		});
 	const mediaY = () =>
 		page.locator('[data-project-hero-media]').evaluate(el => new DOMMatrix(getComputedStyle(el).transform).f);
 	await move(start / 2);
@@ -32,8 +38,9 @@ test('desktop project reveal follows scroll in both directions and returns to to
 	await move(start + reveal / 2);
 	await expect(page.locator('[data-project-hero]')).toHaveCSS('--project-image-saturation', '0');
 	await expect.poll(mediaY).toBeCloseTo(start * 0.6, 0);
-	await expect.poll(x).toBeLessThan(1100);
-	await expect.poll(x).toBeGreaterThan(800);
+	await expect.poll(heroEdge).toBeLessThan(1100);
+	await expect.poll(heroEdge).toBeGreaterThan(800);
+	await expect.poll(x).toBeLessThan(560);
 	await expect
 		.poll(() => hero.evaluate(el => new DOMMatrix(getComputedStyle(el).transform).f))
 		.toBeCloseTo(-start, 0);
@@ -45,7 +52,7 @@ test('desktop project reveal follows scroll in both directions and returns to to
 	const cursorHost = page.locator('[data-profile-scene]').locator('..');
 	await expect(cursorHost).toHaveAttribute('data-cursor', 'follow');
 	await page.mouse.move(200, 400);
-	await expect(cursorHost).not.toHaveAttribute('data-cursor');
+	await expect(cursorHost).toHaveAttribute('data-cursor', 'close');
 	await expect
 		.poll(() =>
 			page.locator('[data-project-panel-content]').evaluate(el => new DOMMatrix(getComputedStyle(el).transform).f)
@@ -53,7 +60,7 @@ test('desktop project reveal follows scroll in both directions and returns to to
 		.toBeCloseTo(-300, 0);
 	await page.screenshot({ path: 'test-results/pocketchange-desktop-panel.png' });
 	await move(start + reveal / 2);
-	await expect.poll(x).toBeGreaterThan(800);
+	await expect.poll(heroEdge).toBeGreaterThan(800);
 	await page
 		.getByRole('button', { name: 'Return to the top of the project' })
 		.click({ position: { x: 200, y: 450 } });
