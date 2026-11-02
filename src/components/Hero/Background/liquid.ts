@@ -7,8 +7,12 @@ import { HERO_DESKTOP_QUERY } from '../layout';
 import { drawHeroContent } from './hero-content-texture';
 import type { LiquidSettings } from './liquid-settings';
 import * as shaders from './liquid-shaders';
-import { drawMarqueeDecoration, marqueePhrases } from './marquee-decoration';
+import { drawMarqueeDecoration, drawMarqueeLabelFrame, marqueePhrases } from './marquee-decoration';
 import { introDefaults, introSettings, sceneIntros } from './scene-intro';
+
+// Constants
+// ------------
+const LABEL_TRANSITION_SECONDS = 0.7;
 
 // Types
 // ------------
@@ -241,8 +245,28 @@ export async function createLiquidLayer(
 		const logos = { texture: texture() };
 		const decoration = { texture: texture() };
 		let labelGesture = 0;
+		const phraseFor = (gesture: number) => marqueePhrases[gesture % marqueePhrases.length];
+		let labelTransition: { from: string; to: string; elapsed: number } | null = null;
+		const labelPatch = document.createElement('canvas');
+		const stepLabelTransition = (dt: number) => {
+			if (!labelTransition) return;
+			labelTransition.elapsed += dt;
+			const progress = Math.min(1, labelTransition.elapsed / LABEL_TRANSITION_SECONDS);
+			const at = drawMarqueeLabelFrame(canvas, host, maxTexture, { ...labelTransition, progress }, labelPatch);
+			if (at) {
+				gl.bindTexture(gl.TEXTURE_2D, decoration.texture);
+				gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+				try {
+					gl.texSubImage2D(gl.TEXTURE_2D, 0, at.x, at.y, gl.RGBA, gl.UNSIGNED_BYTE, labelPatch);
+				} finally {
+					gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+				}
+			}
+			if (progress === 1) labelTransition = null;
+		};
 		const uploadDecoration = () => {
 			if (mobile || portraitOnly) return;
+			labelTransition = null;
 			gl.bindTexture(gl.TEXTURE_2D, decoration.texture);
 			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 			try {
@@ -252,12 +276,7 @@ export async function createLiquidLayer(
 					gl.RGBA,
 					gl.RGBA,
 					gl.UNSIGNED_BYTE,
-					drawMarqueeDecoration(
-						canvas,
-						host,
-						maxTexture,
-						marqueePhrases[labelGesture % marqueePhrases.length]
-					)
+					drawMarqueeDecoration(canvas, host, maxTexture, phraseFor(labelGesture))
 				);
 			} finally {
 				gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
@@ -402,9 +421,13 @@ export async function createLiquidLayer(
 			},
 			draw(dt, scrollVelocity, gesture) {
 				if (gesture !== labelGesture) {
+					const from = labelTransition?.to ?? phraseFor(labelGesture);
 					labelGesture = gesture;
-					uploadDecoration();
+					if (mobile || portraitOnly || matchMedia('(prefers-reduced-motion: reduce)').matches)
+						uploadDecoration();
+					else labelTransition = { from, to: phraseFor(gesture), elapsed: 0 };
 				}
+				stepLabelTransition(dt);
 				if (!portraitOnly && desktopLayout.matches && textFrame !== textElement?.dataset.textFrame) {
 					textFrame = textElement?.dataset.textFrame;
 					gl.bindTexture(gl.TEXTURE_2D, content.texture);
