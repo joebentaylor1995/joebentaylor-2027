@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
 import { pickVideoSource } from '../src/utils/pickVideoSource';
+import { expect, test } from './helpers/test';
 
 const SOURCES = [
 	{ width: 1920, src: 'large' },

@@ -2,7 +2,7 @@
 // ------------
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { expect, type Frame, type Page, test } from '@playwright/test';
+import { expect, type Frame, type Page, test } from './helpers/test';
 
 // Constants
 // ------------
@@ -58,7 +58,9 @@ test.beforeEach(async ({ page }) => {
 });
 
 // Every test must finish without page errors
-test.afterEach(({ page }) => {
+test.afterEach(({ page }, testInfo) => {
+	// NOTE • A quarantined test is skipped before beforeEach records its errors
+	if (testInfo.expectedStatus === 'skipped') return;
 	expect(pageErrors.get(page)).toEqual([]);
 });
 

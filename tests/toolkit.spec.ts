@@ -1,7 +1,8 @@
 // Imports
 // ------------
-import { expect, test } from '@playwright/test';
+
 import { createPhysics } from '../src/components/Profile/Usps/Toolkit/physics';
+import { expect, test } from './helpers/test';
 
 // Tests
 // ------------

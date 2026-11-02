@@ -1,9 +1,10 @@
 // Imports
 // ------------
-import { expect, test } from '@playwright/test';
+
 import { defaultSettings } from '../src/components/Hero/Background/effect-settings';
 import { marqueePhrases } from '../src/components/Hero/Background/marquee-decoration';
 import { ScrollMotion } from '../src/components/Hero/Background/scroll-motion';
+import { expect, test } from './helpers/test';
 
 // Tests
 // ------------
