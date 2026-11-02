@@ -6,7 +6,7 @@
 // Imports
 // ------------
 import { defineQuery } from 'next-sanity';
-import { GALLERY_IMAGE, MEDIA, REVIEW, RIBBON_PROJECT, SEO, TOOLKIT } from './fragments';
+import { GALLERY_IMAGE, MEDIA, REVIEW, RIBBON_PROJECT, SEO, TOOLKIT, VIDEO_SOURCES } from './fragments';
 
 // Exports
 // ------------
@@ -53,7 +53,7 @@ export const GET_PROFILE_PANEL = defineQuery(`
 		"designToolkit": designToolkit${TOOLKIT},
 		"developmentToolkit": developmentToolkit${TOOLKIT},
 		keyboards{ title, count },
-		featuredOn{ eyebrow, title, linkLabel, url, "video": video.asset->url },
+		featuredOn{ eyebrow, title, linkLabel, url, "video": video.asset->url, "videoSources": ${VIDEO_SOURCES('video')} },
 		cssda{ title, linkLabel, url, "image": image.asset->url, "alt": image.alt },
 		"awards": awards[defined(asset)]{ "src": asset->url, "alt": coalesce(alt, ""), hotspot },
 		"servicesIntro": servicesIntro[].children[]{ text, "highlight": "highlight" in coalesce(marks, []) },

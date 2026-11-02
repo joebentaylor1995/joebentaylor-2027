@@ -10,6 +10,9 @@
 // (measured in the project modal), so loading starts three screens out
 const LEAD_SCREENS = 3;
 const MIN_LEAD = 2400;
+// NOTE • A video only reads its metadata (shape, length) that far out, and starts
+// buffering one screen out: a visitor who never gets there costs a few KB
+const BUFFER_SCREENS = 1;
 const LAZY_MEDIA = 'img[loading="lazy"], video[preload="none"]';
 
 // Helpers
@@ -20,7 +23,7 @@ const warm = (media: Element) => {
 		media.loading = 'eager';
 		media.decode?.().catch(() => {});
 	} else if (media instanceof HTMLVideoElement && media.preload === 'none') {
-		media.preload = 'auto';
+		media.preload = 'metadata';
 		media.load();
 	}
 };
@@ -37,11 +40,17 @@ export function mediaScrollRoot(host: HTMLElement) {
 
 export function preloadNearbyMedia(host: HTMLElement) {
 	let observer: IntersectionObserver | undefined;
+	let bufferObserver: IntersectionObserver | undefined;
 	const pending = new Set<Element>();
+	const unbuffered = new Set<HTMLVideoElement>();
 	const track = (media: Element) => {
 		if (pending.has(media)) return;
 		pending.add(media);
 		observer?.observe(media);
+		if (media instanceof HTMLVideoElement) {
+			unbuffered.add(media);
+			bufferObserver?.observe(media);
+		}
 	};
 	// NOTE • Content that mounts after the panel opens (Profile's frames, a newly
 	// opened case study) brings its own lazy media — watch for it too
@@ -67,6 +76,21 @@ export function preloadNearbyMedia(host: HTMLElement) {
 		);
 		observer = current;
 		for (const media of pending) current.observe(media);
+
+		bufferObserver?.disconnect();
+		const buffering = new IntersectionObserver(
+			entries => {
+				for (const entry of entries) {
+					if (!entry.isIntersecting || !(entry.target instanceof HTMLVideoElement)) continue;
+					buffering.unobserve(entry.target);
+					unbuffered.delete(entry.target);
+					entry.target.preload = 'auto';
+				}
+			},
+			{ root, rootMargin: `${(root?.clientHeight || innerHeight) * BUFFER_SCREENS}px 0px` }
+		);
+		bufferObserver = buffering;
+		for (const video of unbuffered) buffering.observe(video);
 	};
 	collect(host);
 	connect();
@@ -81,6 +105,7 @@ export function preloadNearbyMedia(host: HTMLElement) {
 	if (experience) layout.observe(experience, { attributes: true, attributeFilter: ['data-enhanced'] });
 	return () => {
 		observer?.disconnect();
+		bufferObserver?.disconnect();
 		additions.disconnect();
 		layout.disconnect();
 	};

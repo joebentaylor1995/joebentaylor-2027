@@ -9,6 +9,7 @@
 // ------------
 import type { Logo } from '@parts/Hero/LogoMarquee/interface';
 import type { ToolkitItem } from '@parts/Profile/Usps/Toolkit/interface';
+import type { VideoSource } from '@utils/pickVideoSource';
 import { profile } from '@/config';
 import { designTools, developmentTools } from './toolkits';
 
@@ -102,7 +103,7 @@ export interface ProfilePanelContent {
 	designToolkit: Toolkit;
 	developmentToolkit: Toolkit;
 	keyboards: { title: string; count: number };
-	featuredOn: LinkedTile & { eyebrow: string; video: string | null };
+	featuredOn: LinkedTile & { eyebrow: string; video: string | null; videoSources?: VideoSource[] | null };
 	cssda: LinkedTile & { image: string; alt: string };
 	awards: ProfileImage[];
 	servicesIntro: RichTextSegment[];

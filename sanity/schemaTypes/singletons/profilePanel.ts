@@ -9,6 +9,7 @@
 import { UserIcon } from '@sanity/icons/User';
 import { defineArrayMember, defineField, defineType } from 'sanity';
 import { CompressedVideoInput } from '../../components/CompressedVideoInput';
+import { videoRenditionsField } from '../objects/videoRenditions';
 
 // Constants
 // ------------
@@ -175,7 +176,8 @@ export const profilePanel = defineType({
 					title: 'Video loop',
 					type: 'file',
 					options: { accept: 'video/mp4,video/webm' },
-					// NOTE • Compresses in the browser before upload (H.264, ≤1280px, sound removed)
+					fields: [videoRenditionsField],
+					// NOTE • Compresses in the browser before upload (H.264, several widths, sound removed)
 					components: { input: CompressedVideoInput },
 					description: 'Muted MP4 that loops in the tile. Keep it short and small (under ~2 MB).',
 				}),

@@ -16,6 +16,7 @@ import {
 import { AwardInput } from '../../components/AwardInput';
 import { CompressedVideoInput } from '../../components/CompressedVideoInput';
 import { insertPreviewUrl } from '../objects/caseBlocks';
+import { videoRenditionsField } from '../objects/videoRenditions';
 
 // Helpers
 // ------------
@@ -153,7 +154,8 @@ export const project = defineType({
 			type: 'file',
 			group: 'listing',
 			options: { accept: 'video/mp4,video/webm' },
-			// NOTE • Compresses in the browser before upload (H.264, ≤1280px, sound removed)
+			fields: [videoRenditionsField],
+			// NOTE • Compresses in the browser before upload (H.264, several widths, sound removed)
 			components: { input: CompressedVideoInput },
 			description: 'Muted MP4 that loops on the tile. Keep it short, 16:10 and under ~10 MB.',
 			hidden: ({ document }) => document?.thumbnailType !== 'video',

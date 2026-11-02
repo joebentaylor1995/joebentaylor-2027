@@ -5,6 +5,12 @@
 
 // Exports
 // ------------
+// NOTE • A field's renditions, unless its file has since been replaced in the
+// Studio's own input, which leaves them describing the old video
+export const VIDEO_SOURCES = (field: string) => /* groq */ `select(
+	${field}.asset._ref in ${field}.renditions[].file.asset._ref => ${field}.renditions[]{ width, "src": file.asset->url }
+)`;
+
 export const SEO = /* groq */ `{ title, description, "image": image.asset->url }`;
 
 export const REVIEW = /* groq */ `{
@@ -20,7 +26,7 @@ export const MEDIA = /* groq */ `{
 	"alt": coalesce(alt, ""),
 	// NOTE • Width ÷ height, so full-width tiles keep the media's own shape —
 	// a video's comes from its poster (or its metadata once loaded, see Video.tsx)
-	kind == "video" => { "src": video.asset->url, "poster": poster.asset->url, "aspect": poster.asset->metadata.dimensions.aspectRatio },
+	kind == "video" => { "src": video.asset->url, "sources": ${VIDEO_SOURCES('video')}, "poster": poster.asset->url, "aspect": poster.asset->metadata.dimensions.aspectRatio },
 	kind == "youtube" => { "src": youtube },
 	!(kind in ["video", "youtube"]) => { "src": image.asset->url, "aspect": image.asset->metadata.dimensions.aspectRatio }
 }`;

@@ -57,7 +57,7 @@ const Usps = ({ designToolkit, developmentToolkit, keyboards, featuredOn, cssda 
 							<span>{featuredOn.title}</span>
 						</h3>
 
-						{featuredOn.video && <FeaturedOn video={featuredOn.video} />}
+						{featuredOn.video && <FeaturedOn video={featuredOn.video} sources={featuredOn.videoSources} />}
 					</SingleUSP>
 				</Col>
 
