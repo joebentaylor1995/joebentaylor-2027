@@ -10,7 +10,7 @@ Studio uploads are encoded into up to three widths (640, 1280 and 1920px, never 
 index at the front of the file and no audio (`sanity/lib/compressVideo.ts`). The widest stays the field's own asset;
 all of them are listed in the field's hidden `renditions`, which `VIDEO_SOURCES` turns into `sources`.
 
-`src/utils/pickVideoSource.ts` then picks one in the browser: the narrowest that stays sharp in its tile at up to 2×,
+`src/utils/pickVideoSource.ts` then picks one in the browser: the narrowest that stays sharp in its tile at up to 1.5×,
 or the smallest on 3G or slower or with Save-Data on. A video reads only its metadata from three screens away and
 buffers from one screen away. There's no segmented streaming: these are short loops, and anything long belongs on
 YouTube. A video uploaded without renditions plays its one file as before.

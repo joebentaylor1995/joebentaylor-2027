@@ -18,8 +18,9 @@ interface Connection {
 
 // Constants
 // ------------
-// NOTE • Past 2× the extra pixels can't be seen in a moving loop
-const MAX_PIXEL_RATIO = 2;
+// NOTE • Past 1.5× the extra pixels are hard to see in a moving loop, and it's
+// what lets every phone (tiles up to ~400px wide) take the smallest copy
+const MAX_PIXEL_RATIO = 1.5;
 // NOTE • A copy this close to the wanted width looks the same and saves a rung
 const WIDTH_TOLERANCE = 0.9;
 const SLOW_CONNECTIONS = ['slow-2g', '2g', '3g'];

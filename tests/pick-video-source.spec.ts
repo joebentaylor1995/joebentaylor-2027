@@ -24,13 +24,15 @@ test.describe('pickVideoSource', () => {
 		expect(pickVideoSource('only', SOURCES, 345)).toBe('small');
 		expect(pickVideoSource('only', SOURCES, 1073)).toBe('medium');
 		setDevice(2);
-		expect(pickVideoSource('only', SOURCES, 438)).toBe('medium');
+		expect(pickVideoSource('only', SOURCES, 438)).toBe('small');
+		expect(pickVideoSource('only', SOURCES, 894)).toBe('medium');
 		expect(pickVideoSource('only', SOURCES, 1073)).toBe('large');
 	});
 
-	test('a phone at 3× is treated as 2×', () => {
+	test('a full-width tile on any phone takes the smallest copy', () => {
 		setDevice(3);
-		expect(pickVideoSource('only', SOURCES, 345)).toBe('small');
+		expect(pickVideoSource('only', SOURCES, 358)).toBe('small');
+		expect(pickVideoSource('only', SOURCES, 398)).toBe('small');
 	});
 
 	test('uses the widest copy when none is wide enough', () => {
