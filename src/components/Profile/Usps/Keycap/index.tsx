@@ -13,12 +13,21 @@ import { use, useEffect, useRef } from 'react';
 // ------------
 import s from './styles.module.scss';
 
+// Constants
+// ------------
+// The keycap is a 33-frame image sequence (0 = resting, LAST_FRAME = fully pressed); hovering eases to HOVER_FRAME
 const LAST_FRAME = 32;
 const HOVER_FRAME = 4;
+
+// Helpers
+// ------------
+// Frame files are numbered from 0001
 const frameUrl = (frame: number) => `/images/keycap/frames/${String(frame + 1).padStart(4, '0')}.webp`;
 
 // Component
 // ------------
+// A clickable mechanical keycap. Its press animation is a preloaded image sequence painted to a canvas
+// and eased with GSAP; pointer, Space and Enter all press it, with optional click sounds and hover tilt.
 const Keycap = () => {
 	// Context
 	const profilePresent = use(ProfilePresenceContext);
@@ -28,6 +37,7 @@ const Keycap = () => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 
 	// Effects
+	// Mirror the live settings panel values into CSS variables
 	useEffect(() => {
 		const apply = () => {
 			const button = buttonRef.current;
@@ -46,31 +56,41 @@ const Keycap = () => {
 		return subscribe(apply);
 	}, []);
 
+	// Frames, sounds and input handling, set up once the profile is present
 	useEffect(() => {
 		const button = buttonRef.current;
 		const canvas = canvasRef.current;
 		const context = canvas?.getContext('2d');
 		if (!profilePresent || !button || !canvas || !context) return;
+
+		// held = key is currently pressed; hovered = a mouse is over it (drives the half-raised hover frame)
 		let disposed = false;
 		let ready = false;
 		let held = false;
 		let hovered = false;
 		let pointerId: number | null = null;
 		let tween: gsap.core.Tween | undefined;
+
+		// pose.frame is tweened (fractional); draw() rounds it to a whole frame
 		const pose = { frame: 0 };
 		const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 		const frames: HTMLImageElement[] = [];
+
+		// Press and release sounds, in that order (indexes 0 and 1)
 		const sounds = ['down', 'up'].map(direction => {
 			const audio = new Audio(`/audio/keycap/${direction}.mp3`);
 			audio.volume = 0.45;
 			audio.preload = 'auto';
 			return audio;
 		});
+
 		const draw = () => {
 			const frame = Math.max(0, Math.min(LAST_FRAME, Math.round(pose.frame)));
 			context.drawImage(frames[frame], 0, 0, canvas.width, canvas.height);
 			button.dataset.frame = String(frame);
 		};
+
+		// Ease towards a frame: quick while held, slower on release, instant under reduced motion
 		const animate = (frame: number) => {
 			if (!ready) return;
 			tween?.kill();
@@ -81,12 +101,15 @@ const Keycap = () => {
 				onUpdate: draw,
 			});
 		};
+
 		const play = (index: number) => {
 			if (!getSettings().keycapSound) return;
 			for (const sound of sounds) sound.pause();
 			sounds[index].currentTime = 0;
 			void sounds[index].play().catch(() => {});
 		};
+
+		// Press and release can come from pointer or keyboard; release(false) is silent
 		const press = () => {
 			if (!ready || held) return;
 			held = true;
@@ -101,6 +124,7 @@ const Keycap = () => {
 			animate(hovered && !reducedMotion.matches ? HOVER_FRAME : 0);
 			if (audible) play(1);
 		};
+
 		const enter = (event: PointerEvent) => {
 			hovered = canHover() && event.pointerType === 'mouse';
 			if (!held && !reducedMotion.matches && hovered) animate(HOVER_FRAME);
@@ -111,6 +135,8 @@ const Keycap = () => {
 			button.style.setProperty('--keycap-tilt-y', '0deg');
 			if (!held) animate(0);
 		};
+
+		// Tilt the whole key a few degrees towards the pointer
 		const move = (event: PointerEvent) => {
 			if (!canHover() || !getSettings().keycapTilt || reducedMotion.matches || event.pointerType === 'touch')
 				return;
@@ -118,6 +144,7 @@ const Keycap = () => {
 			button.style.setProperty('--keycap-tilt-x', `${(0.5 - (event.clientY - bounds.y) / bounds.height) * 8}deg`);
 			button.style.setProperty('--keycap-tilt-y', `${((event.clientX - bounds.x) / bounds.width - 0.5) * 8}deg`);
 		};
+
 		const down = (event: PointerEvent) => {
 			if (event.button !== 0 || pointerId !== null || !ready) return;
 			pointerId = event.pointerId;
@@ -129,6 +156,7 @@ const Keycap = () => {
 			pointerId = null;
 			release(event.type === 'pointerup');
 		};
+
 		const keyDown = (event: KeyboardEvent) => {
 			if (event.code !== 'Space' && event.code !== 'Enter') return;
 			event.preventDefault();
@@ -139,6 +167,8 @@ const Keycap = () => {
 			event.preventDefault();
 			release();
 		};
+
+		// Drop any held state, e.g. when focus or the tab is lost mid-press
 		const reset = () => {
 			pointerId = null;
 			leave();
@@ -148,6 +178,8 @@ const Keycap = () => {
 		const visibility = () => {
 			if (document.hidden) reset();
 		};
+
+		// Decode all frames only once the key is near the viewport; it stays unpressable until then
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				if (!entry.isIntersecting) return;
@@ -173,6 +205,7 @@ const Keycap = () => {
 			{ rootMargin: '150px' }
 		);
 		observer.observe(button);
+
 		button.addEventListener('pointerenter', enter);
 		button.addEventListener('pointerleave', leave);
 		button.addEventListener('pointermove', move);
@@ -185,6 +218,7 @@ const Keycap = () => {
 		button.addEventListener('blur', reset);
 		window.addEventListener('blur', reset);
 		document.addEventListener('visibilitychange', visibility);
+
 		return () => {
 			disposed = true;
 			observer.disconnect();

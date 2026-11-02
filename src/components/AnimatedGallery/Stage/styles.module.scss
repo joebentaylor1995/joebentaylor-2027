@@ -1,0 +1,38 @@
+.jacket {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	background: var(--gallery-background, var(--brand-c5));
+	// NOTE • Animations size their cards in container units (cqw/cqh) off this stage
+	container-type: size;
+	// NOTE • Card positions need the stage's size, so they fade in once measured
+	opacity: 0;
+	transition: opacity var(--time-m) var(--easing-bezzy);
+
+	&[data-ready='true'] { opacity: 1; }
+}
+
+.toggle {
+	position: absolute;
+	right: var(--gap-s);
+	bottom: var(--gap-s);
+	z-index: 2;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--brand-c5);
+	cursor: pointer;
+
+	span {
+		display: block;
+		padding: 0.4rem 1rem;
+		border-radius: var(--br-round);
+		background: alpha(--brand-c4, 70);
+		backdrop-filter: blur(8px);
+	}
+
+	&:focus-visible span { outline: 2px solid var(--brand-c1); }
+
+	// NOTE • Nothing moves with reduced motion, so there's nothing to pause
+	@media (prefers-reduced-motion: reduce) { display: none; }
+}

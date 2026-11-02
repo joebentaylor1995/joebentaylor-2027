@@ -1,10 +1,18 @@
 'use client';
 
+// Imports
+// ------------
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { defaultMediaSettings, MEDIA_REPLAY, MEDIA_SETTINGS_CHANGED, mediaEasings, mediaSettings } from '../settings';
+
+// Styles + Interfaces
+// ------------
 import s from './styles.module.scss';
 
+// Constants
+// ------------
+// The sliders; each key is a field of mediaSettings
 const controls = [
 	{ key: 'delay', label: 'Delay (seconds)', min: 0, max: 2, step: 0.05 },
 	{ key: 'duration', label: 'Duration / speed (seconds)', min: 0.1, max: 2, step: 0.05 },
@@ -12,13 +20,22 @@ const controls = [
 	{ key: 'trigger', label: 'Trigger position (% from top)', min: 20, max: 100, step: 1 },
 ] as const;
 
+// Component
+// ------------
+// NOTE • Dev-only panel (?mediaSettings) for tuning the tile reveal. It edits the shared
+// mediaSettings object and announces each change, so tiles still to reveal pick it up.
 export default function MediaSettings() {
+	// State
 	const [settings, setSettings] = useState({ ...mediaSettings });
+
+	// Handlers
 	const update = (values: Partial<typeof mediaSettings>) => {
 		Object.assign(mediaSettings, values);
 		setSettings({ ...mediaSettings });
 		window.dispatchEvent(new Event(MEDIA_SETTINGS_CHANGED));
 	};
+
+	// Render
 	return createPortal(
 		<aside className={s.jacket} aria-label='Media reveal settings' data-modal-settings data-lenis-prevent>
 			<details open>

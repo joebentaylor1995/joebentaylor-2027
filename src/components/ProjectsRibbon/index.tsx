@@ -1,36 +1,66 @@
 'use client';
 
+// Imports
+// ------------
 import { GlobalContext } from '@parts/Contexts';
+import { HERO_DESKTOP_QUERY } from '@parts/Hero/layout';
 import ProjectHero from '@parts/ProjectHero';
 import { heroFrame } from '@parts/ProjectHero/framing';
 import type { ProjectHeroProps } from '@parts/ProjectHero/interface';
-// Imports
-// ------------
 import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
-import { mq } from '@tackl';
+import { afterHeroEntrance } from '@utils/afterHeroEntrance';
+import { DESKTOP_HOVER_QUERY } from '@utils/desktopHover';
+import { markProjectModalEntry } from '@utils/projectModal';
+import { getImageProps } from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useRef, useState } from 'react';
+import { FILL_PREVIEW, FILL_SCRUB } from './fillSettings';
 import { holdProjectHero } from './handoff';
 
 // Styles
 // ------------
 import s from './styles.module.scss';
 
+// Helpers
+// ------------
+// NOTE • Same props as ProjectHero's image, so the browser caches the very candidate the hero will pick
+const warmHero = (src: string) => {
+	const { props } = getImageProps({ src, alt: '', fill: true, sizes: '100vw', quality: 90 });
+	const image = new Image();
+	if (props.sizes) image.sizes = props.sizes;
+	if (props.srcSet) image.srcset = props.srcSet;
+	image.src = props.src;
+	image.decode?.().catch(() => {});
+};
+
 // Component
 // ------------
+// Hosts the interactive projects ribbon, a standalone app in an iframe (public/projects-ribbon/).
+// The iframe stays mounted ("cached") while you are elsewhere on the site so /projects opens
+// instantly; this component talks to it with same-origin postMessage:
+//   ribbon -> site: projects:wave-ready, :error, :prefetch, :prepare, :modal, :open
+//   site -> ribbon: projects:active, :route, :prepared, :fill-preview, :fill-scrub
 const ProjectsRibbon = () => {
+	// Context
 	const { lenisRef, pagePath } = use(GlobalContext);
 	const active = /^\/projects\/?$/.test(pagePath);
+
 	// Refs
 	const frame = useRef<HTMLIFrameElement>(null);
 	const measure = useRef<HTMLDivElement>(null);
-	const [preview, setPreview] = useState<{ request: number; project: ProjectHeroProps['project'] } | null>(null);
+	const startRibbon = useRef<() => void>(null);
+
 	// State
+	// `preview` is a project hero rendered offscreen so its real height can be measured for the handoff
+	const [preview, setPreview] = useState<{ request: number; project: ProjectHeroProps['project'] } | null>(null);
+
+	// Derived
 	const searchParams = useSearchParams();
 	const router = useRouter();
 	const project = searchParams.get('project');
 
 	// Handlers
+	// Tells the ribbon whether /projects is showing, once its own page has loaded (not about:blank)
 	const syncRoute = () => {
 		if (frame.current?.contentWindow?.location.pathname !== '/projects-ribbon/index.html') return;
 		frame.current?.contentWindow?.postMessage({ type: 'projects:active', active }, window.location.origin);
@@ -38,6 +68,8 @@ const ProjectsRibbon = () => {
 	};
 
 	// Effects
+	// Measure the offscreen hero once its image decodes, then tell the ribbon the final
+	// height/top so its tile can grow into exactly where the project page's hero will sit
 	useEffect(() => {
 		if (!preview) return;
 		let cancelled = false;
@@ -48,11 +80,13 @@ const ProjectsRibbon = () => {
 			try {
 				await image.decode();
 				if (cancelled) return;
+
 				const framing = heroFrame(
 					image.getBoundingClientRect().height,
 					window.innerHeight,
-					matchMedia(`${mq.up.l} and (prefers-reduced-motion: no-preference)`).matches
+					matchMedia(`${DESKTOP_HOVER_QUERY} and (prefers-reduced-motion: no-preference)`).matches
 				);
+
 				frame.current?.contentWindow?.postMessage(
 					{
 						type: 'projects:prepared',
@@ -78,6 +112,7 @@ const ProjectsRibbon = () => {
 		};
 	}, [preview]);
 
+	// Forward header pointer moves into the iframe's canvas (the header sits above the iframe)
 	useEffect(() => {
 		// Header links stay interactive while their pointer motion reaches the canvas below.
 		const forward = (event: PointerEvent) => {
@@ -102,18 +137,38 @@ const ProjectsRibbon = () => {
 		return () => window.removeEventListener('pointermove', forward);
 	}, [active]);
 
+	// Handle messages from the ribbon: readiness, prefetching, and opening a project or link
 	useEffect(() => {
 		const openProject = async (event: MessageEvent) => {
-			if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow) return;
+			// NOTE • Same origin is the trust boundary: WebKit can report this window, not the frame, as the source
+			// of the ribbon's messages, and requiring the frame dropped `wave-ready` — the ribbon never appeared
+			const fromRibbon = event.source === frame.current?.contentWindow || event.source === window;
+			if (event.origin !== window.location.origin || !fromRibbon) return;
 			if (event.data?.type === 'projects:error') {
 				frame.current?.setAttribute('data-ready', 'true');
 				return;
 			}
+
 			if (event.data?.type === 'projects:wave-ready') {
 				frame.current?.setAttribute('data-ready', 'true');
 				frame.current?.setAttribute('data-ribbon-ready', 'true');
 				return;
 			}
+
+			// NOTE • The ribbon prefetches each featured case study in idle time: warm its route and
+			// the exact hero image its page will request, so a tap starts the transition at once
+			if (
+				event.data?.type === 'projects:prefetch' &&
+				typeof event.data.href === 'string' &&
+				/^\/projects\/[^/]+\/?$/.test(event.data.href) &&
+				typeof event.data.hero === 'string'
+			) {
+				router.prefetch(event.data.href);
+				warmHero(event.data.hero);
+				return;
+			}
+
+			// A tile was pressed: show its hero offscreen so the effect above can measure it
 			if (
 				event.data?.type === 'projects:prepare' &&
 				typeof event.data.href === 'string' &&
@@ -121,22 +176,31 @@ const ProjectsRibbon = () => {
 			) {
 				router.prefetch(event.data.href);
 				const data = event.data;
-				if (
-					typeof data.hero === 'string' &&
-					typeof data.title === 'string' &&
-					typeof data.description === 'string'
-				) {
+				if (typeof data.hero === 'string' && typeof data.title === 'string') {
 					setPreview({
 						request: data.request,
 						project: {
 							title: data.title,
-							description: data.description,
 							hero: { src: data.hero, alt: data.title },
 						},
 					});
 				}
 				return;
 			}
+
+			// NOTE • A non-featured case study: open the profile panel on it (@modal slot), no hero handoff
+			if (
+				event.data?.type === 'projects:modal' &&
+				typeof event.data.href === 'string' &&
+				/^\/projects\/[^/]+\/?$/.test(event.data.href)
+			) {
+				const href = event.data.href.replace(/\/?$/, '/');
+				markProjectModalEntry(href);
+				router.push(href, { transitionTypes: ['project-modal'], scroll: false });
+				return;
+			}
+
+			// The fill finished: hold the cover over the page, then navigate. External links open in a new tab.
 			if (event.data?.type !== 'projects:open') return;
 			if (typeof event.data.href !== 'string') return;
 			const href = event.data.href;
@@ -159,24 +223,58 @@ const ProjectsRibbon = () => {
 		return () => window.removeEventListener('message', openProject);
 	}, [router, lenisRef]);
 
+	// Relay the fill-settings panel's preview and scrub events into the iframe
+	useEffect(() => {
+		const preview = () =>
+			frame.current?.contentWindow?.postMessage({ type: 'projects:fill-preview' }, window.location.origin);
+		const scrub = (event: Event) =>
+			frame.current?.contentWindow?.postMessage(
+				{ type: 'projects:fill-scrub', flight: event instanceof CustomEvent ? event.detail : null },
+				window.location.origin
+			);
+		window.addEventListener(FILL_PREVIEW, preview);
+		window.addEventListener(FILL_SCRUB, scrub);
+		return () => {
+			window.removeEventListener(FILL_PREVIEW, preview);
+			window.removeEventListener(FILL_SCRUB, scrub);
+		};
+	}, []);
+
+	// Boot the ribbon: immediately on /projects, otherwise in the background once the loader
+	// has settled and the homepage entrance is done
 	useEffect(() => {
 		const element = frame.current;
 		if (!element) return;
+
 		// Prepare the canvas behind the first-visit loader so its wave can refract it.
 		let started = false;
 		const start = () => {
 			if (started) return;
 			started = true;
-			const playIntroduction = /^\/projects\/?$/.test(location.pathname) && !isLoaderSettled();
+			// NOTE • Phones fade the loader out instead of waving it, so they never need the ribbon's refraction pass
+			const playIntroduction =
+				/^\/projects\/?$/.test(location.pathname) &&
+				!isLoaderSettled() &&
+				matchMedia(HERO_DESKTOP_QUERY).matches;
 			// Replace avoids adding iframe-only entries to the browser's Back stack.
 			element.contentWindow?.location.replace(
 				`/projects-ribbon/index.html${playIntroduction ? '?loaderWave=1' : '?entrance=cascade'}`
 			);
 		};
-		if (/^\/projects\/?$/.test(location.pathname) || isLoaderSettled()) start();
-		else window.addEventListener(LOADER_SETTLED, start, { once: true });
+		startRibbon.current = start;
+
+		// Elsewhere the ribbon boots in the background, after the homepage's text entrance
+		let stopWaiting = () => {};
+		const prepare = () => {
+			stopWaiting = afterHeroEntrance(start);
+		};
+		if (/^\/projects\/?$/.test(location.pathname)) start();
+		else if (isLoaderSettled()) prepare();
+		else window.addEventListener(LOADER_SETTLED, prepare, { once: true });
 		return () => {
-			window.removeEventListener(LOADER_SETTLED, start);
+			window.removeEventListener(LOADER_SETTLED, prepare);
+			stopWaiting();
+			startRibbon.current = null;
 			delete element.dataset.ribbonReady;
 			// The layout owns this frame; only a document teardown unloads it.
 			delete element.dataset.ready;
@@ -184,7 +282,10 @@ const ProjectsRibbon = () => {
 		};
 	}, []);
 
+	// Keep the ribbon in step with the route: active flag, and which project is open (?project=)
 	useEffect(() => {
+		// Visiting /projects before the background boot starts it straight away
+		if (active) startRibbon.current?.();
 		// Also handles Next.js navigation back to /projects from its header link.
 		frame.current?.contentWindow?.postMessage({ type: 'projects:active', active }, window.location.origin);
 		if (active)

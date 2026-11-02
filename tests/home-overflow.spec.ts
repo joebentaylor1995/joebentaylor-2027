@@ -1,5 +1,10 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects against sideways scroll on the homepage at desktop, tablet and phone widths.
 test('homepage does not scroll horizontally across desktop and mobile widths', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('[data-site-loader]')).toBeHidden({ timeout: 15000 });

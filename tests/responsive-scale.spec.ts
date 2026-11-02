@@ -1,8 +1,14 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects fluid sizing on big screens: the root size stays 10px up to 1600px, then scales as width / 160.
 test('root rem scale begins above 1600px without changing smaller layouts', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');
+	// Ends back at 1440 to prove it scales down again
 	for (const width of [440, 1440, 1600, 1601, 1920, 2560, 3840, 1440]) {
 		await page.setViewportSize({ width, height: 900 });
 		await expect
@@ -12,6 +18,8 @@ test('root rem scale begins above 1600px without changing smaller layouts', asyn
 	await expect(page.getByTestId('hero-depth').locator('img')).toHaveCSS('object-fit', 'cover');
 });
 
+// Protects the WebGL portrait proportions: after cover-fitting into the canvas, the drawn aspect ratio matches the
+// source photo to within 0.001, at wide and tall desktop sizes.
 test('WebGL portrait retains its source aspect at wide and tall desktop sizes', async ({ page }) => {
 	await page.goto('/');
 	const hero = page.getByTestId('hero-depth');
@@ -25,6 +33,7 @@ test('WebGL portrait retains its source aspect at wide and tall desktop sizes', 
 		await page.setViewportSize({ width, height });
 		await expect
 			.poll(() =>
+				// Rebuilds the cover-fit size from the shader portraitAspect uniform and returns how far it is from the photo aspect
 				hero.evaluate(element => {
 					const canvas = element.querySelector('canvas');
 					const photo = element.querySelector('img');

@@ -12,12 +12,13 @@ import {
 	loaderSettings,
 } from '../settings';
 
-// Styles
+// Styles + Interfaces
 // ------------
 import s from './styles.module.scss';
 
 // Constants
 // ------------
+// Only the numeric settings can be driven by a slider
 type NumericKey = { [K in keyof LoaderSettings]: LoaderSettings[K] extends number ? K : never }[keyof LoaderSettings];
 
 type Slider = {
@@ -30,6 +31,7 @@ type Slider = {
 	rebuild?: boolean;
 };
 
+// Sliders rendered for the settings that apply to every page
 const SLIDERS: Slider[] = [
 	{ key: 'scale', label: 'Size', min: 0.15, max: 1, step: 0.01 },
 	{ key: 'screenAspect', label: 'Screen aspect', min: 1.5, max: 5, step: 0.01 },
@@ -40,16 +42,19 @@ const SLIDERS: Slider[] = [
 	{ key: 'heroZoomDuration', label: 'Hero zoom duration (s)', min: 1, max: 8, step: 0.1, rebuild: true },
 ];
 
+// One-tap presets for the screen aspect slider
 const ASPECTS = [
 	{ label: '16:9', value: 16 / 9 },
 	{ label: '21:9', value: 21 / 9 },
 	{ label: '32:9', value: 32 / 9 },
 ];
 
+// Starting value of the glitch-blue swatch, which overrides --brand-c8 on the loader
 const DEFAULT_BLUE = '#1012FD';
 
 // Helpers
 // ------------
+// The live loader element, if mounted
 const loaderRoot = () => document.querySelector<HTMLElement>('[data-site-loader]');
 
 // NOTE • Seeking from 0 replays every frame callback up to `time`, so the
@@ -70,8 +75,10 @@ const seek = (time: number) => {
 	tl.seek(time, false);
 };
 
+// Asks the loader to rebuild its timeline and play again
 const replay = () => window.dispatchEvent(new Event(LOADER_REPLAY));
 
+// Whole numbers as is, everything else to two decimals
 const format = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
 
 // Component
@@ -108,6 +115,7 @@ const LoaderTweaks = () => {
 		return () => cancelAnimationFrame(frame);
 	}, []);
 
+	// Previews the glitch colour live on the loader
 	useEffect(() => {
 		loaderRoot()?.style.setProperty('--brand-c8', blue);
 	}, [blue]);
@@ -133,6 +141,7 @@ const LoaderTweaks = () => {
 		}
 	};
 
+	// Snaps to a whole frame, never earlier than the frame the logo lands on
 	const setRevealPoint = (value: number) => {
 		loaderSettings.pageRevealAt = Math.max(INTRO_LAST_FRAME, Math.round(value * INTRO_FPS)) / INTRO_FPS;
 		setSettings({ ...loaderSettings });

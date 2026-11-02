@@ -1,6 +1,5 @@
 // Imports
 // ------------
-
 import LegalPage from '@parts/LegalPage';
 import { cookies } from '@parts/LegalPage/content';
 import PageTransition from '@parts/PageTransition';
@@ -18,6 +17,7 @@ export const metadata: Metadata = {
 // Component
 // ------------
 const Page = () => {
+	// Render
 	return (
 		<PageTransition>
 			<LegalPage document={cookies} />

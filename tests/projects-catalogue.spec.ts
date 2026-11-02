@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects the Projects API: every entry is a real CMS project with an id and an explicit ready flag,
+// so the ribbon never has to guess whether a case study exists.
 test('the server catalogue contains only CMS projects with explicit readiness', async ({ request }) => {
 	const response = await request.get('/api/projects-ribbon/');
 	expect(response.ok()).toBe(true);
@@ -13,8 +19,11 @@ test('the server catalogue contains only CMS projects with explicit readiness', 
 	}
 });
 
+// Protects the empty and failing catalogue states: the ribbon shows a clear message and never falls back to the
+// bundled demo projects.
 for (const unavailable of [false, true]) {
 	test(`an ${unavailable ? 'unavailable' : 'empty'} catalogue never loads demo projects`, async ({ page }) => {
+		// Demo data files that must never be requested
 		const demoRequests: string[] = [];
 		page.on('request', request => {
 			if (/\/projects-ribbon\/(featured|projects)\.json/.test(request.url())) demoRequests.push(request.url());

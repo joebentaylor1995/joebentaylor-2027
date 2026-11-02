@@ -12,6 +12,7 @@ import { redirect } from 'next/navigation';
 // ------------
 export const GET = async (request: Request) => {
 	(await draftMode()).disable();
+
 	const url = new URL(request.url);
 
 	// NOTE • Relative paths only — never an open redirect

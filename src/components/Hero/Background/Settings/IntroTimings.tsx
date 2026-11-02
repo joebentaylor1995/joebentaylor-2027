@@ -1,6 +1,14 @@
+// Imports
+// ------------
 import type { IntroSettings } from '../scene-intro';
+
+// Styles + Interfaces
+// ------------
 import s from './styles.module.scss';
 
+// Constants
+// ------------
+// [IntroSettings key, label, min, max, step]; all values are seconds
 const ranges = [
 	['headingStart', 'Heading start', 0, 6, 0.05],
 	['headingCoverDuration', 'Heading cover duration', 0.05, 3, 0.05],
@@ -15,6 +23,9 @@ const ranges = [
 	['copyrightDigitStagger', 'Copyright digit stagger', 0, 0.3, 0.005],
 ] as const;
 
+// Component
+// ------------
+// Number box and slider for each heading, paragraph and copyright timing of the hero intro
 export default function IntroTimings({
 	intro,
 	onChange,
@@ -24,6 +35,7 @@ export default function IntroTimings({
 	onChange: (settings: IntroSettings) => void;
 	onReplay: () => void;
 }) {
+	// Render
 	return (
 		<details className={s.group}>
 			<summary>Heading & paragraph timing</summary>

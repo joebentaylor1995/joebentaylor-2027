@@ -1,10 +1,10 @@
 'use client';
 
+// Imports
+// ------------
 import ContactModal from '@parts/ContactModal';
 import { ContactContext } from '@parts/Contexts';
 import { introDefaults } from '@parts/Hero/Background/scene-intro';
-// Imports
-// ------------
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
 import SpecialHeading from '@parts/SpecialHeading';
 import { canHover } from '@utils/desktopHover';
@@ -31,10 +31,40 @@ const ICONS = {
 } as const;
 
 type IconName = keyof typeof ICONS;
+
 const RESUME_FILENAME = 'Joe Ben Taylor Resume.pdf';
 
+// Range of the title lines' --tfw-fill and --hover-fill
+const TITLE_FILL_START = -16;
+const TITLE_FILL_END = 111;
+
+// Scroll-in title fill and hover sweep (seconds)
+const TITLE_FILL_DURATION = 1.1;
+const TITLE_FILL_STAGGER = 0.25;
+const HOVER_FILL_DURATION = 0.8;
+const HOVER_FILL_STAGGER = 0.12;
+
+// Copyright timeline start times and digit rise (seconds, %)
+const RULES_START = 0.12;
+const DIGITS_START = 0.3;
+const DIGIT_DURATION = 0.5;
+const DIGIT_RISE_PERCENT = 110;
+
+// Digits on the left of the ©, which the wave radiates out from
+const DIGITS_BEFORE_ICON = 4;
+
+// Share of an element in view before its timeline plays
+const REVEAL_THRESHOLD = 0.2;
+
+// Scroll distance (px) from the panel's end over which --connect-bottom-progress runs
+const BOTTOM_PROGRESS_DISTANCE = 160;
+
+const CLOCK_REFRESH_MS = 30_000;
+
+// Narrows a platform string to one that has icon artwork
 const hasIcon = (platform: string): platform is IconName => platform in ICONS;
 
+// Social links with an icon, then the resume download, then email, each merged with its icon size and label
 const toLinks = ({ socials, resumeUrl, email }: ContactDetails) =>
 	[
 		...socials
@@ -55,18 +85,25 @@ const toLinks = ({ socials, resumeUrl, email }: ContactDetails) =>
 
 // Component
 // ------------
+// Closing 'Connect' section of the profile: a lazy-loaded blue digital-rain portrait behind the contact
+// links, the "Ready? Let's grow." button that opens the contact modal, and the animated copyright years.
 const CallToAction = () => {
 	// Context
 	const present = use(ProfilePresenceContext);
 	const links = toLinks(use(ContactContext));
+
 	// Refs
 	const sectionRef = useRef<HTMLElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+
 	// State
 	const [time, setTime] = useState('');
 	const [year, setYear] = useState('2026');
 	const [contactOpen, setContactOpen] = useState(false);
+
 	// Animations
+	// Title lines fill in and the copyright years roll in when each scrolls into view;
+	// the title also fills on hover/focus. Reduced motion shows the filled title straight away.
 	useAnimation(
 		({ reduced }) => {
 			const section = sectionRef.current;
@@ -74,25 +111,30 @@ const CallToAction = () => {
 			const title = section.querySelector<HTMLElement>('[data-connect-title]');
 			const copyright = section.querySelector<HTMLElement>('[data-connect-copyright]');
 			if (!title || !copyright) return;
+
 			const lines = title.querySelectorAll('[data-connect-line]');
 			const digits = copyright.querySelectorAll('[data-year-digit]');
 			const rules = copyright.querySelectorAll('[data-year-rule]');
 			const icon = copyright.querySelector('[data-year-icon]');
+
 			if (reduced) {
-				gsap.set(lines, { '--tfw-fill': 111 });
+				gsap.set(lines, { '--tfw-fill': TITLE_FILL_END });
 				return;
 			}
+
+			// Scroll-in: both timelines start paused and are played by the observer below
 			const fill = gsap.fromTo(
 				lines,
-				{ '--tfw-fill': -16 },
+				{ '--tfw-fill': TITLE_FILL_START },
 				{
-					'--tfw-fill': 111,
-					duration: 1.1,
-					stagger: 0.25,
+					'--tfw-fill': TITLE_FILL_END,
+					duration: TITLE_FILL_DURATION,
+					stagger: TITLE_FILL_STAGGER,
 					ease: 'expo.out',
 					paused: true,
 				}
 			);
+
 			const years = gsap.timeline({ paused: true });
 			years
 				.fromTo(
@@ -105,16 +147,22 @@ const CallToAction = () => {
 					rules,
 					{ scaleX: 0, transformOrigin: i => (i === 0 ? 'right center' : 'left center') },
 					{ scaleX: 1, duration: introDefaults.copyrightLineDuration, ease: 'power3.inOut' },
-					0.12
+					RULES_START
 				);
+
+			// Digits rise in a wave radiating outwards from the © (the digits next to it go first)
 			digits.forEach((digit, index) => {
 				years.fromTo(
 					digit,
-					{ yPercent: 110 },
-					{ yPercent: 0, duration: 0.5, ease: 'power3.out' },
-					0.3 + (index < 4 ? 3 - index : index - 4) * introDefaults.copyrightDigitStagger
+					{ yPercent: DIGIT_RISE_PERCENT },
+					{ yPercent: 0, duration: DIGIT_DURATION, ease: 'power3.out' },
+					DIGITS_START +
+						(index < DIGITS_BEFORE_ICON ? DIGITS_BEFORE_ICON - 1 - index : index - DIGITS_BEFORE_ICON) *
+							introDefaults.copyrightDigitStagger
 				);
 			});
+
+			// Play each timeline once, the first time its element is in view in the profile panel
 			const observer = new IntersectionObserver(
 				entries => {
 					for (const entry of entries) {
@@ -123,17 +171,20 @@ const CallToAction = () => {
 						observer.unobserve(entry.target);
 					}
 				},
-				{ root: section.closest('#profile-panel'), threshold: 0.2 }
+				{ root: section.closest('#profile-panel'), threshold: REVEAL_THRESHOLD }
 			);
 			observer.observe(title);
 			observer.observe(copyright);
+
+			// Hover: a second fill sweeps over the title lines (mouse and keyboard focus only, not touch)
 			const hoverWave = gsap.to(lines, {
-				'--hover-fill': 111,
-				duration: 0.8,
-				stagger: 0.12,
+				'--hover-fill': TITLE_FILL_END,
+				duration: HOVER_FILL_DURATION,
+				stagger: HOVER_FILL_STAGGER,
 				ease: 'power2.inOut',
 				paused: true,
 			});
+
 			const enter = (event: Event) => {
 				if (event instanceof PointerEvent && (!canHover() || event.pointerType !== 'mouse')) return;
 				if (event.type === 'focus' && !title.matches(':focus-visible')) return;
@@ -142,10 +193,13 @@ const CallToAction = () => {
 			const leave = () => {
 				if (!title.matches(':hover, :focus-visible')) hoverWave.reverse();
 			};
+
 			title.addEventListener('pointerenter', enter);
 			title.addEventListener('focus', enter);
 			title.addEventListener('pointerleave', leave);
 			title.addEventListener('blur', leave);
+
+			// NOTE • Only the listeners and observer need manual cleanup; the context reverts the tweens
 			return () => {
 				observer.disconnect();
 				title.removeEventListener('pointerenter', enter);
@@ -157,29 +211,37 @@ const CallToAction = () => {
 		{ scope: sectionRef, dependencies: [present], revertOnUpdate: true },
 		{ reduced: '(prefers-reduced-motion: reduce)' }
 	);
+
 	// Effects
+	// Exposes how close the panel is to its bottom (0..1 over the last 160px) as --connect-bottom-progress
 	useEffect(() => {
 		const section = sectionRef.current;
 		const panel = section?.closest<HTMLElement>('#profile-panel');
 		if (!present || !section || !panel) return;
+
 		const update = () => {
 			const remaining = panel.scrollHeight - panel.clientHeight - panel.scrollTop;
-			const progress = Math.max(0, Math.min(1, 1 - remaining / 160));
+			const progress = Math.max(0, Math.min(1, 1 - remaining / BOTTOM_PROGRESS_DISTANCE));
 			section.style.setProperty('--connect-bottom-progress', String(progress));
 		};
+
 		update();
 		panel.addEventListener('scroll', update, { passive: true });
 		const observer = new ResizeObserver(update);
 		observer.observe(panel);
 		observer.observe(section);
+
 		return () => {
 			panel.removeEventListener('scroll', update);
 			observer.disconnect();
 			section.style.removeProperty('--connect-bottom-progress');
 		};
 	}, [present]);
+
+	// London time and year, refreshed periodically
 	useEffect(() => {
 		if (!present) return;
+
 		const update = () => {
 			const now = new Date();
 			setTime(
@@ -191,18 +253,30 @@ const CallToAction = () => {
 			);
 			setYear(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', year: 'numeric' }).format(now));
 		};
+
 		update();
-		const timer = setInterval(update, 30_000);
+		const timer = setInterval(update, CLOCK_REFRESH_MS);
 		return () => clearInterval(timer);
 	}, [present]);
+
+	// Lazy-loads the WebGL portrait engine once the section is prepared, and only renders while on screen
 	useEffect(() => {
 		const section = sectionRef.current,
 			canvas = canvasRef.current;
 		if (!present || !section || !canvas) return;
+
 		let disposed = false,
 			loading = false,
 			visible = false;
 		let scene: MatrixScene | undefined;
+
+		// NOTE • Freeze on the last frame while the profile closes: rendering under the panel's
+		// clip-path wipe drops frames on phones
+		const reveal = section.closest('#profile-panel')?.parentElement;
+		const closing = () => reveal?.dataset.state === 'closing';
+		const sync = () => scene?.setVisible(visible && !closing());
+
+		// Import the engine once; a failed import switches the section to its static fallback
 		const load = () => {
 			if (loading || disposed) return Promise.resolve();
 			loading = true;
@@ -210,12 +284,14 @@ const CallToAction = () => {
 				.then(({ createMatrix }) => {
 					if (disposed) return;
 					scene = createMatrix(canvas, section);
-					scene.setVisible(visible);
+					sync();
 				})
 				.catch(() => {
 					if (!disposed) section.dataset.state = 'fallback';
 				});
 		};
+
+		// 'matrixrestore' rebuilds the scene from scratch (dispatched on the section by other code)
 		const restore = () => {
 			scene?.destroy();
 			scene = undefined;
@@ -224,18 +300,24 @@ const CallToAction = () => {
 		};
 		section.addEventListener('matrixrestore', restore);
 		const stopPreparing = prepareScene(section, load);
+
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				visible = entry.isIntersecting;
-				scene?.setVisible(visible);
+				sync();
 			},
 			{ root: section.closest('#profile-panel'), threshold: 0 }
 		);
 		observer.observe(section);
+
+		const states = new MutationObserver(sync);
+		if (reveal) states.observe(reveal, { attributes: true, attributeFilter: ['data-state'] });
+
 		return () => {
 			disposed = true;
 			stopPreparing();
 			observer.disconnect();
+			states.disconnect();
 			scene?.destroy();
 			section.removeEventListener('matrixrestore', restore);
 			section.dataset.state = 'loading';

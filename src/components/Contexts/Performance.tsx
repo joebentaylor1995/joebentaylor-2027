@@ -4,7 +4,7 @@
 // ------------
 import { createContext, useEffect, useMemo, useRef, useState } from 'react';
 
-// Context Definition
+// Context
 // ------------
 export const PerformanceContext = createContext({
 	isReducedMotion: false,
@@ -14,15 +14,18 @@ export const PerformanceContext = createContext({
 // Component
 // ------------
 export const PerformanceProvider = ({ children }: { children: React.ReactNode }) => {
+	// State
 	const [performanceState, setPerformanceState] = useState({
 		isReducedMotion: false,
 		devicePixelRatio: 1,
 	});
 
+	// Refs
 	// Track if component is mounted to prevent state updates after unmount
 	const isMountedRef = useRef(true);
 	const mediaQueryRef = useRef<MediaQueryList | null>(null);
 
+	// Effects
 	useEffect(() => {
 		// Safety check for SSR
 		if (typeof window === 'undefined') {
@@ -78,9 +81,13 @@ export const PerformanceProvider = ({ children }: { children: React.ReactNode })
 		};
 	}, []);
 
+	// Derived
 	const value = useMemo(() => performanceState, [performanceState]);
 
+	// Render
 	return <PerformanceContext.Provider value={value}>{children}</PerformanceContext.Provider>;
 };
 
+// Exports
+// ------------
 // For documentation, see `docs/Tackl/PerformanceContext.md`

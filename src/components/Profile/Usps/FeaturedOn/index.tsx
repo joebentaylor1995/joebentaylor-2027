@@ -3,6 +3,7 @@
 // Imports
 // ------------
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
+import { pickVideoSource, type VideoSource } from '@utils/pickVideoSource';
 import { gsap } from 'gsap';
 import { use, useEffect, useRef } from 'react';
 
@@ -10,13 +11,18 @@ import { use, useEffect, useRef } from 'react';
 // ------------
 import s from './styles.module.scss';
 
+// Constants
+// ------------
+// Seamless loop: two stacked copies of the video; this long before the active one ends, the other
+// starts from 0 and fades in over CROSSFADE_SECONDS
 const CROSSFADE_SECONDS = 0.8;
 const LOOP_LEAD_SECONDS = 1;
 
 // Component
 // ------------
 // NOTE • video is the loop from the Profile panel's “Featured on” tile
-const FeaturedOn = ({ video: source }: { video: string }) => {
+// Autoplaying muted video that loops by crossfading between two <video> elements, only playing while on screen.
+const FeaturedOn = ({ video: fallback, sources }: { video: string; sources?: VideoSource[] | null }) => {
 	// Context
 	const profilePresent = use(ProfilePresenceContext);
 
@@ -27,20 +33,30 @@ const FeaturedOn = ({ video: source }: { video: string }) => {
 	useEffect(() => {
 		const container = containerRef.current;
 		if (!container || !profilePresent) return;
+
 		const videos = Array.from(container.querySelectorAll('video'));
+		const source = pickVideoSource(fallback, sources, container.clientWidth);
 		for (const video of videos) video.src = source;
+
+		// active = index of the video showing; incoming = index fading in (null when no crossfade is running)
 		let active = 0;
 		let incoming: number | null = null;
 		let fade: gsap.core.Tween | undefined;
 		let inView = false;
 		let disposed = false;
+
 		const shouldPlay = () => !disposed && inView && !document.hidden;
+
 		gsap.set(videos[0], { opacity: 1, zIndex: 0 });
 		gsap.set(videos[1], { opacity: 0, zIndex: 1 });
+
+		// Play, then pause again if the tile left the screen while play() was pending
 		const play = (video: HTMLVideoElement) =>
 			video.play().then(() => {
 				if (!shouldPlay()) video.pause();
 			});
+
+		// Restart the idle video from the top and fade it in over the active one
 		const crossfade = () => {
 			if (!shouldPlay() || incoming !== null) return;
 			const outgoing = videos[active];
@@ -71,10 +87,13 @@ const FeaturedOn = ({ video: source }: { video: string }) => {
 					incoming = null;
 				});
 		};
+
 		const checkLoop = () => {
 			const video = videos[active];
 			if (video.duration - video.currentTime <= LOOP_LEAD_SECONDS) crossfade();
 		};
+
+		// Pause everything (including a running fade) when off screen or hidden; resume when back
 		const syncPlayback = () => {
 			if (!shouldPlay()) {
 				for (const video of videos) video.pause();
@@ -86,16 +105,19 @@ const FeaturedOn = ({ video: source }: { video: string }) => {
 			if (incoming !== null) void play(videos[incoming]).catch(() => {});
 			fade?.resume();
 		};
+
 		const observer = new IntersectionObserver(([entry]) => {
 			inView = entry.isIntersecting;
 			syncPlayback();
 		});
 		observer.observe(container);
+
 		for (const video of videos) {
 			video.addEventListener('timeupdate', checkLoop);
 			video.addEventListener('ended', checkLoop);
 		}
 		document.addEventListener('visibilitychange', syncPlayback);
+
 		return () => {
 			disposed = true;
 			observer.disconnect();
@@ -110,7 +132,7 @@ const FeaturedOn = ({ video: source }: { video: string }) => {
 				gsap.set(video, { clearProps: 'opacity,zIndex' });
 			}
 		};
-	}, [profilePresent, source]);
+	}, [profilePresent, fallback, sources]);
 
 	// Render
 	return (

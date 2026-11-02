@@ -1,6 +1,5 @@
 // Imports
 // ------------
-
 import Analytics from '@parts/Analytics';
 import { consentScript } from '@parts/CookieBar/consent';
 import Favicons from '@parts/Favicons';
@@ -23,7 +22,7 @@ import { getSettings } from '@/data/content';
 import { toContact } from '@/data/site';
 import Providers from './Providers';
 
-// Styles
+// Styles + Interfaces
 // ------------
 import '@css/tokens.css';
 import '@css/global.scss';
@@ -86,6 +85,7 @@ export const generateMetadata = async (): Promise<Metadata> => {
 	};
 };
 
+// Browser chrome colour and scaling; the theme colour is the brand blue
 export const viewport: Viewport = {
 	width: 'device-width',
 	initialScale: 1,
@@ -94,10 +94,13 @@ export const viewport: Viewport = {
 
 // Component
 // ------------
-const RootLayout = async ({ children }: { children: React.ReactNode }) => {
+// NOTE • `modal` is the @modal slot: a non-featured case study, shown in the profile panel
+const RootLayout = async ({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) => {
+	// Data
 	// NOTE • Cached Sanity read (see src/cms/sanity/client.ts) — the shell still prerenders
 	const settings = await getSettings();
 
+	// Render
 	return (
 		<html
 			lang='en'
@@ -123,7 +126,7 @@ const RootLayout = async ({ children }: { children: React.ReactNode }) => {
 					<SiteLoader />
 					<LinkPreloader />
 					<NavigationWave>
-						<ProfileReveal profile={<Profile />}>
+						<ProfileReveal profile={<Profile />} project={modal}>
 							<Header />
 							<ViewTransition name='page-viewport' update='none' default='none'>
 								<main id='page'>
@@ -154,6 +157,8 @@ const RootLayout = async ({ children }: { children: React.ReactNode }) => {
 	);
 };
 
+// Exports
+// ------------
 // DisplayName added for better debugging in React DevTools
 RootLayout.displayName = 'RootLayout';
 export default RootLayout;

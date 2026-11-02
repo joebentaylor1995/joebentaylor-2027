@@ -1,6 +1,8 @@
 // NOTE • The full wordmark in its native 405 × 153 artboard, split per letter so
 // the intro can space, slice and recolour each word on its own.
 
+// Constants
+// ------------
 export const LOGO_BOX = { width: 405, height: 153 } as const;
 
 export type Word = {

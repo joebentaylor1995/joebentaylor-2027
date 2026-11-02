@@ -1,8 +1,15 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 import { defaultSettings } from '../src/components/Hero/Background/effect-settings';
 import { marqueePhrases } from '../src/components/Hero/Background/marquee-decoration';
 import { ScrollMotion } from '../src/components/Hero/Background/scroll-motion';
 
+// Tests
+// ------------
+// ScrollMotion unit tests: these run in Node with no page. They protect the wheel-gesture logic behind
+// the hero marquee phrases, portrait pulse and colour switch.
+// Marquee phrase advances once per gesture (a burst of wheel events), when direction reverses, and wraps.
 test('marquee advances once per gesture, on reversal, and wraps through every phrase', () => {
 	const motion = new ScrollMotion();
 	expect(marqueePhrases[motion.gesture]).toBe('Trusted by');
@@ -13,6 +20,7 @@ test('marquee advances once per gesture, on reversal, and wraps through every ph
 	expect(marqueePhrases[motion.gesture]).toBe('Loved by');
 	motion.add(-10);
 	expect(motion.gesture).toBe(2);
+	// A pause longer than the gesture gap starts a new gesture
 	for (let gesture = 3; gesture <= 7; gesture++) {
 		motion.step(defaultSettings.gestureGap + 0.01);
 		motion.add(-10);
@@ -21,6 +29,7 @@ test('marquee advances once per gesture, on reversal, and wraps through every ph
 	expect(marqueePhrases[motion.gesture % marqueePhrases.length]).toBe('Trusted by');
 });
 
+// The colour only switches once velocity passes the configured maximum, in either direction.
 test('colour waits for maximum velocity in either direction', () => {
 	for (const direction of [-1, 1]) {
 		const motion = new ScrollMotion();
@@ -38,6 +47,7 @@ test('colour waits for maximum velocity in either direction', () => {
 	}
 });
 
+// Scrolling up and down are mirror images: same pulse, opposite marquee velocity.
 test('upward and downward gestures produce the same portrait pulse and opposite marquee velocity', () => {
 	const down = new ScrollMotion();
 	const up = new ScrollMotion();
@@ -56,6 +66,8 @@ test('upward and downward gestures produce the same portrait pulse and opposite 
 	expect(up.pulse).toBeLessThan(0.001);
 });
 
+// Holding a fast scroll lets the depth pulse fall back to rest while the colour stays switched, and
+// reversing switches it back.
 test('sustained fast scroll releases the depth pulse and switches colour only once', () => {
 	const motion = new ScrollMotion();
 	let peak = 0;
@@ -68,6 +80,7 @@ test('sustained fast scroll releases the depth pulse and switches colour only on
 	expect(motion.pulse).toBeLessThan(0.001);
 	expect(motion.colourTarget).toBe(1);
 	expect(motion.velocity).toBeGreaterThan(0.8);
+	// Let it settle, then scroll the other way
 	for (let i = 0; i < 40; i++) motion.step(1 / 60);
 	for (let i = 0; i < 30; i++) {
 		motion.add(-400);
@@ -77,6 +90,7 @@ test('sustained fast scroll releases the depth pulse and switches colour only on
 	expect(motion.velocity).toBeLessThan(-0.8);
 });
 
+// Slow scrolling never triggers the colour switch, and velocity decays to a settled state at rest.
 test('gentle scrolling preserves colour and velocity decays at rest', () => {
 	const motion = new ScrollMotion();
 	for (let i = 0; i < 60; i++) {
@@ -89,6 +103,8 @@ test('gentle scrolling preserves colour and velocity decays at rest', () => {
 	expect(motion.settled).toBe(true);
 });
 
+// Browser check of the same behaviour: fast wheel gestures drive the colour portrait up and back down in
+// the live shader, with no GL errors.
 test('fast gestures alternate the rendered colour portrait and release sustained scroll', async ({
 	page,
 }, testInfo) => {
@@ -96,6 +112,7 @@ test('fast gestures alternate the rendered colour portrait and release sustained
 	const effect = page.getByTestId('hero-depth');
 	await expect(effect).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
 	const canvas = effect.locator('canvas');
+	// Fires 90 wheel events ~16ms apart (about a second of continuous scrolling)
 	const gesture = async (delta: number) =>
 		canvas.evaluate(async (element, amount) => {
 			for (let i = 0; i < 90; i++) {
@@ -103,6 +120,7 @@ test('fast gestures alternate the rendered colour portrait and release sustained
 				await new Promise(resolve => setTimeout(resolve, 16));
 			}
 		}, delta);
+	// Reads colourMix and scrollVelocity from the live program
 	const state = () =>
 		canvas.evaluate(element => {
 			const gl = (element as HTMLCanvasElement).getContext('webgl');
@@ -117,10 +135,14 @@ test('fast gestures alternate the rendered colour portrait and release sustained
 				error: gl.getError(),
 			};
 		});
+
+	// A fast downward gesture fully brings in the colour portrait and the pulse has already fallen back
 	await gesture(500);
 	await expect.poll(async () => (await state()).colour).toBeGreaterThan(0.95);
 	expect((await state()).pulse).toBeLessThan(0.02);
 	await page.screenshot({ path: testInfo.outputPath('colour-portrait.png') });
+
+	// A fast upward gesture takes it back out
 	await page.waitForTimeout(500);
 	await gesture(-500);
 	await expect.poll(async () => (await state()).colour).toBeLessThan(0.05);

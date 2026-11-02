@@ -1,6 +1,5 @@
 // Imports
 // ------------
-
 import Copyright from '@parts/Copyright';
 import Background from './Background';
 import Content from './Content';
@@ -13,6 +12,7 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
+// NOTE • introCover hides the scene until the intro reveals it
 const Hero = ({ heading, desc, logos }: I.HeroProps) => {
 	return (
 		<section className={s.jacket}>

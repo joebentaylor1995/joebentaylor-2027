@@ -1,5 +1,5 @@
 // Styles: Logo Marquee
-// ---------------
+// ------------
 // https://ryanmulligan.dev/blog/css-marquee/
 
 @keyframes scroll {
@@ -124,6 +124,8 @@
 		height: auto;
 		max-height: 4.1rem;
 		object-fit: contain;
+		user-select: none;
+		pointer-events: none;
 
 		@include heroDesktop {
 			filter: invert(1);

@@ -1,0 +1,89 @@
+.jacket {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	background: var(--model-background, var(--brand-c5));
+
+	// NOTE • Once the model has drawn its first frame, the canvas fades in over the poster
+	&[data-state='ready'] {
+		.canvas { opacity: 1; }
+		.poster { opacity: 0; }
+	}
+}
+
+.poster {
+	object-fit: cover;
+	transition: opacity var(--time-m) var(--easing-bezzy);
+}
+
+.canvas {
+	position: absolute;
+	inset: 0;
+	display: block;
+	width: 100%;
+	height: 100%;
+	opacity: 0;
+	cursor: grab;
+	transition: opacity var(--time-m) var(--easing-bezzy);
+
+	&:active { cursor: grabbing; }
+}
+
+// NOTE • Shared pill look for every control over the model
+.open span,
+.toggle span,
+.hint span {
+	display: block;
+	padding: 0.4rem 1rem;
+	border-radius: var(--br-round);
+	background: alpha(--brand-c4, 70);
+	color: var(--brand-c5);
+	backdrop-filter: blur(8px);
+}
+
+.open,
+.toggle {
+	padding: 0;
+	border: 0;
+	background: none;
+	cursor: pointer;
+
+	&:focus-visible span { outline: 2px solid var(--brand-c1); }
+}
+
+.open {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	width: 100%;
+
+	span {
+		padding: 0.8rem 1.6rem;
+		transition: background var(--time-m) var(--easing-bezzy);
+	}
+
+	&:hover span { background: alpha(--brand-c4, 85); }
+
+	&:disabled { cursor: progress; }
+}
+
+.toggle {
+	position: absolute;
+	right: var(--gap-s);
+	bottom: var(--gap-s);
+}
+
+// NOTE • A one-off nudge that the model can be dragged, gone after a few seconds
+.hint {
+	position: absolute;
+	bottom: var(--gap-s);
+	left: var(--gap-s);
+	margin: 0;
+	pointer-events: none;
+	animation: hint-out var(--time-m) var(--easing-bezzy) 3s forwards;
+}
+
+@keyframes hint-out {
+	to { opacity: 0; }
+}

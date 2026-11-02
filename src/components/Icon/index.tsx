@@ -1,45 +1,16 @@
 // Imports
-// ------
+// ------------
 import { memo } from 'react';
 import { cn } from '@/utils/cn';
 
-// Interfaces
+// Styles + Interfaces
 // ------------
 import type { IconProps } from './interface';
-// Styles
-// ------
 import s from './styles.module.scss';
 
-/**
- * Icon Component
- *
- * A reusable component for displaying SVG icons with consistent styling.
- * Icons are rendered using predefined SVG paths from ICON_MAP.
- *
- * @component
- * @example
- * // Basic usage
- * <Icon type="facebook" />
- *
- * // With custom class and click handler
- * <Icon
- *   type="codepen"
- *   className="custom-icon"
- *   onClick={() => console.log('Icon clicked')}
- * />
- *
- * @param {Object} props - Component props
- * @param {('facebook'|'codepen')} props.type - The type of icon to display
- * @param {string} [props.className] - Optional CSS class name for styling
- * @param {Function} [props.onClick] - Optional click handler
- * @param {string} [props.size='medium'] - Size of the icon ('small'|'medium'|'large')
- * @param {string} [props.color] - Custom color for the icon
- *
- * @returns {React.Element|null} Returns the icon component or null if type is invalid
- */
-
-// Icon map to avoid repetitive if statements
+// Constants
 // ------------
+// Icon map to avoid repetitive if statements
 const ICON_MAP: Record<string, { viewBox: string; path: React.ReactNode }> = {
 	facebook: {
 		viewBox: '0 0 24 24',
@@ -56,17 +27,26 @@ const ICON_MAP: Record<string, { viewBox: string; path: React.ReactNode }> = {
 	// Add other icons here following same pattern...
 };
 
+// Component
+// ------------
+/**
+ * Renders an SVG icon from ICON_MAP by `type`. Logs an error and renders
+ * nothing when the type isn't in the map.
+ *
+ * @example
+ * <Icon type='facebook' className={s.icon} />
+ */
 const Icon = memo(({ type, className, onClick }: IconProps) => {
-	// Get icon config from map
+	// Derived
 	const iconConfig = ICON_MAP[type];
 
-	// If icon type not found, log error and return null
+	// Unknown type: log it and render nothing
 	if (!iconConfig) {
 		console.error(`Icon type "${type}" not found. Please check the type prop passed to Icon component.`);
 		return null;
 	}
 
-	// Default props for all icons
+	// Props shared by every icon
 	const defaultProps = {
 		width: '24',
 		height: '24',
@@ -76,6 +56,7 @@ const Icon = memo(({ type, className, onClick }: IconProps) => {
 		viewBox: iconConfig.viewBox,
 	};
 
+	// Render
 	// NOTE • Decorative — label the surrounding button/link instead
 	return (
 		<svg aria-hidden='true' {...defaultProps}>

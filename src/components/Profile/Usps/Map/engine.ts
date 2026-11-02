@@ -1,6 +1,5 @@
 // Imports
 // ------------
-
 import { getSettings, subscribe } from '@parts/ProfileReveal/Settings/store';
 import { canHover } from '@utils/desktopHover';
 import { yieldSceneWork } from '@utils/prepareScene';
@@ -8,16 +7,24 @@ import { gsap } from 'gsap';
 import { loadGeometry } from './loadGeometry';
 import { framing, projectLocation, rotation } from './projection';
 
-// Motion
+// Constants
 // ------------
+// Seconds to travel back to the home view (Home key)
 const RETURN_SECONDS = 2;
+
+// Time constant (seconds) of the easing that follows the pointer
 const FOLLOW_SECONDS = 0.22;
+
+// Largest hover tilt, in degrees of longitude / latitude
 const MAX_TILT_X = 9;
 const MAX_TILT_Y = 6;
+
+// Keeps the globe from tipping over the poles
 const clampLatitude = (value: number) => Math.max(-85, Math.min(85, value));
 
 // Shaders
 // ------------
+// uniforms: rotation = globe orientation, scale/offset = clip-space placement, pointSize = dot size in px
 const VERTEX = `
 attribute vec3 position;
 uniform mat3 rotation;
@@ -26,6 +33,7 @@ uniform vec2 offset;
 uniform float pointSize;
 varying float depth;
 void main() {
+	// Rotate the point, then scale/offset its x,y into the card; z (towards viewer) is kept for fading
 	vec3 p = rotation * position;
 	depth = p.z;
 	gl_Position = vec4(p.xy * scale + offset, 0.0, 1.0);
@@ -37,14 +45,20 @@ varying float depth;
 uniform float opacity;
 uniform bool dotted;
 void main() {
+	// Dots are round; far-side points are faint and near-side ones brighten towards the centre
 	float edge = dotted ? 1.0 - smoothstep(0.30, 0.50, length(gl_PointCoord - vec2(0.5))) : 1.0;
 	float visibility = depth < 0.0 ? 0.065 : 0.32 + 0.68 * pow(depth, 0.35);
 	gl_FragColor = vec4(vec3(1.0), opacity * visibility * edge);
 }`;
 
-// Scene
+// Engine
 // ------------
+// Draws the dotted globe: grid, country outlines and land dots are three vertex buffers rotated in the
+// vertex shader. Intro spin settles on the configured view; dragging, arrow keys and hover tilt move it;
+// Home returns. The ticker runs only while something is animating. element.dataset.state is one of
+// travelling | ready | exploring | error. Resolves to { setVisible, destroy }.
 export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
+	// Setup
 	const geometry = await loadGeometry(signal);
 	signal.throwIfAborted();
 	const canvasElement = element.querySelector('canvas');
@@ -54,10 +68,13 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 	const context = canvas.getContext('webgl', { antialias: true, alpha: true });
 	if (!context) throw new Error('WebGL unavailable');
 	const gl = context;
+
 	const shaders: WebGLShader[] = [];
 	const buffers: WebGLBuffer[] = [];
 	const program = gl.createProgram();
 	if (!program) throw new Error('Globe program unavailable');
+
+	// Deletes everything created so far; also used when setup fails part-way
 	function releaseResources() {
 		for (const buffer of buffers) gl.deleteBuffer(buffer);
 		for (const shader of shaders) gl.deleteShader(shader);
@@ -71,16 +88,21 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		gl.compileShader(next);
 		return next;
 	}
+
+	// One buffer per geometry layer (outlines, grid, dots)
 	let layers: { name: string; buffer: WebGLBuffer; count: number }[];
 	try {
 		gl.attachShader(program, shader(gl.VERTEX_SHADER, VERTEX));
 		gl.attachShader(program, shader(gl.FRAGMENT_SHADER, FRAGMENT));
 		gl.linkProgram(program);
+
+		// Wait for compilation without blocking the main thread
 		const parallel = gl.getExtension('KHR_parallel_shader_compile');
 		do {
 			await yieldSceneWork();
 			signal.throwIfAborted();
 		} while (parallel && !gl.getProgramParameter(program, parallel.COMPLETION_STATUS_KHR));
+
 		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('Globe shader linking failed');
 		// biome-ignore lint/correctness/useHookAtTopLevel: WebGL useProgram is not a React hook.
 		gl.useProgram(program);
@@ -96,6 +118,7 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		releaseResources();
 		throw error;
 	}
+
 	const uniforms = Object.fromEntries(
 		['rotation', 'scale', 'offset', 'pointSize', 'opacity', 'dotted'].map(name => [
 			name,
@@ -107,6 +130,8 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 	gl.enable(gl.BLEND);
 	gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 	gl.clearColor(0, 0, 0, 0);
+
+	// Motion state. settings are live-editable, so destination()/start() read them each time
 	const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 	let settings = getSettings();
 	const destination = () => ({ latitude: settings.globeLatitude, longitude: settings.globeLongitude });
@@ -114,13 +139,18 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		latitude: clampLatitude(settings.globeLatitude + 5),
 		longitude: settings.globeLongitude - 28,
 	});
+
+	// reveal fades the globe in (0..1); view is the current centre; hover is a small extra tilt following the pointer;
+	// journey is the eased travel from a starting view to the home view (null when idle)
 	let reveal = motion.matches ? 1 : 0;
 	const listeners = new AbortController();
 	const options = { signal: listeners.signal };
 	const view = { ...(motion.matches ? destination() : start()) };
 	const hover = { x: 0, y: 0, targetX: 0, targetY: 0 };
 	let journey = motion.matches ? null : { from: start(), elapsed: 0, duration: settings.globeIntro };
+
 	let drag: { id: number; x: number; y: number; latitude: number; longitude: number } | null = null;
+
 	let visible = false,
 		ticking = false,
 		disposed = false,
@@ -129,6 +159,7 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		height = 1;
 	let frame = framing(width, height);
 
+	// Ticker control: the loop only runs while visible and animating
 	function stop() {
 		gsap.ticker.remove(tick);
 		ticking = false;
@@ -138,6 +169,8 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		ticking = true;
 		gsap.ticker.add(tick);
 	}
+
+	// Render one frame and position the Doncaster marker (hidden when it turns to the back)
 	function draw() {
 		if (disposed || contextLost) return;
 		element.style.setProperty('--map-reveal', String(reveal * reveal * (3 - 2 * reveal)));
@@ -154,11 +187,14 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 			gl.uniform1i(uniforms.dotted, Number(layer.name === 'dots'));
 			gl.drawArrays(layer.name === 'dots' ? gl.POINTS : gl.LINES, 0, layer.count);
 		}
+
 		const location = projectLocation(matrix);
 		marker?.style.setProperty('--map-x', `${frame.x + location.x * frame.radius}px`);
 		marker?.style.setProperty('--map-y', `${frame.y - location.y * frame.radius}px`);
 		marker?.style.setProperty('--map-opacity', String(Math.max(0, Math.min(1, (location.z - 0.05) / 0.3))));
 	}
+
+	// Advance reveal, the intro/return journey (ease-out quintic) and hover easing; stop once everything has settled
 	function tick(_time: number, deltaMs: number) {
 		const dt = deltaMs / 1000;
 		reveal = Math.min(1, reveal + dt / settings.globeFade);
@@ -173,6 +209,7 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 				element.dataset.state = 'ready';
 			}
 		}
+
 		const blend = 1 - Math.exp(-dt / FOLLOW_SECONDS);
 		hover.x += (hover.targetX - hover.x) * blend;
 		hover.y += (hover.targetY - hover.y) * blend;
@@ -181,9 +218,12 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 			hover.x = hover.targetX;
 			hover.y = hover.targetY;
 		}
+
 		draw();
 		if (!journey && settled && reveal === 1) stop();
 	}
+
+	// Size the canvas (pixel ratio capped at 2) and recompute framing with the zoom/offset settings applied
 	function resize() {
 		const bounds = element.getBoundingClientRect();
 		width = Math.max(1, bounds.width);
@@ -193,21 +233,27 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		canvas.height = Math.round(height * ratio);
 		gl.viewport(0, 0, canvas.width, canvas.height);
 		frame = framing(width, height);
+
 		frame = {
 			radius: frame.radius * settings.globeZoom,
 			x: width / 2 + (frame.x - width / 2) * settings.globeZoom + (width * settings.globeX) / 100,
 			y: height / 2 + (frame.y - height / 2) * settings.globeZoom + (height * settings.globeY) / 100,
 		};
+
 		gl.uniform2f(uniforms.scale, (2 * frame.radius) / width, (2 * frame.radius) / height);
 		gl.uniform2f(uniforms.offset, (2 * frame.x) / width - 1, 1 - (2 * frame.y) / height);
 		gl.uniform1f(uniforms.pointSize, 1.65 * ratio);
 		draw();
 	}
+
+	// Fold the hover tilt into the real view so dragging or travelling starts from what is on screen
 	function absorbHover() {
 		view.longitude += hover.x;
 		view.latitude = clampLatitude(view.latitude + hover.y);
 		hover.x = hover.y = hover.targetX = hover.targetY = 0;
 	}
+
+	// Home key: travel back to the settled view by the shortest way round in longitude
 	function returnHome() {
 		absorbHover();
 		view.longitude =
@@ -223,10 +269,13 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 			wake();
 		}
 	}
+
 	function resetHover() {
 		hover.targetX = hover.targetY = 0;
 		wake();
 	}
+
+	// Input: drag rotates the globe (0.18 degrees per px), hover tilts it, arrows step by 5 degrees
 	canvas.addEventListener(
 		'pointerdown',
 		event => {
@@ -265,6 +314,7 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		},
 		options
 	);
+
 	const release = () => {
 		drag = null;
 	};
@@ -273,6 +323,7 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 	canvas.addEventListener('lostpointercapture', release, options);
 	canvas.addEventListener('pointerleave', resetHover, options);
 	window.addEventListener('blur', resetHover, options);
+
 	canvas.addEventListener(
 		'keydown',
 		event => {
@@ -294,6 +345,8 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		},
 		options
 	);
+
+	// Reduced motion: jump to the home view and stop animating
 	motion.addEventListener(
 		'change',
 		() => {
@@ -310,6 +363,7 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		},
 		options
 	);
+
 	document.addEventListener(
 		'visibilitychange',
 		() => {
@@ -318,6 +372,7 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		},
 		options
 	);
+
 	canvas.addEventListener(
 		'webglcontextlost',
 		event => {
@@ -328,6 +383,8 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		},
 		options
 	);
+
+	// Settings panel: a change to any globe view setting (not dot or pulse styling) snaps to the new home view
 	const observer = new ResizeObserver(resize);
 	const unsubscribe = subscribe(() => {
 		const next = getSettings();
@@ -347,6 +404,8 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		element.dataset.state = 'ready';
 		resize();
 	});
+
+	// Settings panel's replay button restarts the intro
 	window.addEventListener(
 		'modal-settings-replay',
 		() => {
@@ -360,9 +419,12 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		},
 		options
 	);
+
 	observer.observe(element);
 	element.dataset.state = journey ? 'travelling' : 'ready';
 	resize();
+
+	// Handle
 	return {
 		setVisible(next: boolean) {
 			visible = next;

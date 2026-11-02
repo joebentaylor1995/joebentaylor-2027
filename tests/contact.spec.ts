@@ -1,12 +1,21 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects the booking modal as a proper modal dialog: full-viewport, focus moves in and stays
+// trapped, the calendar fades before the shell, and focus returns to the trigger on close.
 test('booking modal covers the viewport, traps focus and restores it on close', async ({ page }) => {
 	await page.goto('/');
+	// Wait for the site loader to complete before opening the modal
 	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true');
 	const trigger = page.getByRole('button', { name: 'Open Booking Form' });
 	await trigger.click();
 	const dialog = page.getByRole('dialog', { name: 'Book a call with Joe Ben Taylor' });
 	await expect(dialog).toBeVisible();
+
+	// Opens full-bleed with focus on the close button
 	const bounds = await dialog.boundingBox();
 	expect(bounds?.width).toBe(page.viewportSize()?.width);
 	expect(bounds?.height).toBe(page.viewportSize()?.height);
@@ -17,11 +26,15 @@ test('booking modal covers the viewport, traps focus and restores it on close', 
 		'rgb(0, 0, 0)'
 	);
 	expect(await dialog.evaluate(element => element.matches(':modal'))).toBe(true);
+
+	// Tab order stays inside the dialog
 	await page.keyboard.press('Tab');
 	await expect(dialog.getByRole('button', { name: 'Allow cookies and load calendar' })).toBeFocused();
 	await page.keyboard.press('Tab');
 	await expect(dialog.getByRole('link', { name: 'Book on Cal.com' })).toBeFocused();
 	await expect(dialog).toHaveCSS('opacity', '1');
+
+	// Closing is staged: the shell waits (transition-delay) while the calendar fades first
 	await page.keyboard.press('Escape');
 	await expect(dialog).toHaveAttribute('data-state', 'closing');
 	await expect(dialog).toBeVisible();
@@ -49,6 +62,7 @@ test('booking modal covers the viewport, traps focus and restores it on close', 
 	await expect(trigger).toBeFocused();
 });
 
+// Users who prefer reduced motion get an instant close with no transition.
 test('reduced motion closes the modal without a fade', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');
@@ -62,6 +76,8 @@ test('reduced motion closes the modal without a fade', async ({ page }) => {
 	await expect(trigger).toBeFocused();
 });
 
+// Protects consent for the calendar: nothing requests Cal.com until the visitor allows it,
+// and the embed stays hidden and busy while the remote page loads.
 test('Cal.com loads only after consent and preserves the booking URL', async ({ page }) => {
 	const requests: string[] = [];
 	await page.route('https://app.cal.com/**', route => {
@@ -81,6 +97,8 @@ test('Cal.com loads only after consent and preserves the booking URL', async ({ 
 	await expect(page.getByRole('status')).toHaveText('Loading calendar…');
 	await expect(page.getByRole('dialog').locator('[aria-busy]')).toHaveAttribute('aria-busy', 'true');
 	await expect(page.getByRole('dialog').locator('[inert]')).toHaveCSS('opacity', '0');
+
+	// The embed stays hidden until it has loaded
 	const embed = page.getByRole('dialog').locator('[inert]');
 	await expect(embed).toHaveCSS('visibility', 'hidden');
 	// Simulate Cal inserting (and later replacing) its iframe while the remote page loads.
@@ -97,6 +115,7 @@ test('Cal.com loads only after consent and preserves the booking URL', async ({ 
 	await expect(page.locator('html')).toHaveAttribute('data-cookie-consent', 'marketing');
 });
 
+// Protects the phone layout: the dialog does not overflow and the close button stays reachable.
 test('booking modal fits a narrow viewport', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/', { waitUntil: 'domcontentloaded' });

@@ -3,8 +3,13 @@
 // NOTE • The minimum honest check: the homepage renders, shows its heading,
 // and the console stays clean. Hydration crashes, broken providers and
 // bundling mistakes all fail here before anything subtler gets a chance.
+
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
 test('homepage renders without console errors', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('console', message => {

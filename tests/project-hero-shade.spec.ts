@@ -1,14 +1,23 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects the darkening gradient over the case study hero: the top 59% is untouched and it eases to 40%
+// black at the bottom, in both the WebGL hero and the native image used for reduced motion.
 for (const width of [390, 1440]) {
-	test(`case-study shade reaches 60% at 100svh and stays there at ${width}px`, async ({ page }) => {
+	test(`case-study shade darkens the bottom 41% to 40% black at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
+		// Serve a plain white image so any darkening in the output is the shade alone
 		await page.route('**/_next/image/**', route =>
 			route.fulfill({
 				contentType: 'image/svg+xml',
 				body: '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1600"><path fill="white" d="M0 0h1600v1600H0z"/></svg>',
 			})
 		);
+		// After each draw with a shade uniform, read the red channel at the right edge at four depths down the
+		// hero (2%, 50%, 80%, 100%) and store them on window
 		await page.addInitScript(() => {
 			const draw = WebGLRenderingContext.prototype.drawArrays;
 			WebGLRenderingContext.prototype.drawArrays = function (...args: Parameters<typeof draw>) {
@@ -19,7 +28,7 @@ for (const width of [390, 1440]) {
 				if (!shade) return;
 				const [scale] = this.getUniform(program, shade) as Float32Array;
 				const viewport = this.getParameter(this.VIEWPORT) as Int32Array;
-				const pixels = [0.02, 0.5, 1, 1.1].map(depth => {
+				const pixels = [0.02, 0.5, 0.8, 1].map(depth => {
 					const pixel = new Uint8Array(4);
 					this.readPixels(
 						Math.floor(viewport[2] * 0.99),
@@ -40,7 +49,8 @@ for (const width of [390, 1440]) {
 		const pixels = await page.evaluate(
 			() => (window as unknown as { projectShadePixels: number[] }).projectShadePixels
 		);
-		for (const [index, expected] of [252, 179, 102, 102].entries())
+		// Untouched above 59% of the hero, then easing to 40% black at its foot
+		for (const [index, expected] of [255, 255, 203, 153].entries())
 			expect(Math.abs(pixels[index] - expected)).toBeLessThanOrEqual(2);
 
 		// Reduced motion uses the native image and must retain the same overlay.
@@ -50,8 +60,8 @@ for (const width of [390, 1440]) {
 			const style = getComputedStyle(element, '::after');
 			return { opacity: style.opacity, background: style.backgroundImage, height: style.height };
 		});
-		expect(native.opacity).toBe('0.6');
-		expect(native.background).toContain('100svh');
-		expect(Number.parseFloat(native.height)).toBeGreaterThan(900);
+		expect(native.opacity).toBe('0.4');
+		expect(native.background).toContain('59%');
+		expect(Number.parseFloat(native.height)).toBeCloseTo(900, 0);
 	});
 }

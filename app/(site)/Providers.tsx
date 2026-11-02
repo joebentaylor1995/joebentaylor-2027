@@ -9,7 +9,7 @@ import dynamic from 'next/dynamic';
 import { type ComponentType, useEffect, useState } from 'react';
 import type { ContactDetails } from '@/data/site';
 
-// Dev Tools
+// Constants
 // ------------
 // NOTE • Loaded lazily and only in development, so neither the overlay's JS
 // nor its CSS ships in production builds
@@ -21,24 +21,33 @@ const GridExposer = process.env.NODE_ENV === 'development' ? dynamic(() => impor
 // site chrome live in app/(site)/layout.tsx, so page content stays
 // server-rendered. Styles need no provider: they're static CSS.
 const Providers = ({ children, contact }: { children: React.ReactNode; contact: ContactDetails }) => {
+	// State
 	const [Settings, setSettings] = useState<ComponentType | null>(null);
 	const [LoaderTweaks, setLoaderTweaks] = useState<ComponentType | null>(null);
+
+	// Effects
+	// Opt-in tooling panels, loaded only when their query parameter is present
 	useEffect(() => {
 		const params = new URLSearchParams(window.location.search);
 		let disposed = false;
+
 		if (params.has('globalSettings'))
 			void import('@parts/GlobalSettings').then(module => {
 				if (!disposed) setSettings(() => module.default);
 			});
+
 		// NOTE • ?loaderTweaks opens a live control panel for the site loader's intro
 		if (params.has('loaderTweaks'))
 			void import('@parts/SiteLoader/Tweaks').then(module => {
 				if (!disposed) setLoaderTweaks(() => module.default);
 			});
+
 		return () => {
 			disposed = true;
 		};
 	}, []);
+
+	// Render
 	return (
 		<>
 			{Settings && <Settings />}

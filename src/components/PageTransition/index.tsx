@@ -6,7 +6,7 @@ import { ViewTransition } from 'react';
 // ------------
 import type * as I from './interface';
 
-// Transition types
+// Constants
 // ------------
 // NOTE • Tag a navigation with a type to pick its animation:
 // <Link href='/work' transitionTypes={[NAV_FORWARD]}> or
@@ -19,6 +19,7 @@ export const NAV_BACK = 'nav-back';
 const pageAnimation = {
 	'project-mesh': 'none',
 	'next-project': 'none',
+	'project-modal': 'none',
 	[NAV_FORWARD]: 'navForward',
 	[NAV_BACK]: 'navBack',
 	default: 'none',

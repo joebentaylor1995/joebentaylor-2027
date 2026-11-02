@@ -1,7 +1,11 @@
+// Imports
+// ------------
 import { useGSAP } from '@gsap/react';
 import { mq } from '@tackl';
 import gsap from 'gsap';
 
+// Types
+// ------------
 type Breakpoints = Record<string, string>;
 
 type MatchMediaConditions = Record<string, boolean>;
@@ -13,6 +17,8 @@ type MatchMediaConditions = Record<string, boolean>;
  */
 type AnimationCallback = (conditions: MatchMediaConditions) => void;
 
+// Constants
+// ------------
 // NOTE • Built from the same breakpoint tokens as the SCSS bp() mixins, so
 // layout and animations can never desync — m is the tablet threshold, l the
 // desktop one. mq.down sits 0.02px under, keeping the ranges exclusive.
@@ -22,6 +28,8 @@ const DEFAULT_BREAKPOINTS: Breakpoints = {
 	isTablet: `${mq.up.m} and ${mq.down.l}`,
 };
 
+// Hook
+// ------------
 /**
  * React hook for running GSAP animations with responsive match media conditions.
  *
@@ -69,8 +77,10 @@ export function useAnimation(
 	options: Parameters<typeof useGSAP>[1] = {},
 	breakpoints: Breakpoints = {}
 ): void {
+	// Derived
 	const mergedBreakpoints: Breakpoints = { ...DEFAULT_BREAKPOINTS, ...breakpoints };
 
+	// Animations
 	useGSAP(() => {
 		const mm = gsap.matchMedia();
 

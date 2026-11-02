@@ -9,7 +9,7 @@ import ProjectOverview from '@parts/ProjectOverview';
 import { toMetadata } from '@utils/metadata';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getNextProject, getProject, getProjectSlugs } from '@/data/content';
+import { getNextProject, getProject, getProjectSlugs, isModalCaseStudy } from '@/data/content';
 import { projectDummy } from '@/data/projects';
 
 // Types
@@ -45,9 +45,26 @@ export const generateMetadata = async ({ params }: Params): Promise<Metadata> =>
 // Component
 // ------------
 const CaseStudy = async ({ params }: Params) => {
+	// Data
 	const { slug } = await params;
-	const [project, nextProject] = await Promise.all([getProject(slug), getNextProject(slug)]);
+	const [project, nextProject, isModal] = await Promise.all([
+		getProject(slug),
+		getNextProject(slug),
+		isModalCaseStudy(slug),
+	]);
+
 	if (!project) notFound();
+
+	// Render
+	// NOTE • A non-featured case study opens in the profile panel (the layout's
+	// @modal slot) over the projects page, so this route renders that page —
+	// the same marker as projects/page.tsx — as the scene behind it
+	if (isModal)
+		return (
+			<PageTransition>
+				<div data-projects-page />
+			</PageTransition>
+		);
 
 	return (
 		<PageTransition>
@@ -60,6 +77,8 @@ const CaseStudy = async ({ params }: Params) => {
 	);
 };
 
+// Page
+// ------------
 // Keep the outgoing page until the complete case study can commit. A local
 // empty Suspense fallback would be captured as the incoming transition image.
 const Page = ({ params }: Params) => <CaseStudy params={params} />;

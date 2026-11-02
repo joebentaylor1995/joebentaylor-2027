@@ -11,6 +11,7 @@ import config from '../../../../sanity.config';
 // Requires NEXT_PUBLIC_SANITY_PROJECT_ID in .env — run
 // `bunx sanity init --env .env` to create/link a project.
 const StudioPage = () => {
+	// Render
 	return <NextStudio config={config} />;
 };
 

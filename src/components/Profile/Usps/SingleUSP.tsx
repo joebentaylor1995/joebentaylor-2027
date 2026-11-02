@@ -2,13 +2,11 @@
 
 // Imports
 // ------------
-
-// Styles + Interfaces
-// ------------
 import s from './styles.module.scss';
 
 // Component
 // ------------
+// Tile wrapper: an external link (new tab) when href is given, otherwise a plain container
 const SingleUSP = ({ children, href, linkLabel }: { children: React.ReactNode; href?: string; linkLabel?: string }) => {
 	if (href)
 		return (

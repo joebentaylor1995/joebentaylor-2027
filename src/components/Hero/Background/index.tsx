@@ -18,6 +18,8 @@ import type { SettingsProps } from './Settings/interface';
 import { type IntroSettings, introDefaults, introReplays, introSettings, mobileIntroDefaults } from './scene-intro';
 import s from './styles.module.scss';
 
+// Constants
+// ------------
 // Cover sizing uses the landscape source (4046 × 2799), including mobile zoom.
 // Desktop scales with width, or with height on tall windows (see portraitFitWidth).
 const DESKTOP_PORTRAIT_VW = Math.ceil(defaultSettings.zoom * 100);
@@ -29,16 +31,23 @@ const PORTRAIT_SIZES = `${HERO_DESKTOP_QUERY} max(${DESKTOP_PORTRAIT_VW}vw, ${DE
 // biggest drag on it. Desktop keeps the higher quality.
 const PORTRAIT_QUALITY = { desktop: 90, mobile: 75 };
 const portraitProps = { src: portraitUrl, alt: '', fill: true, sizes: PORTRAIT_SIZES } as const;
+
+// Resolved at module load so the <link rel='preload'> tags in the render match the <picture> sources exactly
 const { props: desktopPortrait } = getImageProps({ ...portraitProps, quality: PORTRAIT_QUALITY.desktop });
 const { props: mobilePortrait } = getImageProps({ ...portraitProps, quality: PORTRAIT_QUALITY.mobile });
 
 // Component
 // ------------
+// The hero portrait: a Next-optimised <img> (the LCP fallback) with a WebGL canvas layered on top.
+// The renderer is code-split and only mounted without reduced-motion; once its first frame
+// is drawn `ready` flips and the CSS cross-fades from the <img> to the canvas.
 const Background = ({ className }: I.BackgroundProps) => {
 	// Refs
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const photoRef = useRef<HTMLImageElement>(null);
 	const controllerRef = useRef<DepthController | null>(null);
+
+	// Refs mirror the latest settings so the renderer's frame loop reads them without re-mounting
 	const settingsRef = useRef<DepthSettings>({ ...defaultSettings });
 	const liquidRef = useRef<LiquidSettings>({ ...liquidDefaults });
 
@@ -48,6 +57,8 @@ const Background = ({ className }: I.BackgroundProps) => {
 	const [Controls, setControls] = useState<ComponentType<SettingsProps> | null>(null);
 	const [liquidValues, setLiquidValues] = useState<LiquidSettings>({ ...liquidDefaults });
 	const [liquidOpen, setLiquidOpen] = useState(false);
+
+	// Intro settings are kept per layout (phones and desktop animate differently)
 	const [introTarget, setIntroTarget] = useState<'mobile' | 'desktop'>('desktop');
 	const [introProfiles, setIntroProfiles] = useState({
 		mobile: { ...mobileIntroDefaults },
@@ -57,6 +68,7 @@ const Background = ({ className }: I.BackgroundProps) => {
 	const [LiquidControls, setLiquidControls] = useState<ComponentType<LiquidControlsProps> | null>(null);
 
 	// Effects
+	// Load any saved intro profiles before paint and hand the active one to the scene
 	useLayoutEffect(() => {
 		const profiles = readIntroProfiles();
 		const host = canvasRef.current?.closest('section');
@@ -64,6 +76,7 @@ const Background = ({ className }: I.BackgroundProps) => {
 		setIntroProfiles(profiles);
 	}, []);
 
+	// Mount the WebGL renderer, and remount it when reduced-motion or the layout/hover capability changes
 	useEffect(() => {
 		const canvas = canvasRef.current,
 			photo = photoRef.current,
@@ -74,6 +87,8 @@ const Background = ({ className }: I.BackgroundProps) => {
 		const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 		const desktopLayout = window.matchMedia(HERO_DESKTOP_QUERY);
 		const desktop = window.matchMedia(`${HERO_DESKTOP_QUERY} and (hover: hover) and (pointer: fine)`);
+
+		// `generation` lets a newer start() (or unmount) cancel one still awaiting the import
 		let generation = 0;
 		const start = async () => {
 			const current = ++generation;
@@ -114,6 +129,7 @@ const Background = ({ className }: I.BackgroundProps) => {
 		};
 	}, []);
 
+	// Keep the scene's intro settings pointing at the profile for the current layout
 	useEffect(() => {
 		const query = window.matchMedia(HERO_DESKTOP_QUERY);
 		const apply = () => {
@@ -125,10 +141,13 @@ const Background = ({ className }: I.BackgroundProps) => {
 		query.addEventListener('change', apply);
 		return () => query.removeEventListener('change', apply);
 	}, [introProfiles]);
+
+	// Start the settings panel's intro toggle on the layout actually in use
 	useEffect(() => {
 		setIntroTarget(window.matchMedia(HERO_DESKTOP_QUERY).matches ? 'desktop' : 'mobile');
 	}, []);
 
+	// Lazy-load the settings panel only when the page is opened with ?heroSettings
 	useEffect(() => {
 		let active = true;
 		if (new URLSearchParams(window.location.search).has('heroSettings')) {
@@ -146,6 +165,9 @@ const Background = ({ className }: I.BackgroundProps) => {
 		settingsRef.current = next;
 		setSettings(next);
 	};
+
+	// The liquid settings object is mutated in place (the renderer holds a reference), then a
+	// fresh depth settings object is published so the frame loop redraws
 	const updateLiquid = (next: LiquidSettings) => {
 		Object.assign(liquidRef.current, next);
 		setLiquidValues(next);
@@ -195,6 +217,10 @@ const Background = ({ className }: I.BackgroundProps) => {
 						'--mobile-portrait-y': `${settings.mobilePositionY}%`,
 						'--mobile-portrait-scale': settings.mobileZoom,
 						'--mobile-portrait-rotation': `${settings.mobileRotation}deg`,
+						'--tablet-portrait-x': `${settings.tabletPositionX}%`,
+						'--tablet-portrait-y': `${settings.tabletPositionY}%`,
+						'--tablet-portrait-scale': settings.tabletZoom,
+						'--tablet-portrait-rotation': `${settings.tabletRotation}deg`,
 					} as CSSProperties
 				}
 			>

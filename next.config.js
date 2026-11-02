@@ -32,12 +32,22 @@ const sanity = {
 	connect: ['https://*.sanity.io', 'wss://*.sanity.io'],
 };
 
+// NOTE • Sanity files are served from the R2 media Worker when it's set
+// (src/utils/mediaUrl.ts). <video> is covered by media-src https:, but the 3D
+// model viewer fetch()es its .glb, so the Worker's origin needs connect-src too
+const media = {
+	connect: process.env.NEXT_PUBLIC_MEDIA_URL ? [new URL(process.env.NEXT_PUBLIC_MEDIA_URL).origin] : [],
+};
+
 const contentSecurityPolicy = {
 	'default-src': ["'self'"],
 	// NOTE • React needs eval in development only, for its debugging stacks
 	'script-src': [
 		"'self'",
 		"'unsafe-inline'",
+		// NOTE • Lets the 3D model viewer compile its geometry decoders (meshopt,
+		// Draco) — WebAssembly only, not JavaScript eval
+		"'wasm-unsafe-eval'",
 		...(isDev ? ["'unsafe-eval'"] : []),
 		...(hasGoogleAnalytics ? googleAnalytics.script : []),
 		'https://app.cal.com',
@@ -50,7 +60,14 @@ const contentSecurityPolicy = {
 	'img-src': ["'self'", 'blob:', 'data:', 'https:'],
 	'media-src': ["'self'", 'blob:', 'https:'],
 	'font-src': ["'self'"],
-	'connect-src': ["'self'", ...sanity.connect, ...(hasGoogleAnalytics ? googleAnalytics.connect : [])],
+	// NOTE • The Draco decoder (public/draco) runs in workers built from blob: URLs
+	'worker-src': ["'self'", 'blob:'],
+	'connect-src': [
+		"'self'",
+		...sanity.connect,
+		...media.connect,
+		...(hasGoogleAnalytics ? googleAnalytics.connect : []),
+	],
 	'frame-src': [
 		"'self'",
 		'https://cal.com',
@@ -87,6 +104,8 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+	// Lets other devices on the local network load the dev server, which only trusts localhost by default
+	allowedDevOrigins: ['192.168.*.*'],
 	// Sass — styles are SCSS CSS Modules (styles.module.scss) plus the global
 	// src/css/global.scss. `additionalData` prepends the Tackl SCSS layer
 	// (src/css/tackl) to every .scss file, so bp(), the type and spacing mixins,
@@ -260,6 +279,15 @@ const nextConfig = {
 	// loads its own scripts and APIs and manages its own policy
 	async headers() {
 		return [{ source: '/((?!studio).*)', headers: securityHeaders }];
+	},
+
+	// Email signature images moved into /email/ — keep the old URLs working for
+	// signatures and already-sent emails that still point at the root
+	async redirects() {
+		return [
+			{ source: '/pp.jpg', destination: '/email/pp.jpg', permanent: true },
+			{ source: '/logo.jpg', destination: '/email/logo.jpg', permanent: true },
+		];
 	},
 
 	// The profile panel is an overlay, not a page — /profile/ is the address

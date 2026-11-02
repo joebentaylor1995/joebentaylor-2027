@@ -24,6 +24,7 @@ const EXPIRE_NOW = { expire: 0 };
 
 // Exports
 // ------------
+// Development shortcut: clears the cache, then returns to the site
 export const GET = async (request: NextRequest) => {
 	if (process.env.NODE_ENV !== 'development') return new NextResponse(null, { status: 404 });
 
@@ -35,6 +36,7 @@ export const GET = async (request: NextRequest) => {
 	redirect(target.startsWith('/') && !target.startsWith('//') ? target : '/');
 };
 
+// The Sanity webhook: verifies the signature, then expires the cache tag
 export const POST = async (request: NextRequest) => {
 	const secret = process.env.SANITY_REVALIDATE_SECRET;
 	if (!secret) return NextResponse.json({ message: 'Revalidation is not configured' }, { status: 503 });
@@ -47,6 +49,7 @@ export const POST = async (request: NextRequest) => {
 
 		revalidateTag(SANITY_CACHE_TAG, EXPIRE_NOW);
 		revalidatePath('/sitemap.xml');
+
 		return NextResponse.json({ revalidated: true, type: body?._type ?? null });
 	} catch (error: unknown) {
 		console.error('Revalidation failed:', error);
