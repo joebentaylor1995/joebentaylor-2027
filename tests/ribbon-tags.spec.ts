@@ -1,5 +1,6 @@
 // Imports
 // ------------
+import { fetchCatalogue } from './helpers/catalogue';
 import { expect, test } from './helpers/test';
 
 // Tests
@@ -9,8 +10,7 @@ import { expect, test } from './helpers/test';
 test('ribbon displays selected tags in order and hides empty subtitles', async ({ page }) => {
 	// Give the first project three tags and the second none
 	await page.route('**/api/projects-ribbon/', async route => {
-		const response = await route.fetch();
-		const data = await response.json();
+		const { response, data } = await fetchCatalogue(route);
 		data.featured[0].tags = ['Development', 'Branding', 'UI/UX'];
 		data.featured[1].tags = [];
 		await route.fulfill({ response, json: data });
