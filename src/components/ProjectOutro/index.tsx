@@ -141,7 +141,10 @@ const ProjectOutro = ({ review, nextProject, cta = 'next' }: ProjectOutroProps) 
 								src={review.image}
 								alt={review.author}
 								fill
-								sizes='64px'
+								// NOTE • Twice the drawn size, even on a standard screen: a face at
+								// exactly 64px has too few pixels to hold its detail
+								sizes='128px'
+								quality={90}
 							/>
 						</div>
 					</div>

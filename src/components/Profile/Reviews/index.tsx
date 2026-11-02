@@ -111,7 +111,9 @@ const Reviews = ({ reviews }: { reviews: Review[] }) => {
 						<figcaption className={s.author}>
 							<div className={s.portrait}>
 								<div className={s.face} data-review-face>
-									<Image src={review.image} fill sizes='64px' alt={review.author} />
+									{/* NOTE • Twice the drawn size, even on a standard screen: a face at
+									    exactly 64px has too few pixels to hold its detail */}
+									<Image src={review.image} fill sizes='128px' quality={90} alt={review.author} />
 								</div>
 								{review.logo && (
 									<span className={s.logo} data-review-logo>
