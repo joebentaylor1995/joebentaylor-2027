@@ -1,8 +1,16 @@
+import type { VideoSource } from '@utils/pickVideoSource';
 import { PLACEHOLDER_IMAGE, type Seo } from './site';
 
 export type ProjectMedia =
 	| { type: 'image'; src: string; alt: string; aspect?: number | null }
-	| { type: 'video'; src: string; alt: string; poster?: string | null; aspect?: number | null }
+	| {
+			type: 'video';
+			src: string;
+			sources?: VideoSource[] | null;
+			alt: string;
+			poster?: string | null;
+			aspect?: number | null;
+	  }
 	// NOTE • `src` is the YouTube link as pasted in Sanity
 	| { type: 'youtube'; src: string; alt: string };
 

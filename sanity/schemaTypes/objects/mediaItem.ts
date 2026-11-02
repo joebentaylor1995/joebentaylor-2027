@@ -1,8 +1,8 @@
 // Media Item Object
 // ------------
 // NOTE • An image, a short muted video loop, or a YouTube video. Uploaded
-// loops are served straight from Sanity's file CDN, so keep them short,
-// compressed and under ~10 MB — anything longer belongs on YouTube.
+// loops are served from R2 (docs/Sanity/R2Media.md) with no adaptive streaming,
+// so keep them short — anything longer belongs on YouTube.
 
 // Imports
 // ------------
@@ -13,6 +13,7 @@ import { defineField, defineType, type PreviewValue } from 'sanity';
 import { getYouTubeId, getYouTubeThumbnail } from '../../../src/utils/youtube';
 import { CompressedVideoInput } from '../../components/CompressedVideoInput';
 import { YouTubeInput } from '../../components/YouTubeInput';
+import { videoRenditionsField } from './videoRenditions';
 
 // Helpers
 // ------------
@@ -77,7 +78,8 @@ export const mediaItem = defineType({
 			type: 'file',
 			description: 'MP4, muted, a few seconds long. It autoplays and loops.',
 			options: { accept: 'video/mp4,video/webm' },
-			// NOTE • Compresses in the browser before upload (H.264, ≤1280px, sound removed)
+			fields: [videoRenditionsField],
+			// NOTE • Compresses in the browser before upload (H.264, several widths, sound removed)
 			components: { input: CompressedVideoInput },
 			hidden: ({ parent }) => kindOf(parent) !== 'video',
 			validation: rule =>

@@ -3,6 +3,7 @@
 // Imports
 // ------------
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
+import { pickVideoSource, type VideoSource } from '@utils/pickVideoSource';
 import { gsap } from 'gsap';
 import { use, useEffect, useRef } from 'react';
 
@@ -21,7 +22,7 @@ const LOOP_LEAD_SECONDS = 1;
 // ------------
 // NOTE • video is the loop from the Profile panel's “Featured on” tile
 // Autoplaying muted video that loops by crossfading between two <video> elements, only playing while on screen.
-const FeaturedOn = ({ video: source }: { video: string }) => {
+const FeaturedOn = ({ video: fallback, sources }: { video: string; sources?: VideoSource[] | null }) => {
 	// Context
 	const profilePresent = use(ProfilePresenceContext);
 
@@ -34,6 +35,7 @@ const FeaturedOn = ({ video: source }: { video: string }) => {
 		if (!container || !profilePresent) return;
 
 		const videos = Array.from(container.querySelectorAll('video'));
+		const source = pickVideoSource(fallback, sources, container.clientWidth);
 		for (const video of videos) video.src = source;
 
 		// active = index of the video showing; incoming = index fading in (null when no crossfade is running)
@@ -130,7 +132,7 @@ const FeaturedOn = ({ video: source }: { video: string }) => {
 				gsap.set(video, { clearProps: 'opacity,zIndex' });
 			}
 		};
-	}, [profilePresent, source]);
+	}, [profilePresent, fallback, sources]);
 
 	// Render
 	return (

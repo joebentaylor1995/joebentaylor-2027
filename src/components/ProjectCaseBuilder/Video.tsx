@@ -3,6 +3,7 @@
 // Imports
 // ------------
 import { observeVideoPlayback } from '@utils/observeVideoPlayback';
+import { pickVideoSource } from '@utils/pickVideoSource';
 import { useEffect, useRef } from 'react';
 
 // Styles + Interfaces
@@ -20,7 +21,10 @@ const Video = ({ media }: VideoProps) => {
 	useEffect(() => {
 		const video = videoRef.current;
 		if (!video) return;
-		if (video.getAttribute('src') !== media.src) video.src = media.src;
+		// NOTE • The markup's src is the widest copy. preload='none' fetches nothing,
+		// so swapping it here is free
+		const source = pickVideoSource(media.src, media.sources, video.clientWidth);
+		if (video.getAttribute('src') !== source) video.src = source;
 		// NOTE • Without a poster Sanity can't give the shape up front — take it from
 		// the video itself once its metadata loads
 		const figure = video.closest('figure');
@@ -38,7 +42,7 @@ const Video = ({ media }: VideoProps) => {
 			video.removeAttribute('src');
 			video.load();
 		};
-	}, [media.src]);
+	}, [media.src, media.sources]);
 
 	// Render
 	return (
