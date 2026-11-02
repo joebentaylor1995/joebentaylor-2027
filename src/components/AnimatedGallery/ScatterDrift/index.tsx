@@ -4,6 +4,7 @@
 // ------------
 import Image from 'next/image';
 import { type CSSProperties, useCallback, useMemo, useRef, useState } from 'react';
+
 // Styles + Interfaces
 // ------------
 import type * as I from '../interface';
@@ -21,6 +22,7 @@ const CARD_STYLE = { '--card-width': CARD_WIDTH, '--card-aspect': CARD_ASPECT } 
 
 // Component
 // ------------
+// Three lanes of cards drifting in opposite directions, gliding a slot at a time (layout maths lives in ./layout)
 const ScatterDrift = ({ images, background, sizes }: I.GalleryAnimationProps) => {
 	// Refs
 	const stageRef = useRef<HTMLDivElement>(null);

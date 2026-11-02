@@ -9,25 +9,34 @@ import Image from 'next/image';
 import { use, useEffect, useRef, useState } from 'react';
 import type { Review } from '@/data/site';
 
-// Styles
+// Styles + Interfaces
 // ------------
 import s from './styles.module.scss';
 
 // Component
 // ------------
 const Reviews = ({ reviews }: { reviews: Review[] }) => {
-	// Context + Refs
+	// Context
 	const present = use(ProfilePresenceContext);
+
+	// Refs
 	const sectionRef = useRef<HTMLElement>(null);
+	// Set once the motion module has loaded; until then navigation just changes the active slide
 	const navigateRef = useRef<((direction: number) => void) | null>(null);
+
+	// State
 	const [active, setActive] = useState(0);
 
 	// Effects
+	// Loads the GSAP slide transitions only when the section nears the viewport inside the profile panel
 	useEffect(() => {
 		const section = sectionRef.current;
+
 		if (!present || !section) return;
+
 		let cancelled = false;
 		let destroy: (() => void) | undefined;
+
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				if (!entry.isIntersecting) return;
@@ -41,7 +50,9 @@ const Reviews = ({ reviews }: { reviews: Review[] }) => {
 			},
 			{ root: section.closest('#profile-panel'), rootMargin: '200px' }
 		);
+
 		observer.observe(section);
+
 		return () => {
 			cancelled = true;
 			observer.disconnect();

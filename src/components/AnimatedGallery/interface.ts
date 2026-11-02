@@ -1,3 +1,5 @@
+// Types
+// ------------
 import type { ReactNode, Ref } from 'react';
 import type { GalleryAnimation, GalleryImage } from '@/data/projects';
 

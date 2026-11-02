@@ -1,3 +1,5 @@
+// Types
+// ------------
 export interface ToolkitLayer {
 	src: string;
 	x: number;

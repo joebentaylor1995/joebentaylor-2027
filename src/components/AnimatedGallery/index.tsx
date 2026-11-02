@@ -2,6 +2,7 @@
 // ------------
 import type { ComponentType } from 'react';
 import type { GalleryAnimation } from '@/data/projects';
+
 // Styles + Interfaces
 // ------------
 import type * as I from './interface';
@@ -20,6 +21,7 @@ const ANIMATIONS: Record<GalleryAnimation, ComponentType<I.GalleryAnimationProps
 
 // Component
 // ------------
+// Picks the animation variant for a gallery block; an unknown value falls back to scatterDrift
 const AnimatedGallery = ({ animation, ...props }: I.AnimatedGalleryProps) => {
 	// Derived
 	const Animation = ANIMATIONS[animation] ?? ScatterDrift;

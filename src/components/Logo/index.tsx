@@ -14,20 +14,28 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
+// The wordmark as inline SVG. The glyphs are defined once in <defs> and reused three ways:
+// the visible mark, a ghost copy, and one clipped copy per horizontal band (SLICES) that the
+// hover glitch shifts sideways. `useId` keeps the def ids unique when several logos are on a page.
 const Logo = ({ className }: I.LogoProps) => {
 	// Refs
 	const ref = useRef<SVGSVGElement>(null);
 	const id = useId();
 
 	// Effects
+	// Hover/keyboard-focus glitch: listen on the surrounding link (or the svg itself) and
+	// play the frame timeline from glitch.ts
 	useEffect(() => {
 		const svg = ref.current;
 		const host = svg?.closest('a') ?? svg;
 		if (!svg || !host) return;
+
 		const ghost = svg.querySelector('[data-glitch-ghost]');
 		const slices = Array.from(svg.querySelectorAll('[data-glitch-slice]'));
 		let timeline: gsap.core.Timeline | null = null;
 
+		// Applies one glitch frame: a null offset hides that band; the ghost is scaled about
+		// the logo's centre (34, 13 in viewBox units) after its offset
 		const render = ({ ghost: look, slices: offsets }: GlitchFrame) => {
 			slices.forEach((slice, index) => {
 				const offset = offsets[index];
@@ -54,17 +62,21 @@ const Logo = ({ className }: I.LogoProps) => {
 			GLITCH_FRAMES.forEach((frame, index) => {
 				timeline?.call(render, [frame], index / GLITCH_FPS);
 			});
+			// Empty tween that pads the timeline to the full length so onComplete waits for the last frame to be held
 			timeline.set({}, {}, GLITCH_FRAMES.length / GLITCH_FPS);
 		};
 
+		// Pointer enter only counts for a mouse, and focus only when the browser shows a focus ring
 		const onPointerEnter = (event: Event) => {
 			if (event instanceof PointerEvent && event.pointerType === 'mouse') play();
 		};
 		const onFocus = () => {
 			if (host.matches(':focus-visible')) play();
 		};
+
 		host.addEventListener('pointerenter', onPointerEnter);
 		host.addEventListener('focus', onFocus);
+
 		return () => {
 			host.removeEventListener('pointerenter', onPointerEnter);
 			host.removeEventListener('focus', onFocus);

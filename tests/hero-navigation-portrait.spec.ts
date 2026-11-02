@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, type Page, test } from '@playwright/test';
 
+// Helpers
+// ------------
+// Compares two PNG screenshots in the page: the mean per-channel difference, and the fraction of
+// channels that differ by more than 16/255. Alpha is skipped.
 const compareFrames = async (page: Page, before: Buffer, after: Buffer) =>
 	page.evaluate(
 		async sources => {
@@ -29,6 +35,10 @@ const compareFrames = async (page: Page, before: Buffer, after: Buffer) =>
 		[before.toString('base64'), after.toString('base64')]
 	);
 
+// Tests
+// ------------
+// Protects the portrait handover when returning home from Projects: the native image shown while the
+// GPU portrait loads must match the WebGL one closely, on first and repeat visits, at each viewport.
 for (const viewport of [
 	{ width: 1440, height: 900 },
 	{ width: 1440, height: 1280 },
@@ -38,6 +48,7 @@ for (const viewport of [
 		page,
 	}, info) => {
 		await page.setViewportSize(viewport);
+		// The depth map request is held open so the native image can be captured before the GPU takes over
 		let releaseDepth = () => {};
 		let depthGate = Promise.resolve();
 		let depthRequested = false;
@@ -61,6 +72,7 @@ for (const viewport of [
 			height: Math.round(viewport.height * (viewport.width === 390 ? 0.2 : 0.6)),
 		};
 		for (const visit of ['first', 'cached']) {
+			// Re-arm the gate for each round trip
 			depthGate = new Promise<void>(resolve => {
 				releaseDepth = resolve;
 			});
@@ -79,12 +91,14 @@ for (const viewport of [
 			if (visit === 'first' || depthRequested) {
 				await expect(portrait).toHaveAttribute('data-ready', 'false');
 				await portrait.locator('img').evaluate((image: HTMLImageElement) => image.decode());
+				// Capture the native frame, release the depth map, then capture the GPU frame of the same region
 				const native = await page.screenshot({ clip, path: info.outputPath(`${visit}-native.png`) });
 				releaseDepth();
 				await expect(portrait).toHaveAttribute('data-ready', 'true');
 				const gpu = await page.screenshot({ clip, path: info.outputPath(`${visit}-gpu.png`) });
 				const difference = await compareFrames(page, native, gpu);
 				console.log(`${viewport.width}×${viewport.height} ${visit} portrait handover`, difference);
+				// Mean difference under 3/255 and under 4% of channels changed: small shader differences pass, a visible jump fails
 				expect(difference.meanDifference).toBeLessThan(3);
 				expect(difference.changedFraction).toBeLessThan(0.04);
 			} else {
@@ -92,6 +106,8 @@ for (const viewport of [
 				await expect(portrait).toHaveAttribute('data-ready', 'true');
 			}
 			await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
+
+			// Return to Projects for the next round trip
 			await page.getByRole('link', { name: 'Projects', exact: true }).click();
 			await expect(page.locator('html')).toHaveAttribute('data-navigation-wave', 'running');
 			await expect(page).toHaveURL(/\/projects\/$/);

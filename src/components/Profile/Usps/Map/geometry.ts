@@ -13,6 +13,9 @@ type Geography = {
 };
 export type GlobeGeometry = { outlines: Float32Array; grid: Float32Array; dots: Float32Array };
 
+// Helpers
+// ------------
+// Even-odd point-in-polygon test
 function withinRing(x: number, y: number, ring: Coordinate[]) {
 	let inside = false;
 	for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -23,6 +26,7 @@ function withinRing(x: number, y: number, ring: Coordinate[]) {
 	return inside;
 }
 
+// Appends a polyline from a to b as short line segments (about 1.5 degrees each), taking the short way across the antimeridian
 function segment(target: number[], a: Coordinate, b: Coordinate) {
 	let delta = b[0] - a[0];
 	if (delta > 180) delta -= 360;
@@ -73,17 +77,25 @@ export function simplifyRing(ring: Coordinate[], tolerance = 0.0006): Coordinate
 	return [...keep].sort((a, b) => a - b).map(index => ring[index]);
 }
 
+// Loader
+// ------------
 let cached: GlobeGeometry | undefined;
+
+// Builds the three vertex layers from the countries GeoJSON: country outlines, a latitude/longitude grid,
+// and a dot for every land point on a roughly even spacing over the sphere (runs inside the geometry worker)
 export async function loadGeometry(signal: AbortSignal): Promise<GlobeGeometry> {
 	if (cached) return cached;
 	const response = await fetch('/data/globe/countries.geojson', { signal });
 	if (!response.ok) throw new Error('Globe geography could not load');
 	const data: Geography = await response.json();
 	signal.throwIfAborted();
+
 	const outlines: number[] = [],
 		grid: number[] = [],
 		dots: number[] = [];
 	const polygons: { rings: Polygon; minX: number; maxX: number; minY: number; maxY: number }[] = [];
+
+	// Outlines, plus a bounding box per polygon to make the land test below cheap
 	for (const feature of data.features) {
 		const parts =
 			feature.geometry.type === 'Polygon' ? [feature.geometry.coordinates] : feature.geometry.coordinates;
@@ -105,6 +117,8 @@ export async function loadGeometry(signal: AbortSignal): Promise<GlobeGeometry> 
 			}
 		}
 	}
+
+	// Land dots: rows every 1.35 degrees, with longitude spacing widened towards the poles to keep spacing even
 	for (let lat = -88; lat <= 88; lat += 1.35) {
 		const step = 1.35 / Math.cos(lat * RAD);
 		for (let lon = -180; lon < 180; lon += step) {
@@ -122,10 +136,13 @@ export async function loadGeometry(signal: AbortSignal): Promise<GlobeGeometry> 
 				dots.push(...xyz(lon, lat));
 		}
 	}
+
+	// Graticule every 15 degrees
 	for (let lat = -75; lat <= 75; lat += 15)
 		for (let lon = -180; lon < 180; lon += 2) segment(grid, [lon, lat], [lon + 2, lat]);
 	for (let lon = -180; lon < 180; lon += 15)
 		for (let lat = -90; lat < 90; lat += 2) segment(grid, [lon, lat], [lon, lat + 2]);
+
 	cached = {
 		outlines: new Float32Array(outlines),
 		grid: new Float32Array(grid),

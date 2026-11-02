@@ -1,16 +1,25 @@
 'use client';
 
+// Imports
+// ------------
 import { clearProjectModalEntry, isProjectModalEntry, PROJECTS_PATH } from '@utils/projectModal';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 
+// Types
+// ------------
 // NOTE • A non-featured case study renders into the layout's @modal slot, which
 // registers itself here while it's mounted. Closing plays the panel's exit
 // first and only then leaves the route, so the content never vanishes mid-slide.
 type ProjectModal = { href: string; isClosing: boolean };
 
+// Hook
+// ------------
 export function useProjectModal() {
+	// Context
 	const router = useRouter();
+
+	// State
 	const [projectModal, setProjectModal] = useState<ProjectModal | null>(null);
 	// NOTE • Whether this modal was opened from the projects page (Back) or visited directly (replace)
 	const fromSite = useRef(false);
@@ -18,6 +27,7 @@ export function useProjectModal() {
 	// has already left the route — never triggers a second navigation
 	const isLeaving = useRef(false);
 
+	// Handlers
 	const registerProjectModal = useCallback((href: string | null) => {
 		if (href) fromSite.current = isProjectModalEntry(href);
 		else isLeaving.current = false;

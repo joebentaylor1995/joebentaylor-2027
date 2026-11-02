@@ -1,6 +1,5 @@
 // Imports
 // ------------
-
 import PageTitleReveal from '@parts/PageTitleReveal';
 import SpecialHeading from '@parts/SpecialHeading';
 import Image from 'next/image';
@@ -12,6 +11,9 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
+// NOTE • The "Project Overview" block of a case study: heading, then the objectives
+// beside their label, with deliverables, credits, recognition and the website link below.
+// data-objectives-* are read by ProjectExperience to pin the label while the panel scrolls.
 const ProjectOverview = ({ overview, eyebrow }: ProjectOverviewProps) => (
 	<section className={s.jacket} aria-labelledby='project-overview-title' data-project-overview>
 		<div className={s.heading}>

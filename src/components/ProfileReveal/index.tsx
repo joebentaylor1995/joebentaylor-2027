@@ -17,15 +17,38 @@ import { ProfilePresenceContext } from './context';
 import type * as I from './interface';
 import s from './styles.module.scss';
 
-// Cursor motion
+// Constants
 // ------------
+// Cursor follower: seconds to catch the pointer, and seconds to snap onto a sticky
+// target. Stretch grows with its lag (px) up to a maximum.
 const CURSOR_SPEED = 0.25;
 const CURSOR_SNAP_DURATION = 0.4;
 const CURSOR_STRETCH_DISTANCE = 400;
+// Applied as scale 1 + x along the motion and 1 - x across it
 const CURSOR_MAX_STRETCH = 0.25;
+// CTAs pull the cursor toward their centre by this share of the gap, up to a px limit
+const CTA_NUDGE_STRENGTH = 0.12;
+const CTA_NUDGE_LIMIT = 18;
+
+// Helpers
+// ------------
+const ctaPull = (gap: number) => Math.max(-CTA_NUDGE_LIMIT, Math.min(CTA_NUDGE_LIMIT, gap * CTA_NUDGE_STRENGTH));
+
+// Look priority: sticky, cta, soft, link, then follow (inside the panel) or close (outside it)
+const cursorLook = (target: Element, isSticky: boolean, overCta: Element | null, inside: boolean) => {
+	if (isSticky) return 'sticky';
+	if (target.closest('[data-cursor-drag]')) return 'drag';
+	if (overCta) return 'cta';
+	if (target.closest('[data-cursor-soft]')) return 'soft';
+	if (target.closest('[data-cursor-link]')) return 'link';
+	return inside ? 'follow' : 'close';
+};
 
 // Component
 // ------------
+// NOTE • The slide-in panel that holds the profile (or a mini case study), plus the
+// custom cursor that follows the pointer while it's open. The page stays mounted
+// as `scene` behind it, frozen while the panel is up.
 const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => {
 	// Context
 	const { profileOpen, setProfileOpen, projectModalOpen, closeProjectModal, leaveProjectModal, lenisRef } =
@@ -58,6 +81,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 
 	// Effects
 	useEffect(() => {
+		// Remember which content to show, so it survives the closing slide
 		if (profileOpen) setShown('profile');
 		else if (projectModalOpen) setShown('project');
 	}, [profileOpen, projectModalOpen]);
@@ -68,6 +92,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 	}, [isOpen, shown]);
 
 	useEffect(() => {
+		// Dev only: ?modalSettings loads the tweak panel on demand
 		if (!new URLSearchParams(window.location.search).has('modalSettings')) return;
 		let disposed = false;
 		void import('./Settings').then(module => {
@@ -79,6 +104,8 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 	}, []);
 
 	useEffect(() => {
+		// Custom cursor: a follower that eases toward the pointer, stretches with its lag,
+		// and changes look (data-cursor) depending on what's under it
 		const cursor = cursorRef.current;
 		const jacket = jacketRef.current;
 		if (!cursor || !jacket) return;
@@ -90,6 +117,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 		let visible = false;
 		let targetX = 0;
 		let targetY = 0;
+		// Clears the stretch so the cursor returns to a plain circle
 		const resetShape = () => {
 			cursor.style.removeProperty('--cursor-angle');
 			cursor.style.removeProperty('--cursor-stretch');
@@ -115,38 +143,26 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 			delete jacket.dataset.cursor;
 			resetShape();
 		};
-		const move = (event: PointerEvent) => {
-			lastPointer = event;
-			const target = document.elementFromPoint(event.clientX, event.clientY);
-			const projectPanel = target?.closest('[data-project-panel][data-open="true"]');
+
+		// The custom cursor only shows for a mouse, over an open panel, away from dialogs
+		const cursorApplies = (event: PointerEvent, target: Element, projectPanel: Element | null) => {
 			// NOTE • A featured case study's open panel: the dimmed hero beside it closes, as a backdrop does
 			const projectBackdrop =
-				target?.closest('[data-project-backdrop]') &&
+				target.closest('[data-project-backdrop]') &&
 				document.querySelector('[data-project-panel][data-open="true"]');
-			if (
-				(!isOpen && !projectPanel && !projectBackdrop) ||
-				target?.closest('[data-modal-settings], dialog[open]')
-			) {
-				hide();
-				return;
-			}
-			if (!mouse.matches || event.pointerType !== 'mouse' || !target || !jacket.contains(target)) {
-				hide();
-				return;
-			}
-			const stickyTarget = target.closest<HTMLElement>('[data-cursor-sticky]');
-			// Independent positioning keeps the glyph off the circle's eased animation path.
-			gsap.set(closeCursorRef.current, { x: event.clientX, y: event.clientY });
-			const wasSticky = jacket.dataset.cursor === 'sticky';
-			const inside = projectPanel || panelRef.current?.contains(target);
-			let x = event.clientX;
-			let y = event.clientY;
+			if ((!isOpen && !projectPanel && !projectBackdrop) || target.closest('[data-modal-settings], dialog[open]'))
+				return false;
+			return mouse.matches && event.pointerType === 'mouse' && jacket.contains(target);
+		};
+
+		// Sticky targets pull the cursor to their centre, and can ask it to fit their box
+		const applyStickyTarget = (stickyTarget: HTMLElement | null) => {
 			if (stickyTarget) {
 				const bounds = (
 					stickyTarget.querySelector('[data-cursor-anchor]') ?? stickyTarget
 				).getBoundingClientRect();
-				x = bounds.left + bounds.width / 2;
-				y = bounds.top + bounds.height / 2;
+				targetX = bounds.left + bounds.width / 2;
+				targetY = bounds.top + bounds.height / 2;
 				if (stickyTarget.hasAttribute('data-cursor-fit')) {
 					cursor.style.setProperty('--cursor-fit-width', `${bounds.width}px`);
 					cursor.style.setProperty('--cursor-fit-height', `${bounds.height}px`);
@@ -158,47 +174,59 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 				cursor.style.removeProperty('--cursor-fit-height');
 				cursor.style.removeProperty('--cursor-fit-radius');
 			}
-			const overLink = target.closest('[data-cursor-link]');
-			const overSoft = target.closest('[data-cursor-soft]');
-			const overCta = target.closest('[data-cursor-cta]');
-			const overDrag = target.closest('[data-cursor-drag]');
-			if (overCta && !reduced.matches) {
-				const bounds = overCta.getBoundingClientRect();
-				x += Math.max(-18, Math.min(18, (bounds.left + bounds.width / 2 - x) * 0.12));
-				y += Math.max(-18, Math.min(18, (bounds.top + bounds.height / 2 - y) * 0.12));
-			}
-			jacket.dataset.cursor = stickyTarget
-				? 'sticky'
-				: overDrag
-					? 'drag'
-					: overCta
-						? 'cta'
-						: overSoft
-							? 'soft'
-							: overLink
-								? 'link'
-								: inside
-									? 'follow'
-									: 'close';
-			targetX = x;
-			targetY = y;
+		};
+
+		const nudgeTowardCta = (cta: Element) => {
+			const bounds = cta.getBoundingClientRect();
+			targetX += ctaPull(bounds.left + bounds.width / 2 - targetX);
+			targetY += ctaPull(bounds.top + bounds.height / 2 - targetY);
+		};
+
+		// Glides to the target, or jumps there when appearing or with reduced motion
+		const moveCursor = (snap: boolean) => {
 			movement?.kill();
 			if (!visible || reduced.matches) {
-				position.x = x;
-				position.y = y;
+				position.x = targetX;
+				position.y = targetY;
 				deform();
 			} else {
 				movement = gsap.to(position, {
-					x,
-					y,
-					duration: stickyTarget || wasSticky ? CURSOR_SNAP_DURATION : CURSOR_SPEED,
-					ease: stickyTarget || wasSticky ? 'power2.out' : 'power3.out',
+					x: targetX,
+					y: targetY,
+					duration: snap ? CURSOR_SNAP_DURATION : CURSOR_SPEED,
+					ease: snap ? 'power2.out' : 'power3.out',
 					onUpdate: deform,
 				});
 			}
 			visible = true;
 			deform();
 		};
+
+		// Works out which cursor look applies under the pointer, then glides it there
+		const move = (event: PointerEvent) => {
+			lastPointer = event;
+			const target = document.elementFromPoint(event.clientX, event.clientY);
+			const projectPanel = target?.closest('[data-project-panel][data-open="true"]') ?? null;
+			if (!target || !cursorApplies(event, target, projectPanel)) {
+				hide();
+				return;
+			}
+			const stickyTarget = target.closest<HTMLElement>('[data-cursor-sticky]');
+			// Independent positioning keeps the glyph off the circle's eased animation path.
+			gsap.set(closeCursorRef.current, { x: event.clientX, y: event.clientY });
+			const wasSticky = jacket.dataset.cursor === 'sticky';
+			const inside = Boolean(projectPanel || panelRef.current?.contains(target));
+
+			targetX = event.clientX;
+			targetY = event.clientY;
+			applyStickyTarget(stickyTarget);
+			const overCta = target.closest('[data-cursor-cta]');
+			if (overCta && !reduced.matches) nudgeTowardCta(overCta);
+
+			jacket.dataset.cursor = cursorLook(target, Boolean(stickyTarget), overCta, inside);
+			moveCursor(Boolean(stickyTarget) || wasSticky);
+		};
+
 		window.addEventListener('pointermove', move);
 		const refresh = () => {
 			if (lastPointer) move(lastPointer);
@@ -255,6 +283,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 		wrapper.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 		if (isReducedMotion) return;
 
+		// The panel gets its own Lenis, since the page's is stopped while it's open
 		const modalLenis = new Lenis({ wrapper, content, autoRaf: false, syncTouch: false });
 		modalLenis.scrollTo(0, { immediate: true, force: true });
 		const update = (time: number) => modalLenis.raf(time * 1000);
@@ -270,6 +299,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 		if (!active) return;
 		const scene = sceneRef.current;
 		if (!scene) return;
+		// Pause everything animating on the page behind the panel, and resume it on close
 		const animations = new Set<Animation>();
 		const timelines = new Set<gsap.core.Animation>();
 		const pause = () => {
@@ -305,6 +335,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 
 	useEffect(() => {
 		if (!active) return;
+		// Lock page scroll, move focus into the panel and trap Tab inside it; all undone on close
 		const previousFocus = document.activeElement;
 		const page = document.getElementById('page');
 		const overflow = page?.style.overflow;
@@ -318,6 +349,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 		lenis?.stop();
 		if (page) page.style.overflow = 'hidden';
 		closeRef.current?.focus({ preventScroll: true });
+
 		const onKeyDown = (event: KeyboardEvent) => {
 			if (document.querySelector('dialog[open]')) return;
 			if (event.key === 'Escape') {
@@ -343,6 +375,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 				first?.focus();
 			}
 		};
+
 		window.addEventListener('keydown', onKeyDown);
 		return () => {
 			window.removeEventListener('keydown', onKeyDown);
@@ -354,6 +387,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 	}, [active, lenisRef]);
 
 	// Render
+	// Both contents stay mounted; only the active one is shown
 	return (
 		<div ref={jacketRef} className={s.jacket} data-state={isOpen ? 'open' : active ? 'closing' : 'closed'}>
 			{Settings && <Settings />}

@@ -35,6 +35,7 @@ interface Options {
 
 // Constants
 // ------------
+// Vertical camera field of view, in degrees
 const FIELD_OF_VIEW = 30;
 // NOTE • Breathing room round the model's bounding sphere — larger sits the model
 // smaller in the frame (1.55 leaves a round coin at about 45% of the height)
@@ -48,11 +49,15 @@ const RESUME_AFTER = 1.5;
 // How far a drag may tilt the model above and below its starting angle
 const TILT_UP = THREE.MathUtils.degToRad(28);
 const TILT_DOWN = THREE.MathUtils.degToRad(18);
+// Caps render resolution on high-density screens
 const MAX_PIXEL_RATIO = 2;
+
+// Public path the Draco decoder files are served from
 const DRACO_DECODER = '/draco/';
 
 // Helpers
 // ------------
+// Frees GPU memory (geometry, materials and their textures) for every mesh under root
 const disposeObject = (root: THREE.Object3D) =>
 	root.traverse(node => {
 		if (!(node instanceof THREE.Mesh)) return;
@@ -73,17 +78,21 @@ const distanceFor = (radius: number, aspect: number) => {
 
 // Exports
 // ------------
+// Loads the model, sets up the renderer, camera and orbit controls, and returns handles to
+// toggle auto-rotation and dispose everything. Rejects with the signal's reason if aborted mid-load.
 export const createModelViewer = async (
 	canvas: HTMLCanvasElement,
 	url: string,
 	{ onProgress, isRotating, signal }: Options
 ): Promise<ModelViewer> => {
+	// Load
 	const draco = new DRACOLoader().setDecoderPath(DRACO_DECODER);
 	const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).setDRACOLoader(draco);
 	const gltf = await loader
 		.loadAsync(url, event => onProgress(event.lengthComputable ? event.loaded / event.total : null))
 		// NOTE • The decoder's workers are only needed while the file is parsed
 		.finally(() => draco.dispose());
+
 	if (signal.aborted) {
 		disposeObject(gltf.scene);
 		throw signal.reason;
@@ -121,6 +130,7 @@ export const createModelViewer = async (
 	// NOTE • OrbitControls writes an inline cursor, which would beat the stylesheet's
 	canvas.style.removeProperty('cursor');
 
+	// Drag pauses auto-rotation; it resumes RESUME_AFTER seconds after release if still wanted
 	let wantsRotation = isRotating;
 	let resumeCall: gsap.core.Tween | null = null;
 	const onDragStart = () => {
@@ -135,6 +145,7 @@ export const createModelViewer = async (
 	controls.addEventListener('start', onDragStart);
 	controls.addEventListener('end', onDragEnd);
 
+	// Sizing
 	// NOTE • Keeps the camera's direction, re-fitting its distance to the new shape
 	const resize = () => {
 		const { clientWidth: width, clientHeight: height } = canvas;
@@ -150,11 +161,13 @@ export const createModelViewer = async (
 		controls.update();
 	};
 
+	// Frame loop
 	const tick = (_time: number, deltaTime: number) => {
 		controls.update(deltaTime / 1000);
 		renderer.render(scene, camera);
 	};
 
+	// Only ticks while the canvas is on screen
 	let isTicking = false;
 	const setTicking = (shouldTick: boolean) => {
 		if (shouldTick === isTicking) return;
@@ -163,6 +176,7 @@ export const createModelViewer = async (
 		isTicking = shouldTick;
 	};
 
+	// Observe, then draw one frame immediately so the first paint isn't blank
 	const resizeObserver = new ResizeObserver(resize);
 	const visibility = new IntersectionObserver(([entry]) => setTicking(Boolean(entry?.isIntersecting)));
 	resizeObserver.observe(canvas);
@@ -170,6 +184,7 @@ export const createModelViewer = async (
 	resize();
 	renderer.render(scene, camera);
 
+	// Handle
 	return {
 		setRotating: next => {
 			wantsRotation = next;

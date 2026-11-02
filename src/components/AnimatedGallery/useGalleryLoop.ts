@@ -27,6 +27,8 @@ const MAX_DELTA = 0.1;
 
 // Exports
 // ------------
+// Calls render(elapsed, size) on every frame while the stage is on screen, motion is allowed and not paused,
+// and once on every resize. Elapsed time (seconds) persists across pauses.
 export const useGalleryLoop = (stageRef: RefObject<HTMLElement | null>, render: GalleryRender, isPaused: boolean) => {
 	// NOTE • Survives pause/play, so the loop resumes where it stopped
 	const elapsedRef = useRef(0);

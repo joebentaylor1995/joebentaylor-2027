@@ -9,6 +9,10 @@ import { liquidSettings } from '../liquid-settings';
 import type { LiquidControlsProps } from './interface';
 import s from './styles.module.scss';
 
+// Constants
+// ------------
+// [settings key, label, min, max, step]. The panel sections below slice this list by
+// index: simulation quality is 5-6, liquid flow 7-12 and glass appearance 13-16.
 const ranges = [
 	['marqueeSpeed', 'Marquee base speed multiplier', 0, 10, 0.05],
 	['marqueeScrollBoost', 'Marquee scroll acceleration', 0, 100, 0.5],
@@ -31,7 +35,10 @@ const ranges = [
 
 // Component
 // ------------
+// NOTE • Dev-only panel for the liquid effect. It edits a copy of the settings through
+// onChange, so changes last only until reload.
 export default function LiquidControls({ settings, onChange, onClose }: LiquidControlsProps) {
+	// Render
 	return (
 		<section
 			id='liquid-glass-controls'

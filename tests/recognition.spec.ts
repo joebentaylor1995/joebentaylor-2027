@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, type Locator, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects the Recognition tuning controls: edits apply live as data attributes, scroll direction flips the
+// spiral speed, values persist across a reload and Reset defaults restores the approved ones.
 test('Recognition settings update live, persist, reset, and scrolling controls direction', async ({ page }) => {
 	await page.goto('/?modalSettings');
 	const settings = page.getByRole('complementary', { name: 'Modal settings' });
@@ -18,6 +24,7 @@ test('Recognition settings update live, persist, reset, and scrolling controls d
 	await expect(settings.locator('#modal-awardThickness')).toHaveCount(0);
 	await expect(section).toHaveAttribute('data-award-size', '120');
 	await expect(section).toHaveAttribute('data-drag-easing', '0.4');
+	// Spiral speed has a slow idle drift, speeds up scrolling down and reverses scrolling up
 	const speed = async () => Number(await section.getAttribute('data-spiral-speed'));
 	await expect.poll(speed).toBeCloseTo(0.046, 3);
 	await page.locator('#profile-panel').evaluate(el => {
@@ -29,6 +36,8 @@ test('Recognition settings update live, persist, reset, and scrolling controls d
 	});
 	await expect.poll(speed).toBeLessThan(0);
 	await expect.poll(speed).toBeCloseTo(-0.046, 3);
+
+	// Values persist; reset restores defaults
 	await page.reload();
 	await expect(settings.locator('#modal-awardSize')).toHaveValue('120');
 	await expect(settings.locator('#modal-awardSpeed')).toHaveValue('2');
@@ -44,6 +53,9 @@ test('Recognition settings update live, persist, reset, and scrolling controls d
 	await expect(settings.locator('#modal-awardFocusDuration')).toHaveValue('0.6');
 });
 
+// Helpers
+// ------------
+// Scrolls the Profile panel so a given fraction of the Recognition section (beyond one screen) has passed
 async function scrollRecognition(section: Locator, progress: number) {
 	await section.evaluate((element, value) => {
 		const root = element.closest('#profile-panel') as HTMLElement;
@@ -54,6 +66,8 @@ async function scrollRecognition(section: Locator, progress: number) {
 	}, progress);
 }
 
+// Protects the Recognition layout: the copy stays outside the scene and the section scrolls like a normal
+// block rather than pinning.
 test('Recognition keeps its copy outside the scene and scrolls as a normal section', async ({ page }) => {
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
@@ -75,6 +89,8 @@ test('Recognition keeps its copy outside the scene and scrolls as a normal secti
 	).toBeLessThan(3);
 });
 
+// Protects focusing an award: Enter isolates it, pointer movement tilts and glares the card, Escape returns
+// to the spiral without closing Profile, and reopening starts clean.
 test('Recognition isolates an award, returns without closing Profile, and reopens cleanly', async ({ page }) => {
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
@@ -82,10 +98,14 @@ test('Recognition isolates an award, returns without closing Profile, and reopen
 	await scrollRecognition(section, 0.25);
 	await expect(section).toHaveAttribute('data-state', 'ready');
 	const canvas = section.locator('canvas');
+
+	// Focus an award
 	await canvas.press('Enter');
 	await expect(section).toHaveAttribute('data-focus', 'true');
 	await expect.poll(async () => Number(await section.getAttribute('data-focus-progress'))).toBeGreaterThan(0);
 	await expect(section).toHaveAttribute('data-focus-progress', '1.000');
+
+	// Card tilt and glare react to the pointer and settle when it leaves
 	const canvasBounds = await canvas.boundingBox();
 	if (!canvasBounds) throw new Error('Award canvas is missing');
 	await page.mouse.move(canvasBounds.x + canvasBounds.width * 0.6, canvasBounds.y + canvasBounds.height * 0.45);
@@ -95,12 +115,16 @@ test('Recognition isolates an award, returns without closing Profile, and reopen
 	await expect.poll(async () => Number(await section.getAttribute('data-card-tilt'))).toBeLessThan(0.01);
 	await expect.poll(async () => Number(await section.getAttribute('data-card-glare'))).toBeLessThan(0.01);
 	await expect(page.getByRole('button', { name: 'Return to spiral' })).toBeVisible();
+
+	// Escape unfocuses; Profile stays open
 	await canvas.press('Escape');
 	await expect.poll(async () => Number(await section.getAttribute('data-focus-progress'))).toBeGreaterThan(0);
 	await expect(section).toHaveAttribute('data-focus', 'false');
 	await expect(section).toHaveAttribute('data-focus-progress', '0.000');
 	await expect(page.locator('#profile-panel')).toHaveAttribute('aria-hidden', 'false');
 	await expect(section.locator('[data-recognition-pause]')).toHaveCount(0);
+
+	// Closing resets the section; reopening prepares it again
 	await page.getByRole('button', { name: 'Close profile', exact: true }).click();
 	await expect(section).toHaveAttribute('data-state', 'loading');
 	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
@@ -109,6 +133,8 @@ test('Recognition isolates an award, returns without closing Profile, and reopen
 	await expect(section).toHaveAttribute('data-awards', '52');
 });
 
+// Protects the phone layout and reduced motion: the spiral does not spin, text sizes and spacing match the
+// design at 320 to 440px, and nothing overflows horizontally.
 test('Recognition fits mobile and respects reduced motion', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.emulateMedia({ reducedMotion: 'reduce' });

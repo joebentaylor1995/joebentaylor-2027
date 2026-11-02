@@ -4,6 +4,7 @@
 // ------------
 import Image from 'next/image';
 import { type CSSProperties, useCallback, useMemo, useRef, useState } from 'react';
+
 // Styles + Interfaces
 // ------------
 import type * as I from '../interface';
@@ -19,6 +20,7 @@ const easeSpin = cubicBezier(TIMING.spin);
 
 // Component
 // ------------
+// Square cards evenly round a circle; the whole ring makes one eased revolution per loop
 const Orbit = ({ images, background, sizes }: I.GalleryAnimationProps) => {
 	// Refs
 	const stageRef = useRef<HTMLDivElement>(null);

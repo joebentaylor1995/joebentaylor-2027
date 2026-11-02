@@ -21,8 +21,11 @@ export const generateStaticParams = async () => (await getProjectSlugs()).map(sl
 // NOTE • Featured case studies keep their own hero page (projects/[slug]); every
 // other case study renders here, into the profile panel
 const Page = async ({ params }: Params) => {
+	// Data
 	const { slug } = await params;
 	const [project, isModal] = await Promise.all([getProject(slug), isModalCaseStudy(slug)]);
+
+	// Render
 	return project && isModal ? <ProjectModal project={project} /> : null;
 };
 

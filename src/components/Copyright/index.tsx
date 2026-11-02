@@ -7,6 +7,10 @@ import { Suspense } from 'react';
 // ------------
 import s from './styles.module.scss';
 
+// Helpers
+// ------------
+// Renders a year as a screen-reader text plus one clipped, aria-hidden span per digit
+// (data-copyright-digit marks the elements an animation can target)
 const YearDigits = ({ year, side }: { year: number; side: 'left' | 'right' }) => (
 	<em data-type='bodyS' data-copyright-year={side}>
 		<span className={s.yearText}>{year}</span>
@@ -31,6 +35,7 @@ const Year = async () => {
 // Component
 // ------------
 const Copyright = () => {
+	// Render
 	return (
 		<div className={s.copyright} data-copyright>
 			<YearDigits year={1995} side='left' />

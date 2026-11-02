@@ -1,10 +1,9 @@
 'use client';
 
-import { HERO_PARALLAX_COMPENSATION } from '@parts/ProjectHero/framing';
-
-import { DESKTOP_HOVER_QUERY, TOUCH_LAYOUT_QUERY } from '@utils/desktopHover';
 // Imports
 // ------------
+import { HERO_PARALLAX_COMPENSATION } from '@parts/ProjectHero/framing';
+import { DESKTOP_HOVER_QUERY, TOUCH_LAYOUT_QUERY } from '@utils/desktopHover';
 import { useAnimation } from '@utils/useAnimation';
 import { gsap } from 'gsap';
 import ScrollTrigger from 'gsap/ScrollTrigger';
@@ -16,6 +15,8 @@ import { useRef } from 'react';
 import type { ProjectExperienceProps } from './interface';
 import s from './styles.module.scss';
 
+// Setup
+// ------------
 gsap.registerPlugin(ScrollTrigger);
 
 // Constants
@@ -27,6 +28,9 @@ const CONTENT_RESIZE_SETTLE = 0.2;
 
 // Component
 // ------------
+// NOTE • Desktop case study: one pinned stage scrubbed by scroll. First the hero scrolls
+// away at parallax speed, then the details panel slides in over it, then the panel's
+// own content scrolls. Phones use a plain CSS layout with only the outro animated.
 const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 	// Refs
 	const ref = useRef<HTMLDivElement>(null);
@@ -34,6 +38,7 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 	const lenis = useLenis();
 
 	// Handlers
+	// Scrolls back to the top, through Lenis when it's available
 	const returnToTop = () => {
 		if (lenis) lenis.scrollTo(0, { duration: 1.6 });
 		else window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -44,6 +49,7 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 		() => {
 			const root = ref.current;
 			if (!root || !lenis) return;
+			// Everything is scoped to a matchMedia, so it reverts when the breakpoint or motion preference changes
 			const media = gsap.matchMedia();
 			const outro = root.querySelector<HTMLElement>('[data-project-outro]');
 			// NOTE • Phones and touch tablets need no script for the hero: its image sticks in CSS and
@@ -73,6 +79,7 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 					);
 				}
 			);
+			// Desktop: the pinned scroll sequence
 			media.add(`${DESKTOP_HOVER_QUERY} and (prefers-reduced-motion: no-preference)`, () => {
 				const stage = root.querySelector<HTMLElement>('[data-project-stage]');
 				const heroLayer = root.querySelector<HTMLElement>('[data-project-hero-layer]');
@@ -85,8 +92,11 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 				const label = root.querySelector<HTMLElement>('[data-objectives-label]');
 				const shade = returnRef.current;
 				if (!stage || !heroLayer || !heroClip || !heroMedia || !panel || !content || !shade) return;
+
 				const parallaxCompensation = HERO_PARALLAX_COMPENSATION;
+				// Flags that the scripted layout is active (removed again on teardown)
 				root.dataset.enhanced = 'true';
+				// Scroll distances (px) of the three phases: hero scrolling away, panel sliding in, panel content scrolling. The label values place the objectives label.
 				let heroTravel = 0,
 					revealTravel = 0,
 					contentTravel = 0,
@@ -94,6 +104,8 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 				let labelBottom = 0,
 					labelTravel = 0,
 					labelGap = 40;
+
+				// Recomputes the travel distances; returns the total pinned scroll length
 				const measure = () => {
 					heroTravel = Math.max(0, heroLayer.offsetHeight - stage.clientHeight);
 					// Extend above the hero so the slower image never reveals an empty edge.
@@ -120,15 +132,19 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 					return heroTravel + revealTravel + contentTravel;
 				};
 				measure();
+
+				// Maps the pinned scroll position (px) onto every moving part
 				const update = (raw: number) => {
 					// The hero has no scroll of its own, so the reveal starts at 0px. Sub-pixel
 					// ScrollTrigger rounding at the top must not open it: the return-to-top
 					// layer would then cover the hero and catch its clicks.
 					const scroll = raw < 1 ? 0 : raw;
+					// reveal runs 0 to 1 as the panel slides in; the hero fades out over its first 70% (text) and 40% (image)
 					const contentScroll = gsap.utils.clamp(0, contentTravel, scroll - heroTravel - revealTravel);
 					const reveal = gsap.utils.clamp(0, 1, (scroll - heroTravel) / revealTravel);
 					const textFade = gsap.utils.clamp(0, 1, reveal / 0.7);
 					const imageFade = gsap.utils.clamp(0, 1, reveal / 0.4);
+					// Smoothstep easing for the fades
 					hero?.style.setProperty(
 						'--project-image-saturation',
 						String(1 - imageFade * imageFade * (3 - 2 * imageFade))
@@ -137,6 +153,8 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 						'--project-text-opacity',
 						String(1 - textFade * textFade * (3 - 2 * textFade))
 					);
+
+					// Hero slides up and left, the panel in from the right, then the panel content scrolls
 					gsap.set(heroLayer, {
 						y: -Math.min(scroll, heroTravel),
 						xPercent: -12 * reveal,
@@ -156,6 +174,8 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 								contentScroll + stage.clientHeight - labelGap - labelBottom
 							),
 						});
+
+					// The outro eases in over the last 35% of the content scroll
 					if (outro) {
 						const progress = gsap.utils.clamp(
 							0,
@@ -164,8 +184,11 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 						);
 						outro.style.setProperty('--project-outro-progress', String(progress));
 					}
+
+					// The return-to-top layer dims the hero and only takes clicks once the panel is moving
 					gsap.set(shade, { opacity: reveal * 0.85 });
 					panel.inert = reveal === 0;
+
 					const open = String(reveal >= 1);
 					if (panel.dataset.open !== open) {
 						panel.dataset.open = open;
@@ -173,7 +196,10 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 					}
 					shade.disabled = reveal === 0;
 				};
+
 				update(0);
+
+				// Pin the stage for the whole sequence; both callbacks recompute progress in px
 				ScrollTrigger.create({
 					trigger: stage,
 					scroller: lenis.rootElement,
@@ -199,6 +225,7 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 					contentResize.disconnect();
 					settle?.kill();
 					heroClip.style.removeProperty('clip-path');
+					// Undo every inline style and attribute this block set
 					gsap.set([heroLayer, panel, content, shade], { clearProps: 'transform,opacity' });
 					gsap.set(heroMedia, { clearProps: 'transform,top' });
 					if (label) gsap.set(label, { clearProps: 'transform' });

@@ -1,5 +1,9 @@
+// Imports
+// ------------
 import type { Page } from '@playwright/test';
 
+// Helpers
+// ------------
 type CatalogueProject = { href?: string; isReady?: boolean };
 
 // Navigation tests need published, ready case studies without changing CMS content.

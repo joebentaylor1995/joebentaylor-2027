@@ -1,3 +1,5 @@
+// Types
+// ------------
 import type { NextProject, Project } from '@/data/projects';
 
 export interface ProjectOutroProps {

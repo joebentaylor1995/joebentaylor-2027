@@ -6,7 +6,7 @@ import { ViewTransition } from 'react';
 // ------------
 import type * as I from './interface';
 
-// Transition types
+// Constants
 // ------------
 // NOTE • Tag a navigation with a type to pick its animation:
 // <Link href='/work' transitionTypes={[NAV_FORWARD]}> or

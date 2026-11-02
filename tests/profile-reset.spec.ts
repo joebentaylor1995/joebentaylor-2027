@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects the closing wipe from the footer: while the clip edge retreats, the content drifts no further
+// than the area still covered, so nothing visibly lags behind the edge.
 test('closing from the footer keeps content behind the retreating clip edge', async ({ page }) => {
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
@@ -10,6 +16,7 @@ test('closing from the footer keeps content behind the retreating clip edge', as
 		.poll(() => panel.locator(':scope > div').evaluate(el => new DOMMatrix(getComputedStyle(el).transform).e))
 		.toBe(0);
 	await page.keyboard.press('Escape');
+	// Pause the closing animations and scrub them to fixed times, reading the clip width and content drift
 	const samples = await panel.evaluate(element => {
 		const content = element.firstElementChild as HTMLElement;
 		const animations = [...element.getAnimations(), ...content.getAnimations()];
@@ -24,6 +31,7 @@ test('closing from the footer keeps content behind the retreating clip edge', as
 			};
 		});
 	});
+	// Half a pixel of tolerance
 	for (const sample of samples) expect(sample.drift).toBeLessThanOrEqual(sample.covered + 0.5);
 	await panel.evaluate(element => {
 		for (const target of [element, element.firstElementChild])
@@ -32,6 +40,8 @@ test('closing from the footer keeps content behind the retreating clip edge', as
 	await expect(panel).toBeHidden();
 });
 
+// Protects Profile cleanup: the toolkit canvas and featured video stay alive during the closing
+// animation and are only released once it has finished.
 test('profile media resets only after the closing animation settles', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');
@@ -46,6 +56,7 @@ test('profile media resets only after the closing animation settles', async ({ p
 	await expect(video).toHaveJSProperty('paused', false);
 	const source = await video.getAttribute('src');
 	if (!source) throw new Error('Visible Profile video has no source');
+	// Back to full motion so the close actually animates
 	await page.emulateMedia({ reducedMotion: 'no-preference' });
 	await page.getByRole('button', { name: 'Close profile', exact: true }).press('Escape');
 	await expect(shell).toHaveAttribute('data-state', 'closing');

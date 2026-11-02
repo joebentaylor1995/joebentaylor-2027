@@ -1,9 +1,12 @@
+// Imports
+// ------------
+import type { gsap } from 'gsap';
+
+// Types
+// ------------
 // NOTE • The intro's tunable options in one live object. The renderer reads it on
 // every frame and the timeline reads it when it's built, so the ?loaderTweaks
 // panel can change it and replay. Bake final values back into the defaults.
-
-import type { gsap } from 'gsap';
-
 export type LoaderSettings = {
 	// Size of the whole intro relative to the video's full-frame staging
 	scale: number;
@@ -18,13 +21,18 @@ export type LoaderSettings = {
 	revealGap: number;
 	// Non-homepage window reveal, after the logo lands.
 	pageRevealAt: number;
+	// How the loader gives way to the page, and where a window reveal opens from
 	revealEffect: 'fade' | 'window' | 'wave';
 	revealOrigin: 'lower' | 'logo';
+	// Seconds the reveal takes
 	revealDuration: number;
+	// The hero starts this much larger and settles to 1 over heroZoomDuration seconds
 	heroStartScale: number;
 	heroZoomDuration: number;
 };
 
+// Defaults
+// ------------
 export const DEFAULT_LOADER_SETTINGS: LoaderSettings = {
 	scale: 0.39,
 	screenAspect: 32 / 9,
@@ -40,9 +48,14 @@ export const DEFAULT_LOADER_SETTINGS: LoaderSettings = {
 	heroZoomDuration: 4,
 };
 
+// Live state
+// ------------
+// What everything reads; the tweak panel mutates it in place
 export const loaderSettings: LoaderSettings = { ...DEFAULT_LOADER_SETTINGS };
 
-// Dev hooks for the tweak panel: the live timeline and a replay trigger
+// Dev hooks
+// ------------
+// For the tweak panel: the live timeline and a replay trigger
 export const LOADER_REPLAY = 'site-loader:replay';
 export const loaderControl: {
 	timeline: gsap.core.Timeline | null;

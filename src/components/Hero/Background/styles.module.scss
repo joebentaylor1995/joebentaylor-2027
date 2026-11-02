@@ -2,86 +2,86 @@
 // ------------
 
 .jacket {
-    --portrait-aspect: 1;
-    --desktop-portrait-x: 0%;
-    --desktop-portrait-y: 0%;
-    --desktop-portrait-scale: 1;
-    --desktop-portrait-rotation: 0deg;
-    --desktop-portrait-bottom-span: 1;
-    --mobile-portrait-x: 0%;
-    --mobile-portrait-y: 0%;
-    --mobile-portrait-scale: 1;
-    --mobile-portrait-rotation: 0deg;
-    --tablet-portrait-x: 0%;
-    --tablet-portrait-y: 0%;
-    --tablet-portrait-scale: 1;
-    --tablet-portrait-rotation: 0deg;
+	--portrait-aspect: 1;
+	--desktop-portrait-x: 0%;
+	--desktop-portrait-y: 0%;
+	--desktop-portrait-scale: 1;
+	--desktop-portrait-rotation: 0deg;
+	--desktop-portrait-bottom-span: 1;
+	--mobile-portrait-x: 0%;
+	--mobile-portrait-y: 0%;
+	--mobile-portrait-scale: 1;
+	--mobile-portrait-rotation: 0deg;
+	--tablet-portrait-x: 0%;
+	--tablet-portrait-y: 0%;
+	--tablet-portrait-scale: 1;
+	--tablet-portrait-rotation: 0deg;
 
-    position: absolute;
-    inset: 0;
-    overflow: clip;
-    z-index: 0;
-    pointer-events: none;
-    container-type: size;
+	position: absolute;
+	inset: 0;
+	overflow: clip;
+	z-index: 0;
+	pointer-events: none;
+	container-type: size;
 
-    .portrait {
-        position: absolute;
-        inset: 0;
+	.portrait {
+		position: absolute;
+		inset: 0;
 
-        @include heroDesktop {
-            inset: auto;
-            left: calc(50% + var(--desktop-portrait-x));
-            top: calc(50% + var(--desktop-portrait-y) + max(0px, (100cqh - 100cqw * var(--desktop-portrait-bottom-span)) / 2));
-            width: calc(100% * var(--desktop-portrait-scale));
-            aspect-ratio: var(--portrait-aspect);
-            transform: translate(-50%, -50%) rotate(var(--desktop-portrait-rotation));
-        }
-    }
+		@include heroDesktop {
+			inset: auto;
+			left: calc(50% + var(--desktop-portrait-x));
+			top: calc(50% + var(--desktop-portrait-y) + max(0px, (100cqh - 100cqw * var(--desktop-portrait-bottom-span)) / 2));
+			width: calc(100% * var(--desktop-portrait-scale));
+			aspect-ratio: var(--portrait-aspect);
+			transform: translate(-50%, -50%) rotate(var(--desktop-portrait-rotation));
+		}
+	}
 
-    .fallback {
-        object-fit: cover;
-        transform-origin: center bottom;
-        transform: translate(var(--mobile-portrait-x), var(--mobile-portrait-y))
-            rotate(var(--mobile-portrait-rotation)) scale(var(--mobile-portrait-scale));
+	.fallback {
+		object-fit: cover;
+		transform-origin: center bottom;
+		transform: translate(var(--mobile-portrait-x), var(--mobile-portrait-y))
+			rotate(var(--mobile-portrait-rotation)) scale(var(--mobile-portrait-scale));
 
-        @include bp(m) {
-            transform: translate(var(--tablet-portrait-x), var(--tablet-portrait-y))
-                rotate(var(--tablet-portrait-rotation)) scale(var(--tablet-portrait-scale));
-        }
+		@include bp(m) {
+			transform: translate(var(--tablet-portrait-x), var(--tablet-portrait-y))
+				rotate(var(--tablet-portrait-rotation)) scale(var(--tablet-portrait-scale));
+		}
 
-        @include heroDesktop {
-            transform: none;
-            transform-origin: center;
-        }
-    }
+		@include heroDesktop {
+			transform: none;
+			transform-origin: center;
+		}
+	}
 
-    .canvas {
-        width: 100%;
-        height: 100%;
-        opacity: 0;
-    }
+	.canvas {
+		width: 100%;
+		height: 100%;
+		opacity: 0;
+	}
 
-    &[data-ready='true'] {
-        .canvas { opacity: 1; }
-        .fallback { visibility: hidden; }
-    }
+	&[data-ready='true'] {
+		.canvas { opacity: 1; }
+		.fallback { visibility: hidden; }
+	}
 }
 
 .liquidControls {
-    display: none;
-    margin-block: var(--gap-m);
+	display: none;
+	margin-block: var(--gap-m);
 
-    @include heroDesktop {
-        @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-            display: block;
-        }
-    }
+	@include heroDesktop {
+		@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+			display: block;
+		}
+	}
 
-    > button {
-        padding: var(--gap-s) var(--gap-m);
-        background: var(--brand-c5);
-        border: 1px solid currentcolor;
-        border-radius: var(--br-m);
-        cursor: pointer;
-    }
+	> button {
+		padding: var(--gap-s) var(--gap-m);
+		background: var(--brand-c5);
+		border: 1px solid currentcolor;
+		border-radius: var(--br-m);
+		cursor: pointer;
+	}
 }

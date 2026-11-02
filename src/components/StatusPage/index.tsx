@@ -1,5 +1,3 @@
-// Imports
-// ------------
 // NOTE • No 'use client' — it's rendered by the server 404 pages and by the
 // client error boundaries alike
 
@@ -8,6 +6,8 @@
 import type * as I from './interface';
 import s from './styles.module.scss';
 
+// Constants
+// ------------
 // NOTE • For the links and buttons passed as children
 export const actionClass = s.action;
 
@@ -16,6 +16,7 @@ export const actionClass = s.action;
 // NOTE • The shared layout of the 404 and error pages (app/(site)/not-found,
 // app/global-not-found, app/(site)/error, app/global-error)
 const StatusPage = ({ code, title, message, children }: I.StatusPageProps) => (
+	// Render
 	<section className={s.jacket}>
 		{code && (
 			<p data-type='captionL' className={s.code}>

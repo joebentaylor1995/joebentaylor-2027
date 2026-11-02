@@ -13,8 +13,10 @@ import { PLACEHOLDER_IMAGE } from '@/data/site';
 
 // Exports
 // ------------
+// With ?project=<slug> returns that project's hero, title and description; otherwise the whole catalogue
 export const GET = async (request: Request) => {
 	const slug = new URL(request.url).searchParams.get('project');
+
 	if (slug) {
 		const project = await getProject(slug);
 		return project
@@ -23,6 +25,7 @@ export const GET = async (request: Request) => {
 				)
 			: NextResponse.json({ error: 'Project not found' }, { status: 404 });
 	}
+
 	// SanityDevSync and the publish webhook invalidate this data on changes.
 	// Reading the catalogue must not evict the routes we just prefetched.
 	const { featured, all } = await getProjectsPage();

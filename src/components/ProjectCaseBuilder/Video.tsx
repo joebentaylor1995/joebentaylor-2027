@@ -12,6 +12,7 @@ import type { VideoProps } from './interface';
 
 // Component
 // ------------
+// NOTE • A muted, looping clip that plays only while on screen (observeVideoPlayback)
 const Video = ({ media }: VideoProps) => {
 	// Refs
 	const videoRef = useRef<HTMLVideoElement>(null);
@@ -32,6 +33,7 @@ const Video = ({ media }: VideoProps) => {
 				figure?.style.setProperty('--media-aspect', String(video.videoWidth / video.videoHeight));
 		};
 		applyAspect();
+
 		video.addEventListener('loadedmetadata', applyAspect);
 		const stopPlayback = observeVideoPlayback(video);
 		return () => {

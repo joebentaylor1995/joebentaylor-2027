@@ -3,25 +3,33 @@
 // Imports
 // ------------
 import PageTransition from '@parts/PageTransition';
-// Styles + Interfaces
-// ------------
 import button from '@parts/ProjectOverview/styles.module.scss';
 import { prepareNavigationScene, waitForNavigationScene } from '@utils/navigationScene';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+
+// Styles + Interfaces
+// ------------
 import type { NotFoundSceneProps } from './interface';
 import s from './styles.module.scss';
 
 // Component
 // ------------
+// 404 page: falling blue glyph rain drawn by a lazy-loaded WebGL engine. The CSS fallback "404"
+// shows until the engine reports ready, and the pause button only appears once it is running.
 export default function NotFoundScene({ standalone = false }: NotFoundSceneProps) {
 	// Refs
 	const canvas = useRef<HTMLCanvasElement>(null);
+
 	// State
 	const [ready, setReady] = useState(false);
 	const [paused, setPaused] = useState(false);
+
+	// Engine handle, set once the dynamic import has mounted the scene
 	const controller = useRef<{ destroy: () => void; pause: (value: boolean) => void } | null>(null);
+
 	// Effects
+	// Wait for the page transition to settle, then import and mount the engine
 	useEffect(() => {
 		const abort = new AbortController();
 		void (async () => {
@@ -40,8 +48,11 @@ export default function NotFoundScene({ standalone = false }: NotFoundSceneProps
 			controller.current = null;
 		};
 	}, []);
+
+	// Forward the pause toggle to the engine
 	useEffect(() => controller.current?.pause(paused), [paused]);
-	// Render
+
+	// Derived
 	const label = (
 		<>
 			<span className={button.websiteFill} aria-hidden='true' />
@@ -50,6 +61,8 @@ export default function NotFoundScene({ standalone = false }: NotFoundSceneProps
 			</span>
 		</>
 	);
+
+	// Render
 	return (
 		<PageTransition>
 			<section className={s.jacket} data-not-found-scene data-ready={ready} aria-labelledby='not-found-title'>

@@ -10,6 +10,8 @@
 export const PROFILE_PATH = '/profile/';
 export const PROFILE_PARAM = 'profile';
 
+// Helpers
+// ------------
 export const isProfilePath = (url: string) => {
 	const { pathname } = new URL(url, 'http://localhost');
 	return pathname === PROFILE_PATH || `${pathname}/` === PROFILE_PATH;

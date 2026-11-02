@@ -4,6 +4,7 @@
 
 // Constants
 // ------------
+// Frames per second the glitch steps at (each frame is a hard cut, not a tween)
 export const GLITCH_FPS = 30;
 
 // The logo's horizontal bands, as [top, bottom] in viewBox units
@@ -26,6 +27,8 @@ export type GlitchFrame = {
 
 // Timeline
 // ------------
+// One entry per frame, played in order at GLITCH_FPS. `dx`/`dy` move the ghost in viewBox
+// units; each slice entry lines up with the same index in SLICES.
 export const GLITCH_FRAMES: readonly GlitchFrame[] = [
 	{ ghost: { dx: -2, dy: 1.5 }, slices: [0, 0, 0, 0, 0, 0] },
 	{ ghost: { dx: -1.5, dy: -2, scale: 1.05 }, slices: [0, 2, 0, -1.5, 0, null] },

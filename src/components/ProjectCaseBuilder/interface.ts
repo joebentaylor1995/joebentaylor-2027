@@ -1,5 +1,9 @@
+// Imports
+// ------------
 import type { ProjectCaseBlock, ProjectMedia } from '@/data/projects';
 
+// Types
+// ------------
 export interface ProjectCaseBuilderProps {
 	blocks: ProjectCaseBlock[];
 }

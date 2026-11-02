@@ -1,7 +1,5 @@
-// Imports
+// Types
 // ------------
-
-// Exports
 // ------------
 export interface ContentProps {
 	heading: string;

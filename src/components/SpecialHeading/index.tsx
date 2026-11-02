@@ -19,11 +19,19 @@ const SpecialHeading = ({
 	revealOnOpen = false,
 	revealOnView = false,
 }: I.SpecialHeadingProps) => {
+	// Context
 	const present = use(ProfilePresenceContext);
+
+	// Refs
 	const textRef = useRef<HTMLSpanElement>(null);
+
+	// Effects
+	// Marks the heading data-revealed once it scrolls into view inside the profile panel
 	useEffect(() => {
 		const heading = textRef.current?.parentElement;
+
 		if (!heading || !revealOnView || !present) return;
+
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				if (!entry.isIntersecting) return;
@@ -33,14 +41,18 @@ const SpecialHeading = ({
 			{ root: heading.closest('#profile-panel'), threshold: 0.15 }
 		);
 		observer.observe(heading);
+
 		return () => {
 			observer.disconnect();
 			delete heading.dataset.revealed;
 		};
 	}, [present, revealOnView]);
+
+	// Derived
 	const size = 11;
 	const viewBox = `0 0 ${size} ${size}`;
 
+	// Render
 	return (
 		<Tag
 			className={s.special}

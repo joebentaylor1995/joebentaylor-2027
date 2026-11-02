@@ -3,6 +3,8 @@
 // NOTE • Shared by the Studio (validation + preview) and the site, so a link
 // that previews in Sanity is exactly the one that plays on the page.
 
+// Constants
+// ------------
 const VIDEO_ID = /^[\w-]{11}$/;
 const HOSTS = [
 	'youtube.com',
@@ -13,6 +15,8 @@ const HOSTS = [
 	'www.youtube-nocookie.com',
 ];
 
+// Exports
+// ------------
 // NOTE • Accepts watch, youtu.be, shorts, live and embed links
 export const getYouTubeId = (url: string | null | undefined): string | null => {
 	if (!url) return null;

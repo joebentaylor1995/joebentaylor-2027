@@ -9,8 +9,10 @@ import type { GalleryImage } from '@/data/projects';
 
 // Exports
 // ------------
+// Fewest cards a gallery lays out; shorter image lists are repeated to reach it
 export const MIN_CARDS = 6;
 
+// List lookup that wraps in both directions, so any integer index is valid
 export const at = <T>(list: readonly T[], index: number) =>
 	list[((index % list.length) + list.length) % list.length] as T;
 

@@ -1,7 +1,5 @@
-// Imports
+// Types
 // ------------
-
-// Exports
 // ------------
 export interface BackgroundProps {
 	className?: string;

@@ -9,6 +9,7 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
+// Shared frame for every gallery animation: a clipped, optionally coloured stage plus the pause/play button
 const Stage = ({ ref, background, isPaused, onTogglePause, children }: I.StageProps) => {
 	// Derived
 	const style = background ? ({ '--gallery-background': background } as CSSProperties) : undefined;

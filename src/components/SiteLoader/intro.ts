@@ -10,11 +10,14 @@ import { loaderSettings } from './settings';
 
 // Constants
 // ------------
+// The source video's frame rate; INTRO_FRAMES is keyed by frame at this rate
 export const INTRO_FPS = 30;
 const STROKE_PX = 1.5;
+// The stage is the viewport capped at STAGE_MAX px wide and STAGE_ASPECT x its height
 const STAGE_MAX = 1200;
 const STAGE_ASPECT = 1.2;
 
+// Palette: white, black, brand blue and the mid grey used on the outlined frames
 const W = 'var(--global-white)';
 const K = 'var(--global-black)';
 const B = 'var(--brand-c8)';
@@ -68,17 +71,21 @@ export type Frame = {
 
 // Timeline
 // ------------
-// NOTE • Keyed by source frame (30fps). Frames 0–2 are the black lead-in.
+// Offset copy of the main word in brand blue, the video's recurring drop shadow
 const shadow = (dx = -1.5, dy = 1.5): Look => ({ fill: B, dx, dy });
 const solid: Look = { fill: W };
 
+// The full-height curved screen band used in frames 32–33
 const SCREEN: Band = { height: 1, rim: 0.003 };
 // NOTE • The full logo's sizes below are authored against the video, where it lands
 // at 0.63 of the stage. At render they're rescaled so it lands at the static mark's
 // size instead — the zoom-out finishes on the mark itself, with no shrink after.
 export const INTRO_SETTLE_SIZE = 0.63;
 
+// NOTE • Keyed by source frame (30fps). Frames 0–2 are the black lead-in, and
+// frames absent from the table (18, 35) keep the previous frame's state.
 export const INTRO_FRAMES: Record<number, Frame> = {
+	// JOE: stroked, then solid with black glitch cuts
 	0: {},
 	3: { word: 'joe', size: 0.78, y: 0.2, spread: 16, main: { stroke: W } },
 	4: { word: 'joe', size: 0.78, y: 0.16, spread: 16, main: { stroke: G } },
@@ -166,6 +173,7 @@ export const INTRO_FRAMES: Record<number, Frame> = {
 		ghost: { fill: B, scale: 1.1, dx: 8 },
 		cuts: [{ box: [0, 1, 0.45, 0.8], fill: W }],
 	},
+	// BEN
 	22: {
 		word: 'ben',
 		size: 0.92,
@@ -229,6 +237,7 @@ export const INTRO_FRAMES: Record<number, Frame> = {
 	29: { word: 'ben', size: 0.66, main: { fill: K } },
 	30: { word: 'ben', size: 0.65, main: solid, shadow: shadow() },
 	31: { word: 'ben', size: 0.645, main: solid, shadow: shadow() },
+	// Curved screen band opens
 	32: {
 		band: SCREEN,
 		word: 'ben',
@@ -252,6 +261,7 @@ export const INTRO_FRAMES: Record<number, Frame> = {
 	38: { band: { height: 0.68, rim: 0.005 } },
 	39: { band: { height: 0.65, rim: 0.003 } },
 	40: { band: { height: 0.6, rim: 0.002 } },
+	// Full logo zooms out and lands
 	41: {
 		word: 'logo',
 		size: 2.1,
@@ -347,17 +357,20 @@ export const INTRO_FRAMES: Record<number, Frame> = {
 	51: { word: 'logo', size: INTRO_SETTLE_SIZE, main: solid },
 };
 
+// The frame the logo lands on and holds
 export const INTRO_LAST_FRAME = 51;
 
 // Renderer
 // ------------
 const WORDS: Record<WordKey, Word> = { joe: JOE, ben: BEN, logo: LOGO };
+// How many cut and bar elements the markup provides: no frame may use more
 export const CUT_SLOTS = 3;
 export const BAR_SLOTS = 3;
 
 const query = <T extends Element>(root: Element, selector: string) => root.querySelector<T>(selector);
 const queryAll = <T extends Element>(root: Element, selector: string) => Array.from(root.querySelectorAll<T>(selector));
 
+// Paints one layer (main, shadow, ghost or a cut) from a Look; no look hides it
 const applyLook = (el: SVGElement | null, look: Look | undefined, word: Word, strokeWidth: number) => {
 	if (!el) return;
 	if (!look) {
@@ -376,6 +389,8 @@ const applyLook = (el: SVGElement | null, look: Look | undefined, word: Word, st
 	);
 };
 
+// Path for the curved band: straight sides, with the top and bottom edges bowed
+// in by screenCurve. `grow` pushes the edge outwards, which is how the rim is drawn.
 const bandPath = (band: Band, halfWidth: number, stage: number, toUnits: number, grow = 0) => {
 	const cx = LOGO_BOX.width / 2;
 	const cy = LOGO_BOX.height / 2;
@@ -398,6 +413,7 @@ const bandPath = (band: Band, halfWidth: number, stage: number, toUnits: number,
 
 export type IntroIds = Record<WordKey | 'band' | 'blur', string>;
 
+// Sizes in pixels, and the factor that converts them to logo artboard units
 const measure = (root: SVGSVGElement) => {
 	const markPx = root.getBoundingClientRect().width || 120;
 	const stagePx = Math.min(window.innerWidth, window.innerHeight * STAGE_ASPECT, STAGE_MAX) * loaderSettings.scale;
@@ -410,6 +426,8 @@ export const restingSize = (root: SVGSVGElement) => {
 	return (markPx * LOGO.width) / LOGO_BOX.width / stagePx;
 };
 
+// Builds the frame renderer: it finds the SVG pieces once, then each call paints
+// one Frame from INTRO_FRAMES into them.
 export const createIntro = (root: SVGSVGElement, ids: IntroIds) => {
 	const scene = query<SVGGElement>(root, '[data-intro]');
 	const stageClip = query<SVGGElement>(root, '[data-stage-clip]');
@@ -429,6 +447,7 @@ export const createIntro = (root: SVGSVGElement, ids: IntroIds) => {
 		ben: queryAll<SVGPathElement>(root, '[data-letters="ben"] path'),
 	};
 
+	// Frame renderers, one per kind of layer
 	const renderBand = (frame: Frame, halfWidth: number, stagePx: number, toUnits: number) => {
 		if (!band || !rim) return;
 		const shape = frame.band;
@@ -452,6 +471,7 @@ export const createIntro = (root: SVGSVGElement, ids: IntroIds) => {
 		});
 	};
 
+	// Letters of JOE and BEN fan out horizontally around the middle letter
 	const renderSpread = (key: WordKey, spread = 0) => {
 		if (key === 'logo') return;
 		letters[key].forEach((path, i) => {
@@ -459,6 +479,7 @@ export const createIntro = (root: SVGSVGElement, ids: IntroIds) => {
 		});
 	};
 
+	// Each cut is a clipped copy of the word, restyled, so it reads as a shifted slice
 	const renderCuts = (frame: Frame, word: Word, href: string, strokeWidth: number) => {
 		const top = word.cy - word.height / 2;
 		const left = word.cx - word.width / 2;
@@ -476,6 +497,7 @@ export const createIntro = (root: SVGSVGElement, ids: IntroIds) => {
 		});
 	};
 
+	// ANCHOR • Paints a single frame
 	const render = (frame: Frame) => {
 		if (!scene || !stage || !stageClip) return;
 		// NOTE • Measured every frame so a resize mid-intro stays correct
@@ -493,12 +515,15 @@ export const createIntro = (root: SVGSVGElement, ids: IntroIds) => {
 			stageClip.setAttribute('clip-path', `url(#${ids.band})`);
 		} else stageClip.removeAttribute('clip-path');
 
+		// NOTE • No word means a black frame (or just the band and bars)
 		if (!frame.word) {
 			stage.style.display = 'none';
 			return;
 		}
+
 		const word = WORDS[frame.word];
 		const href = `#${ids[frame.word]}`;
+		// Only the logo is rescaled, so it lands at the static mark's size (see INTRO_SETTLE_SIZE)
 		const landing = frame.word === 'logo' ? restingSize(root) / INTRO_SETTLE_SIZE : 1;
 		const scale = ((frame.size ?? 1) * landing * stagePx * toUnits) / word.width;
 		const y = (frame.y ?? 0) * stagePx * toUnits;

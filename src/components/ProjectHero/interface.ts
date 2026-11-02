@@ -1,3 +1,5 @@
+// Types
+// ------------
 import type { Project } from '@/data/projects';
 
 export interface ProjectHeroProps {

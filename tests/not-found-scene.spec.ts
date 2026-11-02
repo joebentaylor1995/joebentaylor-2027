@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from '@playwright/test';
 
+// Tests
+// ------------
+// Protects the 404 page on desktop: the home action sits above the caption and returns through the logo
+// wave as a client-side navigation, not a full page load.
 test('404 uses the case study action above its caption and returns through the logo wave', async ({ page }) => {
 	await page.goto('/missing-matrix-scene/');
 	const consent = page.getByRole('button', { name: 'Accept Necessary' });
@@ -11,6 +17,7 @@ test('404 uses the case study action above its caption and returns through the l
 	const action = await home.boundingBox();
 	const caption = await page.getByText('Page got lost in the rain', { exact: true }).boundingBox();
 	expect(action && caption && action.y + action.height <= caption.y).toBeTruthy();
+	// timeOrigin changes on a full page load, so an equal value afterwards proves the SPA transition
 	const origin = await page.evaluate(() => performance.timeOrigin);
 	await page.screenshot({ path: 'test-results/matrix-404-desktop.png' });
 	await home.click();
@@ -20,6 +27,7 @@ test('404 uses the case study action above its caption and returns through the l
 	expect(await page.evaluate(() => performance.timeOrigin)).toBe(origin);
 });
 
+// Protects the mobile 404 layout: the action and caption stay on screen over the rain, which can be paused.
 test('mobile rain keeps the home action and caption clear of the numerals', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/missing-mobile-rain/');
@@ -34,9 +42,12 @@ test('mobile rain keeps the home action and caption clear of the numerals', asyn
 	await page.screenshot({ path: 'test-results/matrix-404-mobile.png' });
 });
 
+// Protects the fallback for phones with reduced motion and no WebGL: the page shows a static 404 that still
+// links home.
 test('mobile 404 stays usable with reduced motion and without WebGL', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.emulateMedia({ reducedMotion: 'reduce' });
+	// Make every WebGL context request fail
 	await page.addInitScript(() => {
 		const original = HTMLCanvasElement.prototype.getContext;
 		HTMLCanvasElement.prototype.getContext = function (

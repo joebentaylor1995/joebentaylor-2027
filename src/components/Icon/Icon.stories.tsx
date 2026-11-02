@@ -1,6 +1,10 @@
+// Imports
+// ------------
 import type { Meta, StoryObj } from '@storybook/nextjs';
 import Icon from './';
 
+// Story config
+// ------------
 const meta: Meta<typeof Icon> = {
 	title: 'Components/Icon',
 	component: Icon,
@@ -27,6 +31,8 @@ const meta: Meta<typeof Icon> = {
 	},
 };
 
+// Exports
+// ------------
 export default meta;
 type Story = StoryObj<typeof Icon>;
 

@@ -35,18 +35,28 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
+// A tuning panel for site-wide settings (opened with ?globalSettings): the page-transition wave,
+// the projects ribbon's fill, and a tablet font-scale preview. Wave and fill settings are saved
+// to localStorage and read back by the live site; the font scale is a live preview only.
 export default function GlobalSettings() {
+	// State
 	const [scale, setScale] = useState(100);
+
+	// Navigation wave. `preview` is the point (0-100%) to hold the wave at on this page, or null for off
 	const [wave, setWave] = useState<WaveSettings>(waveDefaults);
 	const [waveStatus, setWaveStatus] = useState('Changes apply to the next navigation and are saved in this browser.');
-
 	const [preview, setPreview] = useState<number | null>(null);
 
+	// Project fill. `scrub` is the point (0-100%) to hold the fill at on /projects, or null for off
 	const [fill, setFill] = useState<FillSettings>(fillDefaults);
 	const [scrub, setScrub] = useState<number | null>(null);
 	const [fillStatus, setFillStatus] = useState('Changes apply to the next fill and are saved in this browser.');
+
+	// Derived
 	const isOnProjects = /^\/projects\/?$/.test(usePathname());
 
+	// Effects
+	// Load saved settings after mount (localStorage is unavailable during server render)
 	useEffect(() => setWave(readWaveSettings()), []);
 	useEffect(() => setFill(readFillSettings()), []);
 
@@ -56,6 +66,7 @@ export default function GlobalSettings() {
 		window.dispatchEvent(new CustomEvent(FILL_SCRUB, { detail: scrub === null ? null : scrub / 100 }));
 	}, [scrub, fill]);
 
+	// Let go of the fill when the panel closes
 	useEffect(() => () => void window.dispatchEvent(new CustomEvent(FILL_SCRUB, { detail: null })), []);
 
 	// Draw the chosen point of the wave on this page, redrawn as any setting changes
@@ -65,8 +76,11 @@ export default function GlobalSettings() {
 		else wavePreview.paint?.(preview / 100);
 	}, [preview, wave]);
 
+	// Clear the wave preview when the panel closes
 	useEffect(() => () => wavePreview.clear?.(), []);
 
+	// Handlers
+	// Save to localStorage and announce the change so the live wave re-reads it
 	const updateWave = (settings: WaveSettings) => {
 		try {
 			localStorage.setItem(WAVE_STORAGE_KEY, JSON.stringify(settings));
@@ -78,6 +92,7 @@ export default function GlobalSettings() {
 		}
 	};
 
+	// Save to localStorage; the ribbon reads it again when the next fill begins
 	const updateFill = (settings: FillSettings) => {
 		try {
 			localStorage.setItem(FILL_STORAGE_KEY, JSON.stringify(settings));
@@ -88,6 +103,7 @@ export default function GlobalSettings() {
 		}
 	};
 
+	// Tablet font-scale preview: set the CSS variable, then nudge layout and ScrollTrigger to re-measure
 	useEffect(() => {
 		document.documentElement.style.setProperty('--tablet-font-scale', `${scale}%`);
 		const refresh = window.setTimeout(() => {
@@ -100,6 +116,7 @@ export default function GlobalSettings() {
 		};
 	}, [scale]);
 
+	// Render
 	return (
 		<aside className={s.jacket} aria-label='Global settings' data-type='captionL' data-lenis-prevent>
 			<details open>

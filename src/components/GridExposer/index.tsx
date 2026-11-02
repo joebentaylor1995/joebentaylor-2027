@@ -24,17 +24,17 @@
  */
 
 // Imports
-// ------
+// ------------
 import { theme } from '@theme';
 import Grid, { Col } from '@waffl';
 import { useCallback, useEffect, useState } from 'react';
 
-// Styles
-// ------
+// Styles + Interfaces
+// ------------
 import s from './styles.module.scss';
 
 // Constants
-// ------
+// ------------
 // NOTE • Derived from the same tokens the Waffl grid uses — edit
 // theme.grid.columns and this overlay follows
 const GRID_SIZE = theme.grid.columns?.l ?? 12;
@@ -42,13 +42,13 @@ const MOBILE_COLUMNS = theme.grid.columns?.s ?? 2;
 const TABLET_COLUMNS = theme.grid.columns?.m ?? 6;
 
 // Component
-// ------
+// ------------
 const GridExposer = () => {
-	// State for grid visibility and color mode
+	// State
 	const [isGridVisible, setIsGridVisible] = useState(false);
 	const [useAltColor, setUseAltColor] = useState(true);
 
-	// Toggle handlers
+	// Handlers
 	const toggleGrid = useCallback(() => {
 		setIsGridVisible(prev => !prev);
 	}, []);
@@ -57,7 +57,8 @@ const GridExposer = () => {
 		setUseAltColor(prev => !prev);
 	}, []);
 
-	// Set up keyboard shortcuts
+	// Effects
+	// Ctrl + G toggles the overlay, Ctrl + F swaps its colour scheme
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.ctrlKey) {
@@ -72,9 +73,11 @@ const GridExposer = () => {
 		};
 
 		window.addEventListener('keydown', handleKeyDown);
+
 		return () => window.removeEventListener('keydown', handleKeyDown);
 	}, [toggleGrid, toggleColor]);
 
+	// Derived
 	// No memoization: gridColumns is created on each render
 	const gridColumns = Array.from({ length: GRID_SIZE }, (_, i) => (
 		<Col
@@ -89,6 +92,7 @@ const GridExposer = () => {
 		</Col>
 	));
 
+	// Render
 	return (
 		<aside className={s.jacket} data-visible={isGridVisible || undefined} data-alt={useAltColor || undefined}>
 			<Grid>{gridColumns}</Grid>
@@ -96,4 +100,6 @@ const GridExposer = () => {
 	);
 };
 
+// Exports
+// ------------
 export default GridExposer;
