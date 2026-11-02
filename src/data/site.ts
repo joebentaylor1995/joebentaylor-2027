@@ -9,6 +9,7 @@
 // ------------
 import type { Logo } from '@parts/Hero/LogoMarquee/interface';
 import type { ToolkitItem } from '@parts/Profile/Usps/Toolkit/interface';
+import type { VideoSource } from '@utils/pickVideoSource';
 import { profile } from '@/config';
 import { designTools, developmentTools } from './toolkits';
 
@@ -102,7 +103,7 @@ export interface ProfilePanelContent {
 	designToolkit: Toolkit;
 	developmentToolkit: Toolkit;
 	keyboards: { title: string; count: number };
-	featuredOn: LinkedTile & { eyebrow: string; video: string | null };
+	featuredOn: LinkedTile & { eyebrow: string; video: string | null; videoSources?: VideoSource[] | null };
 	cssda: LinkedTile & { image: string; alt: string };
 	awards: ProfileImage[];
 	servicesIntro: RichTextSegment[];
@@ -122,6 +123,8 @@ export interface RibbonProject {
 	poster: string;
 	video?: string | null;
 	href?: string | null;
+	/** In the Featured list — opens as a full case study; other case studies open in the project modal. */
+	featured?: boolean;
 }
 
 export interface ProjectsPageContent {

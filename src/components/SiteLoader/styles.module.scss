@@ -1,88 +1,88 @@
 .jacket {
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  overflow: hidden;
-  // Cover the first paint before SVG masks and the animation are ready.
-  background: var(--brand-c4);
+	position: fixed;
+	inset: 0;
+	z-index: 3000;
+	overflow: hidden;
+	// Cover the first paint before SVG masks and the animation are ready.
+	background: var(--brand-c4);
 
-  &[data-revealing='true'] { background: transparent; }
+	&[data-revealing='true'] { background: transparent; }
 
-  &[data-outro='fade'] {
-    background: var(--brand-c4);
-    .veil, .ring { display: none; }
-  }
-  // NOTE • Asset wait (≤1.5s) + intro (~2.9s) + GPU wait (≤2s) + wave (~1.35s)
-  animation: fail-open 0s 9s forwards;
+	&[data-outro='fade'] {
+		background: var(--brand-c4);
+		.veil, .ring { display: none; }
+	}
+	// NOTE • Asset wait (≤1.5s) + intro (~2.9s) + GPU wait (≤2s) + wave (~1.35s)
+	animation: fail-open 0s 9s forwards;
 
-  &[data-complete='true'] {
-    display: none;
-  }
+	&[data-complete='true'] {
+		display: none;
+	}
 
-  // Once ready, WebGL owns the boundary and ring; a second mask hides its wave.
-  &[data-webgl-reveal='true'] {
-    .veil, .ring { display: none; }
-  }
+	// Once ready, WebGL owns the boundary and ring; a second mask hides its wave.
+	&[data-webgl-reveal='true'] {
+		.veil, .ring { display: none; }
+	}
 }
 
 // Fail open even if hydration fails.
 @keyframes fail-open {
-  to {
-    visibility: hidden;
-    pointer-events: none;
-  }
+	to {
+		visibility: hidden;
+		pointer-events: none;
+	}
 }
 
 .veil {
-  position: absolute;
-  inset: 0;
+	position: absolute;
+	inset: 0;
 }
 .dark { fill: var(--brand-c4); }
 
 .centre {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
 
-  // The incoming window removes the logo and backdrop together, without a fade.
-  [data-outro='window'] & {
-    mask-image: var(--loader-window-mask, none);
-    mask-mode: luminance;
-  }
+	// The incoming window removes the logo and backdrop together, without a fade.
+	[data-outro='window'] & {
+		mask-image: var(--loader-window-mask, none);
+		mask-mode: luminance;
+	}
 }
 .mark { width: min(120px, 22vw); }
 
 .logoViewport {
-  display: block;
-  width: 100%;
-  overflow: visible;
+	display: block;
+	width: 100%;
+	overflow: visible;
 }
 
 // Hidden until the intro lands on it (or straight away for reduced motion).
 .final {
-  visibility: hidden;
-  fill: var(--global-white);
+	visibility: hidden;
+	fill: var(--global-white);
 }
 
 .intro use {
-  stroke-linejoin: miter;
+	stroke-linejoin: miter;
 }
 .band { fill: var(--global-white); }
 .rim { fill: var(--brand-c8); }
 .bar { fill: var(--global-black); }
 
 .ring {
-  position: absolute;
-  top: calc(50% - 100px);
-  left: calc(50% - 100px);
-  width: 200px;
-  height: 200px;
-  opacity: 0;
-  border: var(--ring-width, 1px) solid var(--global-white);
-  border-radius: 50%;
+	position: absolute;
+	top: calc(50% - 100px);
+	left: calc(50% - 100px);
+	width: 200px;
+	height: 200px;
+	opacity: 0;
+	border: var(--ring-width, 1px) solid var(--global-white);
+	border-radius: 50%;
 
-  @include heroDesktop {
-    box-shadow: inset 0 0 12px alpha(var(--global-white), 25), 0 0 12px alpha(var(--global-white), 15);
-  }
+	@include heroDesktop {
+		box-shadow: inset 0 0 12px alpha(var(--global-white), 25), 0 0 12px alpha(var(--global-white), 15);
+	}
 }

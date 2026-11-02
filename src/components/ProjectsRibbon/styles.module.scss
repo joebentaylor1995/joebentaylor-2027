@@ -6,7 +6,10 @@
 	overflow: hidden;
 	background: var(--brand-c4);
 
+	// NOTE • Hidden, not just transparent: iOS hands swipes to an iframe's own scroll view even
+	// through pointer-events: none, so a transparent ribbon froze scrolling on every other page
 	&[data-state='cached'] {
+		visibility: hidden;
 		opacity: 0;
 		pointer-events: none;
 	}

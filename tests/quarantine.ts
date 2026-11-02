@@ -133,7 +133,7 @@ export const quarantine = new Map<string, string>([
 		'toBeInViewport on a[data-next-project]:visible: expected in viewport',
 	],
 	[
-		'next-project-transition.spec.ts › Next Project uses the feathered wave under a fixed header (mobile)',
+		'next-project-transition.spec.ts › Next Project crossfades under a fixed header (mobile)',
 		'toBeInViewport on a[data-next-project]:visible: expected in viewport',
 	],
 	[
@@ -226,7 +226,10 @@ export const quarantine = new Map<string, string>([
 		'projects.spec.ts › featured and grid selections open the Pocketchange template and support browser Back',
 		'Times out after 60s',
 	],
-	['projects.spec.ts › mobile uses all projects in the vertical stacked ribbon', 'Times out after 60s'],
+	[
+		'projects.spec.ts › mobile shows only the featured case studies in the vertical stacked ribbon',
+		'Times out after 60s',
+	],
 	['projects.spec.ts › projects retains the ribbon, grid, settings and host navigation', 'Times out after 60s'],
 	[
 		'recognition.spec.ts › Recognition fits mobile and respects reduced motion',

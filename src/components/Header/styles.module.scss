@@ -1,12 +1,27 @@
 // Styles: Header
-// ---------------
+// ------------
+
+@keyframes availability-pulse {
+	0% {
+		opacity: 0.6;
+		transform: scale(1);
+	}
+
+	70%, 100% {
+		opacity: 0;
+		transform: scale(3.5);
+	}
+}
 
 .jacket {
 	--header-foreground: var(--brand-c4);
 	// Text colour inside the nav's hover block
 	--header-inverse: var(--global-white);
+	--header-dot: var(--brand-c1);
 
-	&[data-tone='light'] {
+	&[data-case-study='true'] { --header-dot: var(--global-white); }
+
+	&[data-tone='light'], :global(body:has([data-not-found-scene])) & {
 		--header-foreground: var(--global-white);
 		--header-inverse: var(--brand-c4);
 	}
@@ -30,6 +45,10 @@
 	}
 
 	@include bp(l) {
+		padding: var(--gap-l);
+	}
+
+	@include bp(xl) {
 		padding: var(--gap-xl);
 	}
 
@@ -53,6 +72,10 @@
 		@include bp(m) { display: flex }
 
 		em {
+			// NOTE • Pixels, as rem is fluid: the dot keeps one size on every screen
+			--size: 4px;
+
+			position: relative;
 			display: flex;
 			align-items: center;
 			gap: var(--gap-xs);
@@ -60,15 +83,31 @@
 			color: var(--header-foreground);
 
 			&::before {
-				--size: 0.4rem;
-
 				content: '';
 				display: block;
+				flex: none;
 				width: var(--size);
 				height: var(--size);
 				border-radius: 50%;
-				background-color: var(--brand-c1);
+				background-color: var(--header-dot);
 				transform: translateY(0.5px);
+			}
+
+			// The pulse is its own layer, so the dot itself never changes size
+			&::after {
+				content: '';
+				position: absolute;
+				left: 0;
+				top: calc(50% - var(--size) / 2 + 0.5px);
+				width: var(--size);
+				height: var(--size);
+				border-radius: 50%;
+				background-color: var(--header-dot);
+				opacity: 0;
+				pointer-events: none;
+				animation: availability-pulse 2s ease-out infinite;
+
+				@media (prefers-reduced-motion: reduce) { animation: none; }
 			}
 		}
 

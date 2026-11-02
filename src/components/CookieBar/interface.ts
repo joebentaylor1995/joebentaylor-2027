@@ -10,6 +10,7 @@ export type ConsentCategory = 'necessary' | OptionalCategory;
 // NOTE • One flag per optional category — "necessary" is always granted
 export type Consent = Record<OptionalCategory, boolean>;
 
+// NOTE • What is stored in localStorage; `version` and `at` decide whether it is still valid
 export type ConsentRecord = {
 	version: number;
 	at: string;

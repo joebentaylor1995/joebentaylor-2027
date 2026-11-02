@@ -8,15 +8,25 @@ import * as THREE from 'three';
 import type { ToolkitItem } from './interface';
 import { createPhysics, STEP } from './physics';
 
-// Artwork
+// Constants
 // ------------
+// Tile size and corner radius in design pixels, and the canvas supersampling used for its artwork
 const SIZE = 98;
 const RADIUS = 16;
 const RESOLUTION = 3;
+
+// Longest frame time (ms) fed to the physics, so a stalled tab doesn't fast-forward the simulation
 const MAX_DELTA = 50;
+
+// Physics steps run up front when motion is reduced, so tiles appear already at rest
 const SETTLE_STEPS = 600;
+
+// Keyboard nudge strength (design pixels); Space tosses at double
 const KEY_STEP = 20;
 
+// Artwork
+// ------------
+// Loads an image so it can be drawn to canvas
 async function loadImage(src: string) {
 	const image = new Image();
 	// NOTE • Sanity CDN logos are cross-origin; without CORS the canvas would be
@@ -27,6 +37,7 @@ async function loadImage(src: string) {
 	return image;
 }
 
+// Paints one tile: rounded square in the item's colour with each layer drawn on top (optionally masked and rotated)
 async function artwork(item: ToolkitItem, signal?: AbortSignal) {
 	signal?.throwIfAborted();
 	const canvas = document.createElement('canvas');
@@ -39,6 +50,7 @@ async function artwork(item: ToolkitItem, signal?: AbortSignal) {
 	context.clip();
 	context.fillStyle = item.background;
 	context.fillRect(0, 0, SIZE, SIZE);
+
 	const images = await Promise.all(
 		item.layers.map(async layer => ({
 			layer,
@@ -46,6 +58,7 @@ async function artwork(item: ToolkitItem, signal?: AbortSignal) {
 			mask: layer.mask ? await loadImage(layer.mask) : undefined,
 		}))
 	);
+
 	for (const { layer, image, mask } of images) {
 		await yieldSceneWork();
 		signal?.throwIfAborted();
@@ -55,10 +68,13 @@ async function artwork(item: ToolkitItem, signal?: AbortSignal) {
 		const drawing = stamp.getContext('2d');
 		if (!drawing) continue;
 		drawing.drawImage(image, 0, 0, stamp.width, stamp.height);
+
+		// The mask keeps only the part of the layer where the mask is opaque
 		if (mask) {
 			drawing.globalCompositeOperation = 'destination-in';
 			drawing.drawImage(mask, 0, 0, stamp.width, stamp.height);
 		}
+
 		context.save();
 		context.translate(layer.x + layer.width / 2, layer.y + layer.height / 2);
 		context.rotate(((layer.angle ?? 0) * Math.PI) / 180);
@@ -68,11 +84,17 @@ async function artwork(item: ToolkitItem, signal?: AbortSignal) {
 	return canvas;
 }
 
-// Scene
+// Engine
 // ------------
+// Builds the toolkit scene: tile artwork is baked to canvases, drawn as textured planes by three.js
+// (falling back to a 2D canvas without WebGL) and moved by the Matter.js world in ./physics. Each tile's
+// DOM button follows its body through CSS variables so it can be focused and dragged. The ticker
+// runs only while visible and the physics is awake. Resolves to { setVisible, destroy }.
 export async function createToolkit(element: HTMLElement, items: readonly ToolkitItem[], signal?: AbortSignal) {
+	// Setup
 	const artworkCanvases = await Promise.all(items.map(item => artwork(item, signal)));
 	signal?.throwIfAborted();
+
 	const buttons = Array.from(element.querySelectorAll('button'));
 	// Keep physics in design units; the camera and hit targets scale with rem sizing.
 	const getScale = () =>
@@ -81,10 +103,14 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 				? getSettings().designToolkitSize
 				: getSettings().developmentToolkitSize)) /
 		100;
+
+	// scale converts design units to CSS px; width/height are the box in design units
 	let scale = getScale();
 	let width = Math.max(SIZE + 16, element.clientWidth / scale);
 	let height = Math.max(SIZE + 16, element.clientHeight / scale);
 	const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+	// Tiles start spread across the width and stacked above the box so they fall in one by one
 	const physics = createPhysics(
 		width,
 		height,
@@ -99,6 +125,8 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		{ intro: true }
 	);
 	if (motion.matches) for (let i = 0; i < SETTLE_STEPS; i++) physics.step();
+
+	// Renderer: top-left origin orthographic camera in design units; WebGL if available, otherwise a 2D canvas
 	const scene = new THREE.Scene();
 	const camera = new THREE.OrthographicCamera(0, width, 0, height, 0.1, 100);
 	camera.position.z = 10;
@@ -114,8 +142,11 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		canvas = document.createElement('canvas');
 		fallback = canvas.getContext('2d');
 	}
+
 	canvas.setAttribute('aria-hidden', 'true');
 	element.prepend(canvas);
+
+	// One textured plane per tile
 	const meshes = artworkCanvases.map(art => {
 		const texture = new THREE.CanvasTexture(art);
 		texture.colorSpace = THREE.SRGBColorSpace;
@@ -127,6 +158,8 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		scene.add(mesh);
 		return mesh;
 	});
+
+	// Frees GPU/physics resources and removes the canvas
 	const releaseAssets = () => {
 		physics.destroy();
 		for (const mesh of meshes) {
@@ -138,6 +171,8 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		renderer?.forceContextLoss();
 		canvas.remove();
 	};
+
+	// Warm up shaders and textures one at a time so the first frame doesn't hitch
 	try {
 		if (renderer) {
 			await renderer.compileAsync(scene, camera);
@@ -152,6 +187,8 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		releaseAssets();
 		throw error;
 	}
+
+	// Runtime state
 	let visible = false;
 	let listening = false;
 	let destroyed = false;
@@ -161,6 +198,7 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 	const events = new AbortController();
 	const options = { signal: events.signal };
 
+	// Copy each body's position/angle to its mesh (or 2D draw) and to its button's CSS variables, then render
 	function draw() {
 		fallback?.clearRect(0, 0, width, height);
 		physics.bodies.forEach((body, index) => {
@@ -182,6 +220,8 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		});
 		renderer?.render(scene, camera);
 	}
+
+	// Ticker control: the loop only runs while visible and the physics is awake
 	function stop() {
 		gsap.ticker.remove(tick);
 		listening = false;
@@ -192,6 +232,8 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		listening = true;
 		gsap.ticker.add(tick);
 	}
+
+	// Fixed-timestep physics from accumulated frame time
 	function tick(_time: number, delta: number) {
 		accumulator += Math.min(delta, MAX_DELTA);
 		while (accumulator >= STEP) {
@@ -201,6 +243,8 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		draw();
 		if (!physics.active) stop();
 	}
+
+	// End any drag and give up pointer capture
 	function release() {
 		physics.release();
 		if (activePointer !== null && activeButton?.hasPointerCapture(activePointer))
@@ -208,6 +252,8 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		activePointer = null;
 		activeButton = undefined;
 	}
+
+	// Pointer position in design units
 	function point(event: PointerEvent) {
 		const bounds = element.getBoundingClientRect();
 		return {
@@ -215,6 +261,8 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 			y: ((event.clientY - bounds.top) * height) / bounds.height,
 		};
 	}
+
+	// Make each button live: pointer drag grabs its body; arrow keys nudge it and Space tosses it upwards
 	buttons.forEach((button, index) => {
 		button.tabIndex = 0;
 		button.disabled = false;
@@ -262,6 +310,8 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 			options
 		);
 	});
+
+	// Re-measure the box (also on setting changes), resize the physics world and renderer, then redraw
 	function resize() {
 		scale = getScale();
 		const nextWidth = Math.max(SIZE + 16, element.clientWidth / scale);
@@ -284,6 +334,7 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		draw();
 		start();
 	}
+
 	const unsubscribe = subscribe(resize);
 	const resizeObserver = new ResizeObserver(resize);
 	resizeObserver.observe(element);
@@ -298,6 +349,8 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		options
 	);
 	window.addEventListener('blur', release, options);
+
+	// Switching to reduced motion settles the tiles immediately
 	motion.addEventListener(
 		'change',
 		() => {
@@ -309,9 +362,12 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		},
 		options
 	);
+
 	resize();
 	element.dataset.state = 'ready';
 	element.dataset.renderer = renderer ? 'webgl' : 'canvas';
+
+	// Handle
 	return {
 		setVisible(next: boolean) {
 			visible = next;

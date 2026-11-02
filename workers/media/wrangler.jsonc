@@ -1,0 +1,21 @@
+// Media Worker — Cloudflare config
+// NOTE • Deploy with `bunx wrangler deploy` from this folder. Setup: docs/Sanity/R2Media.md
+{
+	"$schema": "https://unpkg.com/wrangler@4.151.3/config-schema.json",
+	"name": "joebentaylor-media",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-10-01",
+	"r2_buckets": [{ "binding": "MEDIA", "bucket_name": "joebentaylor-media-eu" }],
+	"vars": {
+		"SANITY_PROJECT_ID": "lsgdcp1a",
+		"SANITY_DATASET": "production"
+	},
+	// NOTE • joebentaylor.com's DNS is on Cloudflare (the site's own domain stays on
+	// Netlify), so the Worker can own cdn.joebentaylor.com — Cloudflare adds the
+	// DNS record and certificate on deploy, and the edge cache only works there.
+	// The apex and www redirect to joebentaylor.co.uk (a zone Redirect Rule).
+	// workers.dev stays on as a fallback while NEXT_PUBLIC_MEDIA_URL moves over.
+	"routes": [{ "pattern": "cdn.joebentaylor.com", "custom_domain": true }],
+	"workers_dev": true,
+	"observability": { "enabled": true }
+}

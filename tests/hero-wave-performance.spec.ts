@@ -1,8 +1,15 @@
+// Imports
+// ------------
 import { writeFile } from 'node:fs/promises';
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Measures the loader wave on an emulated phone with CPU throttled 4x and 6x. Set WAVE_TRACE=1 to log
+// the page console and save a DevTools trace for investigating a failure.
 for (const rate of [4, 6]) {
 	test(`mobile loader fade frame budget at ${rate}x CPU slowdown`, async ({ browser }, testInfo) => {
+		// A dedicated context is needed to emulate the phone (mobile, touch, 3x scale)
 		const context = await browser.newContext({
 			viewport: { width: 390, height: 844 },
 			deviceScaleFactor: 3,
@@ -15,6 +22,8 @@ for (const rate of [4, 6]) {
 		await session.send('Emulation.setCPUThrottlingRate', { rate });
 		if (process.env.WAVE_TRACE)
 			await session.send('Tracing.start', { categories: 'devtools.timeline,v8', transferMode: 'ReturnAsStream' });
+		// Audit collected from the reveal event to the loader settled event: frame gaps from requestAnimationFrame
+		// and any main-thread task of 50ms or more (the long task threshold) within that window
 		await page.addInitScript(() => {
 			const audit = {
 				running: false,
@@ -74,6 +83,7 @@ for (const rate of [4, 6]) {
 			);
 		});
 		try {
+			// Wait for the loader to settle, then read the audit
 			await page.goto(testInfo.project.use.baseURL || 'http://localhost:3000/');
 			await page.waitForFunction(
 				() => (window as unknown as { heroWaveAudit: { done: boolean } }).heroWaveAudit.done,
@@ -88,6 +98,8 @@ for (const rate of [4, 6]) {
 						}
 					).heroWaveAudit
 			);
+
+			// Frame gap statistics
 			const sorted = [...audit.gaps].sort((a, b) => a - b);
 			if (process.env.WAVE_TRACE) console.log(JSON.stringify(audit));
 			const result = {
@@ -104,6 +116,8 @@ for (const rate of [4, 6]) {
 				contentType: 'application/json',
 			});
 			console.log(JSON.stringify(result));
+
+			// Optional: stop tracing and attach the trace
 			if (process.env.WAVE_TRACE) {
 				const completed = new Promise<{ stream?: string }>(resolve =>
 					session.once('Tracing.tracingComplete', resolve)

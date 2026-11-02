@@ -1,11 +1,18 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects two performance behaviours: case study images just below the viewport are eagerly loaded, while far
+// ones stay lazy, and (as a measurement) the frame rate of each main route while scrolling.
 for (const width of [440, 1440]) {
 	test(`case study warms offscreen media at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
 		await page.goto('/projects/pocketchange/');
 		await page.getByRole('button', { name: 'Accept Necessary' }).click();
 		await expect(page.locator('[data-site-loader]')).toBeHidden({ timeout: 20000 });
+		// Scroll a tile to 350px below the viewport bottom, using the Lenis wrapper
 		const tile = page.locator('[data-media-tile]').first();
 		await tile.evaluate(el => {
 			const scroll = document.querySelector('#page .lenis');
@@ -23,6 +30,8 @@ for (const width of [440, 1440]) {
 					: scroll.scrollTop + el.getBoundingClientRect().top - target;
 			scroll.scrollTo({ top, behavior: 'instant' });
 		});
+
+		// Nearby image loads eagerly before it is visible
 		await expect(tile.locator('img')).toHaveAttribute('loading', 'eager');
 		await expect(page.locator('[data-project-case-builder]')).toHaveAttribute('data-reveal-ready', 'true');
 		await expect
@@ -37,6 +46,8 @@ for (const width of [440, 1440]) {
 		await expect(page.locator('[data-media-tile]').last().locator('img')).toHaveAttribute('loading', 'lazy');
 	});
 
+	// Measures frame timing for each route while scrolling for 3 seconds. This only fails on page errors,
+	// horizontal overflow or too few frames; the numbers are attached to the report for comparison.
 	for (const route of ['/', '/projects/', '/projects/pocketchange/', '/terms-privacy/', '/cookies/']) {
 		test(`frame sample ${route} at ${width}px`, async ({ page }, info) => {
 			await page.setViewportSize({ width, height: 900 });
@@ -46,7 +57,10 @@ for (const width of [440, 1440]) {
 			await expect(page.locator('[data-site-loader]')).toBeHidden({ timeout: 20000 });
 			if (route === '/projects/')
 				await expect(page.frameLocator('iframe[title="Interactive projects"]').locator('#stage')).toBeVisible();
+			// Let the page settle before measuring
 			await page.waitForTimeout(1200);
+			// In the page: record the WebGL renderer name, then step animation frames for 3s while scrolling (or wheeling
+			// the ribbon canvas on Projects), collecting frame gaps and long main-thread tasks
 			const sample = await page.evaluate(async () => {
 				const probe = document.createElement('canvas').getContext('webgl');
 				const debug = probe?.getExtension('WEBGL_debug_renderer_info');
@@ -101,7 +115,10 @@ for (const width of [440, 1440]) {
 	}
 }
 
+// Protects the case study water effect from running behind Profile: no draw calls while Profile is open, even
+// with the pointer moving.
 test('case-study water stops rendering behind Profile', async ({ page }) => {
+	// Count draws on the water canvas via a data attribute
 	await page.addInitScript(() => {
 		const draw = WebGLRenderingContext.prototype.drawArrays;
 		WebGLRenderingContext.prototype.drawArrays = function (mode, first, count) {
@@ -117,6 +134,8 @@ test('case-study water stops rendering behind Profile', async ({ page }) => {
 	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
 	await expect(page.locator('[data-profile-scene]')).toHaveAttribute('data-scene-paused', 'true');
 	await page.waitForTimeout(300);
+
+	// Draws must not increase while Profile covers the scene
 	const count = await water.getAttribute('data-draws');
 	await page.mouse.move(300, 300);
 	await page.mouse.move(600, 500, { steps: 10 });

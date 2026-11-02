@@ -1,6 +1,13 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the opening wave on slow connections: the loader keeps waiting for the depth texture instead
+// of revealing without WebGL, and the wave plays once the texture arrives.
 test('slow hero textures do not miss the opening WebGL wave', async ({ page }) => {
+	// Hold the depth texture request until released
 	let release = () => {};
 	const textureReady = new Promise<void>(resolve => {
 		release = resolve;
@@ -13,6 +20,8 @@ test('slow hero textures do not miss the opening WebGL wave', async ({ page }) =
 		await page.goto('/');
 		// Simulate a texture arriving after the former two-second readiness deadline.
 		await page.waitForTimeout(6000);
+
+		// Still waiting well past the deadline
 		await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'false');
 		await expect(page.locator('html')).toHaveAttribute('data-loader-pending', 'true');
 		release();

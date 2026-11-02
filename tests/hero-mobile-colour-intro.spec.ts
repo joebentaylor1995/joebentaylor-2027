@@ -1,8 +1,15 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the mobile intro: the portrait colour uniform starts at 1 on reveal and eases to 0 after
+// the loader fade rather than snapping.
 test('mobile portrait colour settles after the loader fade', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.addInitScript(() => {
+		// Record the portrait introColour uniform and snapshot it on the loader reveal and settled events
 		const audit = { colour: 0, atReveal: -1, atFadeEnd: -1 };
 		Object.assign(window, { colourIntroAudit: audit });
 		const locations = new WeakSet<WebGLUniformLocation>();
@@ -26,6 +33,8 @@ test('mobile portrait colour settles after the loader fade', async ({ page }) =>
 	});
 	await page.goto('/');
 	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 15000 });
+
+	// Reads the audit object back from the page
 	const read = () =>
 		page.evaluate(
 			() =>
@@ -35,6 +44,8 @@ test('mobile portrait colour settles after the loader fade', async ({ page }) =>
 					}
 				).colourIntroAudit
 		);
+
+	// introColour is 1 at reveal, part-way when the loader settles, and ends at 0
 	const audit = await read();
 	expect(audit.atReveal).toBe(1);
 	expect(audit.atFadeEnd).toBeGreaterThan(0);

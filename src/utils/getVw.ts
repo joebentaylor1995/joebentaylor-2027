@@ -1,3 +1,13 @@
+// Imports
+// ------------
+import { grid } from '../theme/grid';
+
+// Constants
+// ------------
+const { desktop, tablet, mobile } = grid.design;
+
+// Exports
+// ------------
 /**
  * Converts pixel values to viewport width (vw) units
  *
@@ -15,21 +25,19 @@
  * @example Inline style (in SCSS, use the vw() function instead)
  * <div style={{ fontSize: getVw(48) }} />
  */
-
-import { grid } from '../theme/grid';
-
-const { desktop, tablet, mobile } = grid.design;
-
 export const getVw = (px: number): string => {
 	const vw = (px / desktop) * 100;
+
 	return `${vw.toFixed(2)}vw`;
 };
 
+/** Same conversion against the mobile design width */
 export const getVwMobile = (px: number): string => {
 	const vw = (px / mobile) * 100;
 	return `${vw.toFixed(2)}vw`;
 };
 
+/** Same conversion against the tablet design width */
 export const getVwTablet = (px: number): string => {
 	const vw = (px / tablet) * 100;
 	return `${vw.toFixed(2)}vw`;

@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { mq } from '@tackl';
 
+// Defaults
+// ------------
+// NOTE • The profile panel's tunables, grouped by section (matrix rain, toolkits, awards,
+// keycap, globe, about). Units are shown beside each control in the settings panel.
 export const defaults = {
 	matrixSpeed: 1.9,
 	matrixBrightness: 0.95,
@@ -44,7 +50,10 @@ export const defaults = {
 	aboutExitParallax: 50,
 	aboutPreviousZoom: 25,
 };
+
 export type ModalSettings = typeof defaults;
+
+// Phones start from the desktop values with these overrides
 export const mobileDefaults: ModalSettings = {
 	...defaults,
 	designToolkitSize: 90,
@@ -57,9 +66,14 @@ export const mobileDefaults: ModalSettings = {
 	keycapSize: 81.8,
 	globeZoom: 2.02,
 };
+
+// Ranges
+// ------------
 export type NumberSetting = {
 	[K in keyof ModalSettings]: ModalSettings[K] extends number ? K : never;
 }[keyof ModalSettings];
+
+// [min, max, step] for each numeric setting; values are clamped to these when applied
 export const ranges: Record<NumberSetting, [number, number, number]> = {
 	matrixSpeed: [0, 5, 0.1],
 	matrixBrightness: [0, 2, 0.05],
@@ -99,15 +113,23 @@ export const ranges: Record<NumberSetting, [number, number, number]> = {
 	aboutExitParallax: [0, 100, 1],
 	aboutPreviousZoom: [0, 100, 1],
 };
+
+// Store
+// ------------
 export const STORAGE_KEY = 'jbt-modal-settings-v2';
 export type SettingsTarget = 'mobile' | 'desktop';
+
+// Desktop and mobile each keep their own profile; the active one follows the breakpoint
 let desktopSettings = { ...defaults };
 let mobileSettings = { ...mobileDefaults };
+
+// Subscribers (for useSyncExternalStore) are told after every change or breakpoint switch
 const subscribers = new Set<() => void>();
 let desktopQuery: MediaQueryList | undefined;
 const notify = () => {
 	for (const callback of subscribers) callback();
 };
+
 export const getSettingsTarget = (): SettingsTarget => {
 	if (typeof window === 'undefined') return 'mobile';
 	desktopQuery ??= window.matchMedia(mq.up.l);
@@ -116,6 +138,8 @@ export const getSettingsTarget = (): SettingsTarget => {
 export const getSettingsFor = (target: SettingsTarget) => (target === 'mobile' ? mobileSettings : desktopSettings);
 export const getSettings = () => getSettingsFor(getSettingsTarget());
 export const getSavedSettings = () => ({ desktop: desktopSettings, mobile: mobileSettings });
+
+// The breakpoint listener is attached only while someone is subscribed
 export const subscribe = (callback: () => void) => {
 	if (!subscribers.size && typeof window !== 'undefined') {
 		desktopQuery ??= window.matchMedia(mq.up.l);
@@ -130,6 +154,8 @@ export const subscribe = (callback: () => void) => {
 		}
 	};
 };
+
+// Merges known, in-range values into a profile; anything else is ignored
 export function updateSettings(values: Partial<ModalSettings>, target: SettingsTarget = 'desktop') {
 	const next = { ...getSettingsFor(target) };
 	for (const key of Object.keys(defaults) as (keyof ModalSettings)[]) {
@@ -145,6 +171,8 @@ export function updateSettings(values: Partial<ModalSettings>, target: SettingsT
 	else desktopSettings = next;
 	notify();
 }
+
+// Applies saved settings: the current { desktop, mobile } shape, or the older single profile
 export function restoreSettings(saved: unknown) {
 	if (!saved || typeof saved !== 'object') return;
 	if ('desktop' in saved && 'mobile' in saved) {

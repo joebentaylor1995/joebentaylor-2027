@@ -1,6 +1,13 @@
+// Imports
+// ------------
+
 import { createPhysics } from '../src/components/Profile/Usps/Toolkit/physics';
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Physics unit test (no browser): tools start above the box, fall and rest inside it, can be dragged up and
+// released, and a narrower box pulls them back inside. Each loop of 900 steps lets the bodies settle.
 test('tools enter from above, collide with the floor, drag, release and stay contained after resize', () => {
 	const world = createPhysics(
 		500,
@@ -31,6 +38,8 @@ test('tools enter from above, collide with the floor, drag, release and stay con
 	world.destroy();
 });
 
+// Protects the toolkit in Profile at three widths (2560 covers the large-screen scale-up): both sets render with
+// the right tile counts and sizes, tiles can be dragged and fall back, and closing Profile releases the canvas.
 for (const width of [1440, 440, 2560]) {
 	test(`both toolkit sets render and drag independently at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
@@ -39,6 +48,7 @@ for (const width of [1440, 440, 2560]) {
 		page.on('pageerror', error => errors.push(error.message));
 		await page.goto('/');
 		await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+		// [toolkit label, expected tile count]
 		for (const [label, count] of [
 			['Design toolkit', 6],
 			['Development toolkit', 5],
@@ -49,6 +59,7 @@ for (const width of [1440, 440, 2560]) {
 			await expect(toolkit).toHaveAttribute('data-renderer', 'webgl');
 			await expect(toolkit.locator('button')).toHaveCount(count);
 			const tile = toolkit.locator('button').last();
+			// Above 1600px everything scales with the width
 			const scale = width > 1600 ? width / 1600 : 1;
 			await expect(tile).toHaveCSS('border-radius', `${16 * scale}px`);
 			expect(await tile.evaluate(element => parseFloat(getComputedStyle(element).width))).toBeCloseTo(
@@ -56,6 +67,8 @@ for (const width of [1440, 440, 2560]) {
 				1
 			);
 			await expect(toolkit).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+
+			// Drag: hold a tile, pull it up to the top of the area, then release and watch it fall
 			const consent = page.getByRole('button', { name: 'Accept Necessary', exact: true });
 			if (await consent.isVisible()) await consent.click();
 			const bounds = await tile.boundingBox();
@@ -71,6 +84,8 @@ for (const width of [1440, 440, 2560]) {
 			await page.screenshot({ path: `test-results/toolkit-${label.split(' ')[0]}-${width}.png` });
 			await expect.poll(async () => (await tile.boundingBox())?.y).toBeGreaterThan((held?.y ?? area.y) + 15);
 		}
+
+		// Closing Profile releases the canvases and disables the tiles; reopening rebuilds them
 		expect(errors).toEqual([]);
 		await page.getByRole('button', { name: 'Close profile', exact: true }).press('Escape');
 		for (const toolkit of await page.locator('[data-toolkit]').all()) {

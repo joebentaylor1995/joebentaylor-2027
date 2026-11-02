@@ -1,10 +1,7 @@
 // Imports
 // ------------
-
 import SpecialHeading from '@parts/SpecialHeading';
 import Grid, { Col } from '@waffl';
-// Styles
-// ------------
 import s from './styles.module.scss';
 import Title from './Title';
 

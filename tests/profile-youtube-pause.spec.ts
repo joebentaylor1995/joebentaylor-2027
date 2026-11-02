@@ -1,13 +1,20 @@
+// Imports
+// ------------
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { expect, test } from './helpers/test';
 
+// Helpers
+// ------------
+// Test state exposed on window by the fake YouTube player below
 declare global {
 	interface Window {
 		youtubeTestPlayer: { state: number; plays: number; pauses: number };
 	}
 }
 
+// Constants
+// ------------
 // Exercise the real lifecycle adapter with a deterministic player API, without
 // depending on third-party ads, login prompts, or geographic playback restrictions.
 const adapter = execFileSync(
@@ -16,7 +23,12 @@ const adapter = execFileSync(
 	{ encoding: 'utf8' }
 );
 
+// Tests
+// ------------
+// Protects YouTube behind Profile: a playing video is paused when Profile opens and resumed on close,
+// but a video that was already paused is left paused.
 test('profile pauses YouTube and only resumes playback that was previously running', async ({ page }) => {
+	// Serve the bundled adapter and stub the embed so no real YouTube request is made
 	await page.route('**/__tests/youtube-player.js', route =>
 		route.fulfill({ body: adapter, contentType: 'application/javascript' })
 	);
@@ -26,6 +38,8 @@ test('profile pauses YouTube and only resumes playback that was previously runni
 	await page.goto('/projects/pocketchange/');
 	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 30_000 });
 	await page.getByRole('button', { name: 'Accept Necessary' }).click();
+	// Install a fake YT.Player (state 1 = playing, 2 = paused) that counts play and pause calls, then
+	// mount the real adapter on it
 	await page.evaluate(async () => {
 		window.youtubeTestPlayer = { state: 1, plays: 0, pauses: 0 };
 		window.YT = {
@@ -53,12 +67,15 @@ test('profile pauses YouTube and only resumes playback that was previously runni
 		document.querySelector('[data-profile-scene]')?.append(host);
 		mountYouTubePlayer(host, 'M7lc1UVf-VE', 'Test player');
 	});
+
+	// Playing before: Profile pauses it once, closing plays it once
 	const state = () => page.evaluate(() => window.youtubeTestPlayer);
 	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
 	await expect.poll(state).toEqual({ state: 2, plays: 0, pauses: 1 });
 	await page.getByRole('button', { name: 'Close profile', exact: true }).click();
 	await expect.poll(state).toEqual({ state: 1, plays: 1, pauses: 1 });
 	await page.evaluate(() => {
+		// The visitor pauses it themselves
 		window.youtubeTestPlayer.state = 2;
 	});
 	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();

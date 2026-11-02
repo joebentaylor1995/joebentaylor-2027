@@ -1,5 +1,7 @@
 'use client';
 
+// Imports
+// ------------
 import { GlobalContext } from '@parts/Contexts';
 import { use, useEffect, useState, useSyncExternalStore } from 'react';
 import {
@@ -17,8 +19,14 @@ import {
 	subscribe,
 	updateSettings as updateProfileSettings,
 } from './store';
+
+// Styles + Interfaces
+// ------------
 import s from './styles.module.scss';
 
+// Constants
+// ------------
+// Panel section title to the selector of the part of the profile it controls
 const sections: Record<string, string> = {
 	Recognition: '[data-recognition]',
 	About: '[data-about]',
@@ -29,6 +37,7 @@ const sections: Record<string, string> = {
 	'Development toolkit': '[data-toolkit="Development toolkit" i]',
 };
 
+// The controls of each section: [setting key, label, unit]
 const fields: { title: string; controls: [NumberSetting, string, string][] }[] = [
 	{
 		title: 'Connect',
@@ -93,21 +102,34 @@ const fields: { title: string; controls: [NumberSetting, string, string][] }[] =
 	},
 ];
 
+// Component
+// ------------
+// NOTE • Dev-only panel (?modalSettings) for tuning the profile panel live. Each device
+// profile is saved to localStorage as you edit, and can be copied out as the new defaults.
 export default function ModalSettingsPanel() {
+	// Context
 	const { setProfileOpen } = use(GlobalContext);
+
+	// State
 	const [target, setTarget] = useState<SettingsTarget>('desktop');
 	const values = useSyncExternalStore(
 		subscribe,
 		() => getSettingsFor(target),
 		() => defaults
 	);
+
 	const updateSettings = (values: Partial<ModalSettings>) => updateProfileSettings(values, target);
+
 	const [message, setMessage] = useState('Changes save in this browser for settings mode.');
+
+	// Effects
 	useEffect(() => {
 		setTarget(getSettingsTarget());
 		try {
+			// Restore any saved profiles from this browser
 			const saved = localStorage.getItem(STORAGE_KEY);
 			if (saved) restoreSettings(JSON.parse(saved));
+
 			// Apply the approved mobile preset once, preserving saved desktop settings.
 			const mobilePresetKey = 'jbt-mobile-preset-2026-10-16';
 			if (!localStorage.getItem(mobilePresetKey)) {
@@ -119,6 +141,8 @@ export default function ModalSettingsPanel() {
 			/* Storage may be unavailable or contain an older draft. */
 		}
 		setProfileOpen(true);
+
+		// Save to localStorage on every change
 		return subscribe(() => {
 			try {
 				localStorage.setItem(STORAGE_KEY, JSON.stringify(getSavedSettings()));
@@ -127,6 +151,8 @@ export default function ModalSettingsPanel() {
 			}
 		});
 	}, [setProfileOpen]);
+
+	// Handlers
 	const copy = async () => {
 		try {
 			await navigator.clipboard.writeText(JSON.stringify(getSavedSettings(), null, 2));
@@ -135,6 +161,8 @@ export default function ModalSettingsPanel() {
 			setMessage('Clipboard unavailable. Your settings remain saved in this browser.');
 		}
 	};
+
+	// Render
 	return (
 		<aside className={s.jacket} data-modal-settings data-lenis-prevent aria-label='Modal settings'>
 			<details open>

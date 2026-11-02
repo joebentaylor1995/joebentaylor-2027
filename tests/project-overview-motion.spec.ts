@@ -1,10 +1,17 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the case study overview: the words reveal when it arrives, the label sits 40px above the
+// viewport bottom, and the cursor fits itself to images and the website button it hovers.
 test('overview words, bottom heading and fitted cursor targets', async ({ page }) => {
 	await page.goto('/projects/pocketchange/');
 	await page.getByRole('button', { name: 'Accept Necessary' }).click();
 	await expect(page.locator('[data-loader-overlay]')).toBeHidden({ timeout: 15000 });
 	const scroller = page.locator('#page .lenis').first();
+	// Scrolls so the element sits desiredY px from the top of the viewport, accounting for the pinned hero layer
 	const goTo = async (selector: string, y = 160) => {
 		const top = await page.locator(selector).evaluate((el, desiredY) => {
 			const content = document.querySelector('[data-project-panel-content]') as HTMLElement;
@@ -20,15 +27,21 @@ test('overview words, bottom heading and fitted cursor targets', async ({ page }
 		}, y);
 		await scroller.evaluate((el, value) => el.scrollTo({ top: value, behavior: 'instant' }), top);
 	};
+
+	// Objectives: words revealed and the label sits 40px above the bottom
 	await goTo('[data-objectives-layout]', 0);
 	const words = page.locator('[data-objectives-layout] [data-reveal-variant="words"]').first();
 	await expect(words).toHaveAttribute('data-wave-state', 'complete');
 	const label = page.locator('[data-objectives-label]');
 	await expect.poll(() => label.evaluate(el => innerHeight - el.getBoundingClientRect().bottom)).toBeCloseTo(40, 0);
+
+	// Hovering an image makes the cursor sticky
 	await goTo('[data-objectives-layout] img[data-cursor-fit]', 300);
 	const credit = page.locator('[data-objectives-layout] img[data-cursor-fit]').first();
 	await credit.hover();
 	await expect(page.locator('[data-cursor="sticky"]')).toHaveCount(1);
+
+	// Hovering the button makes the cursor stick and morph to the exact button box
 	const button = page.getByRole('link', { name: /View Website/ });
 	await goTo('[data-button-050]', 400);
 	await button.hover();
@@ -41,6 +54,7 @@ test('overview words, bottom heading and fitted cursor targets', async ({ page }
 				.evaluate(el => Number.parseFloat((el as HTMLElement).style.getPropertyValue('--cursor-fit-width')))
 		)
 		.toBeCloseTo(width, 0);
+	// The cursor shape must overlap the button within 2px on every edge
 	const shape = page.locator('[class*="cursorShape"]');
 	await expect
 		.poll(async () => {

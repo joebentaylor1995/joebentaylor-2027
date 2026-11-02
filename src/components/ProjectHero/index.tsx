@@ -1,8 +1,7 @@
 // Imports
 // ------------
-
 import PageTitleReveal from '@parts/PageTitleReveal';
-import Grid, { Col } from '@waffl';
+import SpecialHeading from '@parts/SpecialHeading';
 import Image from 'next/image';
 
 // Styles + Interfaces
@@ -13,6 +12,8 @@ import Water from './Water';
 
 // Component
 // ------------
+// Case study opener: full-bleed hero photo with the water canvas over it and the title below.
+// In preview mode it is a plain image and heading: no water canvas, title animation or page-level ids.
 const ProjectHero = ({ project, preview = false }: ProjectHeroProps) => (
 	// NOTE • The case study streams in under Suspense, so the site loader and
 	// Water can reach this section before React hydrates it and set
@@ -38,40 +39,25 @@ const ProjectHero = ({ project, preview = false }: ProjectHeroProps) => (
 		</div>
 		{!preview && <Water />}
 
-		<div className={s.title} data-project-hero-copy>
-			<Grid>
-				<Col as='h1' id={preview ? undefined : 'project-title'} data-type='displayL' l='2/12'>
-					{preview ? (
-						project.title
-					) : (
-						<PageTitleReveal
-							variant='wave'
-							trigger='project'
-							transparentStart
-							waveDuration={1.6}
-							waveEase='sine.inOut'
-						>
-							{project.title}
-						</PageTitleReveal>
-					)}
-				</Col>
-			</Grid>
-		</div>
-
-		<div className={s.description} data-project-hero-copy>
-			<Grid>
-				<Col as='p' data-type='titleS' l='2/9'>
+		<div className={s.copy} data-project-hero-copy>
+			<div className={s.label}>
+				<SpecialHeading text='Case Study' tag='p' />
+			</div>
+			<h1 id={preview ? undefined : 'project-title'} className={s.title} data-type='displayL'>
+				{preview ? (
+					project.title
+				) : (
 					<PageTitleReveal
 						variant='wave'
-						trigger='view'
+						trigger='project'
 						transparentStart
 						waveDuration={1.6}
 						waveEase='sine.inOut'
 					>
-						{project.description}
+						{project.title}
 					</PageTitleReveal>
-				</Col>
-			</Grid>
+				)}
+			</h1>
 		</div>
 	</section>
 );

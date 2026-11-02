@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the loader on routes other than the homepage: it fades out (no wave), the view-transition is not
+// involved, the aperture closes and the page title reveals afterwards.
 for (const route of ['/projects/pocketchange/', '/projects/', '/cookies']) {
 	test(`non-homepage loader fades without a wave on ${route}`, async ({ page }) => {
 		await page.goto(route);
@@ -23,6 +29,7 @@ for (const route of ['/projects/pocketchange/', '/projects/', '/cookies']) {
 	});
 }
 
+// Protects the mobile case study loader: fade outro and a block title reveal that waits until the loader is done.
 test('mobile project uses the fade outro and block title reveal', async ({ page }) => {
 	await page.setViewportSize({ width: 440, height: 780 });
 	await page.goto('/projects/pocketchange/');
@@ -36,6 +43,8 @@ test('mobile project uses the fade outro and block title reveal', async ({ page 
 	await expect(page.locator('[data-project-water]')).toHaveAttribute('data-intro', 'complete');
 });
 
+// Protects the mobile homepage loader: the scene cover is not used, the aperture is centred on the screen, and
+// the loader fades rather than pulsing radially.
 test('mobile fades out the loader without a radial pulse', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/');
@@ -53,6 +62,8 @@ test('mobile fades out the loader without a radial pulse', async ({ page }) => {
 	await expect(page.locator('header')).toHaveAttribute('data-header-entrance', 'complete');
 });
 
+// Protects the desktop homepage loader: the logo stays small, the wave outro reveals the hero through the scene
+// cover, then the header and hero content enter in order.
 test('homepage restores its wave while other routes keep their fade', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', error => errors.push(error.message));
@@ -60,6 +71,8 @@ test('homepage restores its wave while other routes keep their fade', async ({ p
 	const loader = page.locator('[data-site-loader]');
 	await expect(loader).toBeVisible();
 	const header = page.locator('header');
+
+	// Header waits behind the loader
 	await expect(header).toHaveAttribute('data-header-entrance', 'waiting');
 	await expect(header).toBeHidden();
 	await expect(page.locator('main [data-site-loader]')).toHaveCount(0);
@@ -67,6 +80,8 @@ test('homepage restores its wave while other routes keep their fade', async ({ p
 	const bounds = await mark.boundingBox();
 	if (!bounds) throw new Error('Missing loader logo');
 	expect(bounds.width).toBeLessThanOrEqual(120);
+
+	// Wave outro: the aperture and the cover reveal radius both grow
 	await expect(loader).toHaveAttribute('data-outro', 'wave');
 	await expect(loader).toHaveAttribute('data-webgl-reveal', 'true', { timeout: 8000 });
 	await expect(page.locator('[data-loader-ring]')).toHaveCSS('display', 'none');
@@ -82,6 +97,8 @@ test('homepage restores its wave while other routes keep their fade', async ({ p
 		)
 		.toBeGreaterThan(0);
 	await expect(mark).toHaveCSS('transform', 'none');
+
+	// Finished: header and hero enter, and a resize afterwards does not bring the loader back
 	await expect(loader).toHaveAttribute('data-complete', 'true', { timeout: 8000 });
 	await expect(loader).toBeHidden();
 	await expect(header).toHaveAttribute('data-header-entrance', 'complete');
@@ -94,6 +111,7 @@ test('homepage restores its wave while other routes keep their fade', async ({ p
 	expect(errors).toEqual([]);
 });
 
+// Protects retired URLs: the old ?loaderConcepts preview shows no chooser, and reduced motion still completes.
 test('old preview URL has no chooser and reduced motion completes', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/?loaderConcepts');
@@ -104,6 +122,7 @@ test('old preview URL has no chooser and reduced motion completes', async ({ pag
 	await expect(page.locator('header')).toHaveAttribute('data-header-entrance', 'complete');
 });
 
+// Protects against a stuck loader when the first image fails.
 test('failed first-view image cannot trap the loader', async ({ page }) => {
 	await page.route('**/_next/image/**', route => route.abort());
 	await page.goto('/');
@@ -111,6 +130,7 @@ test('failed first-view image cannot trap the loader', async ({ page }) => {
 	await expect(page.locator('[data-site-loader]')).toBeHidden();
 });
 
+// Protects the first paint: before any script runs the loader is already opaque, so the page never flashes.
 test('loader has an opaque first paint before hydration', async ({ page }) => {
 	await page.route('**/*.js*', route => route.abort());
 	await page.goto('/projects/pocketchange/', { waitUntil: 'domcontentloaded' });
@@ -120,6 +140,7 @@ test('loader has an opaque first paint before hydration', async ({ page }) => {
 	await expect(loader).not.toHaveAttribute('data-revealing', 'true');
 });
 
+// Protects the pre-hydration cover: a fixed dark layer above everything, from CSS alone, before the stylesheets load.
 test('document cover protects the hero even before stylesheets load', async ({ page }) => {
 	await page.route(/\.(js|css)(\?|$)/, route => route.abort());
 	await page.goto('/projects/pocketchange/', { waitUntil: 'domcontentloaded' });
@@ -140,6 +161,7 @@ test('document cover protects the hero even before stylesheets load', async ({ p
 	});
 });
 
+// Protects visitors without JavaScript: the loader never covers the page.
 test('JavaScript-disabled visitors are not covered by the loader', async ({ browser }) => {
 	const context = await browser.newContext({ javaScriptEnabled: false });
 	const page = await context.newPage();

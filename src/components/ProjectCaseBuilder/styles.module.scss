@@ -14,6 +14,9 @@
 	// from Sanity's dimensions); the ratio below only applies until it's known
 	&[data-media-layout='single'] .media { aspect-ratio: var(--media-aspect, 894 / 615); }
 
+	// NOTE • Animated galleries play on a fixed 3:4 stage at every size
+	&[data-media-layout='gallery'] .media { aspect-ratio: 3 / 4; }
+
 	&[data-media-layout='dual'] {
 		.media { aspect-ratio: 443 / 560; }
 

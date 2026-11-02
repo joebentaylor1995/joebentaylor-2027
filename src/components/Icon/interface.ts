@@ -1,6 +1,3 @@
-// Imports
-// ------------
-
 // Exports
 // ------------
 export interface IconProps {

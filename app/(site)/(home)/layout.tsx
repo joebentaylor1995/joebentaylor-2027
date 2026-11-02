@@ -19,6 +19,7 @@ export const generateMetadata = async (): Promise<Metadata> => {
 // Component
 // ------------
 const Layout = ({ children }: { children: React.ReactNode }) => {
+	// Render
 	return <PageTransition>{children}</PageTransition>;
 };
 

@@ -3,45 +3,104 @@
 // Imports
 // ------------
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { type BooleanSetting, defaultSettings, type NumericSetting } from '../effect-settings';
 import { type IntroSettings, introDefaults, introEasings, mobileIntroDefaults } from '../scene-intro';
 import IntroTimings from './IntroTimings';
+
 // Styles + Interfaces
 // ------------
 import type { SettingsProps } from './interface';
 import s from './styles.module.scss';
 
-const ranges: [NumericSetting, string, number, number, number][] = [
-	['gestureGap', 'Gesture reset gap (seconds)', 0.1, 1.5, 0.05],
-	['fastRate', 'Fast scroll speed (pixels/second)', 500, 20000, 100],
-	['velocityScale', 'Marquee velocity sensitivity (lower is stronger)', 100, 15000, 100],
-	['velocitySmoothing', 'Velocity smoothing (seconds)', 0.01, 1, 0.01],
-	['colourThreshold', 'Colour switch velocity threshold', 0.1, 1, 0.01],
-	['colourTransition', 'Colour transition (seconds)', 0.01, 2, 0.01],
-	['pulsePeak', 'Depth pulse release threshold', 0.1, 1, 0.01],
-	['pulseDuration', 'Maximum depth pulse duration (seconds)', 0.1, 2, 0.01],
-	['pulseAttack', 'Depth pulse attack (seconds)', 0.01, 1, 0.01],
-	['pulseRelease', 'Depth pulse return (seconds)', 0.01, 2, 0.01],
-	['intensity', 'Parallax intensity', 0, 2, 0.01],
-	['horizontal', 'Horizontal movement', 0, 2, 0.01],
-	['vertical', 'Vertical movement', 0, 2, 0.01],
-	['lift', 'Hand depth', 0, 2, 0.01],
-	['smooth', 'Smoothing', 0, 0.99, 0.01],
-	['rotation', 'Rotation', -45, 45, 1],
-	['positionX', 'X position', -100, 100, 1],
-	['positionY', 'Y position', -100, 100, 1],
-	['zoom', 'Scale', 0.3, 2.5, 0.01],
-	['chroma', 'Blue edge strength', 0, 2, 0.05],
-	['glow', 'Fingertip glow strength', 0, 2, 0.05],
-	['drag', 'Blue scroll drag', 0, 2, 0.05],
-	['push', 'Scroll zoom strength', 0, 2, 0.05],
-	['trails', 'Motion trails', 0, 2, 0.05],
-	['focus', 'Focus pull', 0, 2, 0.05],
-	['mobilePositionX', 'Mobile X position (%)', -100, 100, 0.01],
-	['mobilePositionY', 'Mobile bottom offset (%)', -100, 100, 0.01],
-	['mobileZoom', 'Mobile scale', 0.3, 2.5, 0.01],
-	['mobileRotation', 'Mobile rotation', -45, 45, 1],
+// Constants
+// ------------
+// Slider groups, in panel order. Each range is [setting key, label, min, max, step].
+const rangeGroups: {
+	title: string;
+	isOpen: boolean;
+	note?: string;
+	ranges: [NumericSetting, string, number, number, number][];
+}[] = [
+	{
+		title: 'Mobile and compact portrait',
+		isOpen: true,
+		note: 'Used below 1283px wide. Changes last until reload; copy all hero settings when ready.',
+		ranges: [
+			['mobilePositionX', 'Mobile X position (%)', -100, 100, 0.01],
+			['mobilePositionY', 'Mobile bottom offset (%)', -100, 100, 0.01],
+			['mobileZoom', 'Mobile scale', 0.3, 2.5, 0.01],
+			['mobileRotation', 'Mobile rotation', -45, 45, 1],
+		],
+	},
+	{
+		title: 'Tablet portrait',
+		isOpen: true,
+		ranges: [
+			['tabletPositionX', 'Tablet X position (%)', -100, 100, 0.01],
+			['tabletPositionY', 'Tablet bottom offset (%)', -100, 100, 0.01],
+			['tabletZoom', 'Tablet scale', 0.3, 2.5, 0.01],
+			['tabletRotation', 'Tablet rotation', -45, 45, 1],
+		],
+	},
+	{
+		title: 'Scroll response',
+		isOpen: false,
+		ranges: [
+			['gestureGap', 'Gesture reset gap (seconds)', 0.1, 1.5, 0.05],
+			['fastRate', 'Fast scroll speed (pixels/second)', 500, 20000, 100],
+			['velocityScale', 'Marquee velocity sensitivity (lower is stronger)', 100, 15000, 100],
+			['velocitySmoothing', 'Velocity smoothing (seconds)', 0.01, 1, 0.01],
+		],
+	},
+	{
+		title: 'Colour transition',
+		isOpen: false,
+		ranges: [
+			['colourThreshold', 'Colour switch velocity threshold', 0.1, 1, 0.01],
+			['colourTransition', 'Colour transition (seconds)', 0.01, 2, 0.01],
+		],
+	},
+	{
+		title: 'Depth pulse',
+		isOpen: false,
+		ranges: [
+			['pulsePeak', 'Depth pulse release threshold', 0.1, 1, 0.01],
+			['pulseDuration', 'Maximum depth pulse duration (seconds)', 0.1, 2, 0.01],
+			['pulseAttack', 'Depth pulse attack (seconds)', 0.01, 1, 0.01],
+			['pulseRelease', 'Depth pulse return (seconds)', 0.01, 2, 0.01],
+		],
+	},
+	{
+		title: 'Portrait & cursor',
+		isOpen: false,
+		ranges: [
+			['intensity', 'Parallax intensity', 0, 2, 0.01],
+			['horizontal', 'Horizontal movement', 0, 2, 0.01],
+			['vertical', 'Vertical movement', 0, 2, 0.01],
+			['lift', 'Hand depth', 0, 2, 0.01],
+			['smooth', 'Smoothing', 0, 0.99, 0.01],
+			['rotation', 'Rotation', -45, 45, 1],
+			['positionX', 'X position', -100, 100, 1],
+			['positionY', 'Y position', -100, 100, 1],
+			['zoom', 'Scale', 0.3, 2.5, 0.01],
+		],
+	},
+	{
+		title: 'Light & scroll effects',
+		isOpen: false,
+		ranges: [
+			['chroma', 'Blue edge strength', 0, 2, 0.05],
+			['glow', 'Fingertip glow strength', 0, 2, 0.05],
+			['drag', 'Blue scroll drag', 0, 2, 0.05],
+			['push', 'Scroll zoom strength', 0, 2, 0.05],
+			['trails', 'Motion trails', 0, 2, 0.05],
+			['focus', 'Focus pull', 0, 2, 0.05],
+		],
+	},
 ];
+
+// Checkbox definitions: [setting key, label]
 const toggles: [BooleanSetting, string][] = [
 	['colourOn', 'Scroll colour switching'],
 	['chromaOn', 'Blue cursor edges'],
@@ -56,6 +115,9 @@ const toggles: [BooleanSetting, string][] = [
 
 // Component
 // ------------
+// The "Hero studio" tuning panel, only loaded with ?heroSettings. Edits flow up through
+// onChange / onIntroChange / onLiquidChange and are live; "Copy all hero settings" exports
+// them as JSON, and "Save wave settings" stores the intro profiles in this browser.
 export default function Settings({
 	intro,
 	introTarget,
@@ -75,13 +137,20 @@ export default function Settings({
 	const [open, setOpen] = useState(true);
 	const [copyStatus, setCopyStatus] = useState('');
 	const [saveStatus, setSaveStatus] = useState('');
+
+	// Refs
 	const panelRef = useRef<HTMLElement>(null);
+
+	// Handlers
+	// Opens or closes every <details> group in the panel
 	const expand = (value: boolean) =>
 		panelRef.current?.querySelectorAll('details').forEach(detail => {
 			detail.open = value;
 		});
+
 	// Render
-	return (
+	// NOTE • In the body, or the hero's stacking context lets its copy cover the panel on tablets
+	return createPortal(
 		<div className={s.jacket} data-hero-settings data-lenis-prevent>
 			<button
 				type='button'
@@ -359,23 +428,11 @@ export default function Settings({
 							</label>
 						))}
 					</details>
-					{[
-						['Mobile and compact portrait', 25, 29],
-						['Scroll response', 0, 4],
-						['Colour transition', 4, 6],
-						['Depth pulse', 6, 10],
-						['Portrait & cursor', 10, 19],
-						['Light & scroll effects', 19, 25],
-					].map(([title, start, end]) => (
-						<details className={s.group} key={title} open={start === 25}>
+					{rangeGroups.map(({ title, isOpen, note, ranges }) => (
+						<details className={s.group} key={title} open={isOpen}>
 							<summary>{title}</summary>
-							{start === 25 ? (
-								<p>
-									Used below 1283px wide. Changes last until reload; copy all hero settings when
-									ready.
-								</p>
-							) : null}
-							{ranges.slice(Number(start), Number(end)).map(([key, label, min, max, step]) => (
+							{note ? <p>{note}</p> : null}
+							{ranges.map(([key, label, min, max, step]) => (
 								<label key={key} className={s.control}>
 									{label}
 									<input
@@ -406,6 +463,7 @@ export default function Settings({
 					))}
 				</section>
 			) : null}
-		</div>
+		</div>,
+		document.body
 	);
 }

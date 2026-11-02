@@ -67,10 +67,14 @@ const cleanMediaType = <T extends ProjectMedia>(media: T): T => {
 	const type = stegaClean(media.type);
 	return { ...media, type, ...(type === 'youtube' && { src: stegaClean(media.src) }) };
 };
-const cleanBlock = (block: Project['caseBuilder'][number]): Project['caseBuilder'][number] =>
-	block.type === 'single'
-		? { ...block, media: cleanMediaType(block.media) }
-		: { ...block, media: [cleanMediaType(block.media[0]), cleanMediaType(block.media[1])] };
+const cleanBlock = (block: Project['caseBuilder'][number]): Project['caseBuilder'][number] => {
+	if (block.type === 'single') return { ...block, media: cleanMediaType(block.media) };
+	if (block.type === 'dual')
+		return { ...block, media: [cleanMediaType(block.media[0]), cleanMediaType(block.media[1])] };
+	if (block.type === 'model') return block;
+	// NOTE • The animation name picks a component, so it must compare cleanly
+	return { ...block, animation: stegaClean(block.animation), images: block.images.filter(hasSrc) };
+};
 
 // SECTION • Profile panel normalisers
 type Hotspot = { x?: number; y?: number } | null | undefined;
@@ -148,8 +152,13 @@ const isPlayable = (media: ProjectMedia | null | undefined) =>
 	media?.type === 'youtube' ? Boolean(getYouTubeId(stegaClean(media.src))) : hasSrc(media);
 
 // NOTE • A block whose asset hasn't been uploaded yet is skipped, not crashed on
-const isCompleteBlock = (block: Project['caseBuilder'][number]) =>
-	block.type === 'single' ? isPlayable(block.media) : block.media?.length === 2 && block.media.every(isPlayable);
+const isCompleteBlock = (block: Project['caseBuilder'][number]) => {
+	if (block.type === 'single') return isPlayable(block.media);
+	if (block.type === 'dual') return block.media?.length === 2 && block.media.every(isPlayable);
+	// NOTE • A model needs both its file and the poster that stands in for it
+	if (block.type === 'model') return Boolean(block.src && block.poster);
+	return Boolean(block.images?.some(hasSrc));
+};
 
 // NOTE • Unpublished references come back null — drop them; a project with
 // no thumbnail yet still shows, on the placeholder
@@ -226,19 +235,31 @@ export const getProjectsPage = async (): Promise<ProjectsPageContent> => {
 		seo: ProjectsPageContent['seo'];
 	}>(GET_PROJECTS_PAGE);
 
-	// NOTE • The ribbon runs in an iframe the overlays can't reach — send it clean data
-	const featured = stegaClean(toRibbonProjects(data?.featured));
+	// NOTE • The ribbon runs in an iframe the overlays can't reach — send it clean data.
+	// Every project says whether it's featured, so a click knows how to open it
+	const featured = stegaClean(toRibbonProjects(data?.featured)).map(project => ({ ...project, featured: true }));
 	// An unavailable or empty CMS catalogue must never publish the demo projects.
 
 	// NOTE • The grid shows every project: featured first, then the hand-ordered
 	// All projects list, then everything else newest first
 	const seen = new Set(featured.map(({ id }) => id));
-	const rest = stegaClean([...toRibbonProjects(data?.all), ...toRibbonProjects(data?.others)]).filter(({ id }) => {
-		if (seen.has(id)) return false;
-		seen.add(id);
-		return true;
-	});
+	const rest = stegaClean([...toRibbonProjects(data?.all), ...toRibbonProjects(data?.others)])
+		.filter(({ id }) => {
+			if (seen.has(id)) return false;
+			seen.add(id);
+			return true;
+		})
+		.map(project => ({ ...project, featured: false }));
 	return { featured, all: [...featured, ...rest], seo: data?.seo ?? null };
+};
+
+// NOTE • A case study that's in the CMS catalogue but not Featured opens in the
+// project modal instead of its own hero page. Anything the catalogue doesn't
+// list (an unreachable CMS serving the local fallback) keeps the full page.
+export const isModalCaseStudy = async (slug: string): Promise<boolean> => {
+	const { all } = await getProjectsPage();
+	const href = `/projects/${slug}`;
+	return all.some(project => project.href === href && project.featured === false);
 };
 
 // NOTE • The case study after this one in the ribbon's Featured order,

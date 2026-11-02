@@ -1,3 +1,5 @@
+// Exports
+// ------------
 /**
  * Joins class names, skipping falsy values — for combining module classes,
  * global utility classes (t-*) and an optional className prop.

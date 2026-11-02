@@ -7,9 +7,13 @@
  * @component CookieBar
  */
 
+// Imports
+// ------------
 import type { Meta, StoryObj } from '@storybook/nextjs';
 import CookieBar from './';
 
+// Story config
+// ------------
 const meta: Meta<typeof CookieBar> = {
 	title: 'Components/CookieBar',
 	component: CookieBar,
@@ -24,6 +28,8 @@ const meta: Meta<typeof CookieBar> = {
 	},
 };
 
+// Exports
+// ------------
 export default meta;
 type Story = StoryObj<typeof CookieBar>;
 

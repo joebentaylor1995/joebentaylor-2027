@@ -2,15 +2,33 @@
 // ------------
 // NOTE • The 404 page and the security headers from next.config.js — both
 // fail quietly when broken, so they're checked here.
+
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
-test('unknown URLs get the styled 404 with a 404 status', async ({ page }) => {
+// Tests
+// ------------
+// Protects the not-found page for unknown URLs: noindex, a heading and a way home.
+test('unknown URLs stream the site 404 with noindex and a home action', async ({ page }) => {
 	const response = await page.goto('/this-page-does-not-exist/');
-	expect(response?.status()).toBe(404);
+	// Next commits the shared shell before the dynamic catch-all calls notFound().
+	// Retaining that shell is what makes the home link use the logo's transition.
+	// Dev can finish before streaming (404); production PPR can commit first (200).
+	expect([200, 404]).toContain(response?.status());
+	await expect(page.locator('meta[name="robots"][content="noindex"]').first()).toBeAttached();
 	await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/');
 });
 
+// Protects the real HTTP status for the global fallback route.
+test('the global fallback still returns HTTP 404', async ({ page }) => {
+	const response = await page.goto('/404/');
+	expect(response?.status()).toBe(404);
+	await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+});
+
+// Protects the headers set in next.config.js: CSP restrictions, nosniff, referrer policy and HSTS.
 test('pages are served with the security headers', async ({ request }) => {
 	const response = await request.get('/');
 	const headers = response.headers();

@@ -15,21 +15,27 @@ import { use, useEffect } from 'react';
 import 'lenis/dist/lenis.css';
 import type * as I from './interface';
 
-// GSAP Register
+// Plugins
+// ------------
 gsap.registerPlugin(ScrollTrigger);
 
+// Helpers
+// ------------
 /**
  * Wires Lenis + GSAP after the Lenis instance exists (created in ReactLenis useEffect).
  * Rendered after page children so its useEffect runs after deeper useGSAP hooks schedule work.
  */
 const LenisGsapBridge = () => {
+	// Context
 	const lenis = useLenis();
 
+	// Effects
 	useEffect(() => {
 		if (!lenis) return;
 
 		const wrapper = lenis.rootElement;
 
+		// NOTE • ScrollTrigger reads and writes scroll through Lenis; the page scrolls inside this wrapper, not the window
 		ScrollTrigger.scrollerProxy(wrapper, {
 			scrollTop(value?: number) {
 				if (value !== undefined) {
@@ -51,11 +57,13 @@ const LenisGsapBridge = () => {
 		ScrollTrigger.defaults({ scroller: wrapper });
 		lenis.on('scroll', ScrollTrigger.update);
 
+		// Lenis rides GSAP's shared ticker (autoRaf is off); it is detached while the scene is paused
 		const update = (time: number) => lenis.raf(time * 1000);
 		const stopObservingPause = observeScenePause(wrapper, paused => {
 			gsap.ticker.remove(update);
 			if (!paused) gsap.ticker.add(update);
 		});
+
 		ScrollTrigger.refresh();
 
 		return () => {
@@ -67,15 +75,18 @@ const LenisGsapBridge = () => {
 		};
 	}, [lenis]);
 
+	// Render
 	return null;
 };
 
 // Component
 // ------------
 const SmoothScroll = ({ children }: I.SmoothScrollProps) => {
+	// Context
 	const { lenisRef } = use(GlobalContext);
 	const { isReducedMotion } = use(PerformanceContext);
 
+	// Render
 	// NOTE • prefers-reduced-motion: skip Lenis entirely — native scrolling
 	// takes over (see the reduced-motion overrides in src/css/global.scss) and
 	// the constant rAF loop never starts. ScrollTrigger falls back to the
@@ -90,7 +101,7 @@ const SmoothScroll = ({ children }: I.SmoothScrollProps) => {
 	);
 };
 
-// Export
+// Exports
 // ------------
 SmoothScroll.displayName = 'SmoothScroll';
 export default SmoothScroll;

@@ -1,9 +1,16 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the Profile heading wipe: the first heading reveals on open, the sticky ones when they scroll
+// into view, and the whole sequence replays on each opening.
 test('modal headings reveal on open and on entering view, replaying each opening', async ({ page }) => {
 	await page.goto('/');
 	const headings = page.locator('[data-profile-heading-reveal]');
 	await expect(headings).toHaveCount(6);
+	// Open twice to prove the reveal resets
 	for (let opening = 0; opening < 2; opening++) {
 		await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
 		await expect(headings.first().locator('span')).toHaveCSS('opacity', '0');
@@ -11,6 +18,7 @@ test('modal headings reveal on open and on entering view, replaying each opening
 			'none'
 		);
 		await expect(headings.first().locator('span')).toHaveCSS('opacity', '1');
+		// Sticky headings stay hidden until scrolled to
 		for (const sticky of [headings.nth(1), headings.nth(2), headings.nth(3)]) {
 			await expect(sticky.locator('span')).toHaveCSS('opacity', '0');
 			await expect(sticky).not.toHaveAttribute('data-revealed');
@@ -24,6 +32,7 @@ test('modal headings reveal on open and on entering view, replaying each opening
 	}
 });
 
+// With reduced motion every heading is simply visible, with no wipe overlay.
 test('reduced motion shows modal headings without a wipe', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');

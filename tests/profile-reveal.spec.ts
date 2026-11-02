@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects opening Profile: it slides in as a dialog that takes focus with its own smooth scroll, pushes the
+// scene back, pauses it, and closing restores focus and the scene.
 for (const width of [1440, 440]) {
 	test(`profile reveals and scrolls independently at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
@@ -13,6 +19,7 @@ for (const width of [1440, 440]) {
 		const close = page.getByRole('button', { name: 'Close profile' });
 		await expect(close).toBeFocused();
 		await expect(panel).toHaveClass(/\blenis\b/);
+		// The scene behind Profile shifts left by 12% of the width
 		const scene = page.locator('#profile-panel + div');
 		await expect
 			.poll(() =>
@@ -23,9 +30,12 @@ for (const width of [1440, 440]) {
 			)
 			.toBe(Math.round(-width * 0.12));
 		await expect(scene).toHaveAttribute('inert');
+
+		// Panel is at most 971px wide, anchored right
 		const bounds = await panel.boundingBox();
 		expect(bounds?.width).toBeCloseTo(Math.min(971, width), 0);
 		expect(bounds?.x).toBeCloseTo(Math.max(0, width - 971), 0);
+		// On wide screens the close cursor follows the pointer exactly
 		if (width > 971) {
 			for (const [x, y] of [
 				[100, 300],
@@ -41,6 +51,8 @@ for (const width of [1440, 440]) {
 				expect(icon.y + icon.height / 2).toBeCloseTo(y, 1);
 			}
 		}
+
+		// Scene is paused and the backdrop dimmed
 		await expect(scene).toHaveCSS('clip-path', 'none');
 		await expect(scene).toHaveAttribute('data-scene-paused', 'true');
 		await expect(page.locator('[data-profile-scene] + button')).toHaveCSS('opacity', '1');
@@ -49,12 +61,16 @@ for (const width of [1440, 440]) {
 			'color(srgb 0 0 0 / 0.6)'
 		);
 		await panel.hover();
+
+		// The wheel scrolls Profile, not the page behind it
 		const pageScroll = await page.locator('#page').evaluate(element => element.scrollTop);
 		await page.mouse.wheel(0, 500);
 		await expect(panel).toHaveClass(/\blenis-smooth\b/);
 		await expect.poll(() => panel.evaluate(element => element.scrollTop)).toBeGreaterThan(100);
 		expect(await page.locator('#page').evaluate(element => element.scrollTop)).toBe(pageScroll);
 		await expect(close).toBeInViewport();
+
+		// Keyboard focus stays trapped inside: Tab goes forward into the panel and Shift+Tab back to close
 		const toolkitBounds = await panel.locator('[data-toolkit="Design toolkit"]').boundingBox();
 		await panel.hover();
 		await page.mouse.wheel(0, (toolkitBounds?.y ?? 200) - 200);
@@ -63,6 +79,8 @@ for (const width of [1440, 440]) {
 		await expect(panel.locator('[data-tool="figma"]')).toBeFocused();
 		await panel.locator('[data-tool="figma"]').press('Shift+Tab');
 		await expect(close).toBeFocused();
+
+		// Closing restores focus and the scene, and reopening starts at the top
 		await close.press('Escape');
 		await expect(panel).toBeHidden();
 		await expect(trigger).toBeFocused();
@@ -76,6 +94,8 @@ for (const width of [1440, 440]) {
 	});
 }
 
+// Protects the Profile cursor: it follows the pointer, sticks to the close button when near it, turns into
+// a close cursor over the backdrop, and a backdrop click dismisses.
 test('profile cursor follows, sticks to close, and dismisses from the backdrop', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');
@@ -104,6 +124,8 @@ test('profile cursor follows, sticks to close, and dismisses from the backdrop',
 	await expect(trigger).toBeFocused();
 });
 
+// Protects reduced motion and resizing: no smooth-scroll class is applied, and the open panel follows a
+// viewport change.
 test('profile supports reduced motion and viewport changes while open', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');

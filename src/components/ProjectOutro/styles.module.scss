@@ -41,9 +41,18 @@
 
 	@include bp(l) {
 		@media (hover: hover) {
-			&:has([data-next-project]:hover)::before { background-color: var(--brand-c1); }
+			&:has([data-next-project]:hover, [data-contact-cta]:hover)::before { background-color: var(--brand-c1); }
 		}
-		&:has([data-next-project]:focus-visible)::before { background-color: var(--brand-c1); }
+
+		&:has([data-next-project]:focus-visible, [data-contact-cta]:focus-visible)::before {
+			background-color: var(--brand-c1);
+		}
+	}
+
+	// NOTE • The contact call to action keeps the blue rising behind it at every
+	// size, like the profile's — the grey only suits the next-project hover cue
+	&[data-cta='contact']::before {
+		@include bp(l) { background-color: var(--brand-c1); }
 	}
 }
 
@@ -105,12 +114,19 @@
 	}
 }
 
+// NOTE • A link to the next project, or a button opening the contact modal — reset so both look the same
 .next {
 	--hover-fill: -16;
 	position: relative;
 	z-index: 1;
 	display: block;
 	flex: none;
+	width: 100%;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	cursor: pointer;
 	text-align: center;
 	text-decoration: none;
 	white-space: nowrap;
@@ -133,4 +149,7 @@
 	mask-image: linear-gradient(97deg, rgb(0 0 0 / 40%) calc((var(--hover-fill, -16) - 8) * 1%), black calc((var(--hover-fill, -16) + 8) * 1%));
 
 	@media (prefers-reduced-motion: reduce) { --tfw-fill: 111; }
+
+	// One full line each for the contact call to action's "Ready?" / "Let's grow."
+	&[data-line] { display: block; }
 }

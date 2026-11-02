@@ -1,18 +1,29 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the Codrops card video: nothing is fetched until Profile opens, it plays only while
+// on screen, hands off to a second video before the first ends, and resets when Profile closes.
 for (const width of [1440, 440]) {
 	test(`Codrops background plays only while visible at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
 		await page.emulateMedia({ reducedMotion: 'reduce' });
+		// Track video fetches to prove the file is not requested before it is needed
 		const videoRequests: string[] = [];
 		page.on('request', request => {
 			if (request.url().includes('/videos/codrops.mp4')) videoRequests.push(request.url());
 		});
 		await page.goto('/');
+
+		// Closed: no source attached, no request, not playing
 		const video = page.locator('[data-featured-video]').first();
 		await expect(video).not.toHaveAttribute('src');
 		expect(videoRequests).toEqual([]);
 		await expect(video).toHaveJSProperty('paused', true);
+
+		// Open: it plays muted without looping and fills its card with a slight 1% overscan
 		await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
 		await video.scrollIntoViewIfNeeded();
 		await expect(video).toHaveCSS('object-fit', 'cover');
@@ -29,12 +40,16 @@ for (const width of [1440, 440]) {
 		expect(geometry.video.width).toBeCloseTo(geometry.card.width * 1.01, 2);
 		expect(geometry.video.height).toBeCloseTo(geometry.card.height * 1.01, 2);
 		await page.screenshot({ path: `test-results/featured-on-${width}.png` });
+
+		// Scrolling it out of view pauses it; scrolling back resumes
 		await page.getByRole('dialog', { name: 'Profile', exact: true }).evaluate(element => {
 			element.scrollTop = 0;
 		});
 		await expect(video).toHaveJSProperty('paused', true);
 		await video.scrollIntoViewIfNeeded();
 		await expect(video).toHaveJSProperty('paused', false);
+
+		// Near the end (0.9s left) the second video fades in and takes over from the first
 		const alternate = page.locator('[data-featured-video]').nth(1);
 		await video.evaluate(element => {
 			const media = element as HTMLVideoElement;
@@ -46,12 +61,16 @@ for (const width of [1440, 440]) {
 			.toBeGreaterThan(0);
 		await expect(alternate).toHaveCSS('opacity', '1');
 		await expect(video).toHaveJSProperty('paused', true);
+
+		// And the reverse hand-off when the second video nears its end
 		await alternate.evaluate(element => {
 			const media = element as HTMLVideoElement;
 			media.currentTime = media.duration - 0.9;
 		});
 		await expect(video).toHaveCSS('opacity', '1');
 		await expect(alternate).toHaveJSProperty('paused', true);
+
+		// Closing Profile pauses both, unloads their sources and rewinds them
 		await page.getByRole('button', { name: 'Close profile', exact: true }).press('Escape');
 		await expect(video).toHaveJSProperty('paused', true);
 		await expect(alternate).not.toHaveAttribute('src');

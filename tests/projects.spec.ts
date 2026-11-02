@@ -1,13 +1,24 @@
+// Imports
+// ------------
+
 import { readyProjects } from './helpers/ready-projects';
 import { expect, test } from './helpers/test';
 
+// Helpers
+// ------------
+// Globals of the standalone ribbon document, declared so the page.evaluate bodies type-check
 declare const ready: boolean;
 declare const introduction: { active: boolean };
 declare const gridView: { mix: number };
 declare function returningToFeatured(): boolean;
 
+// Every test marks all case studies as ready
 test.beforeEach(async ({ page }) => readyProjects(page));
 
+// Tests
+// ------------
+// Protects the Projects page as a whole: the ribbon mounts without errors or its own header, host navigation
+// stays correct, and the grid, featured and settings views all switch.
 test('projects retains the ribbon, grid, settings and host navigation', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	const errors: string[] = [];
@@ -39,13 +50,18 @@ test('projects retains the ribbon, grid, settings and host navigation', async ({
 	expect(errors).toEqual([]);
 });
 
-test('mobile uses all projects in the vertical stacked ribbon', async ({ page }) => {
+// Protects the phone ribbon: only featured case studies, in the vertical stacked layout, and tapping the
+// centre opens the first one.
+test('mobile shows only the featured case studies in the vertical stacked ribbon', async ({ page }) => {
 	await page.setViewportSize({ width: 440, height: 780 });
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/projects/?projectSettings');
 	await page.getByRole('button', { name: 'Accept Necessary' }).click();
 	const embedded = page.frameLocator('iframe[title="Interactive projects"]');
-	await expect(embedded.locator('#slide-number')).toHaveText(/01 \/ \d+/, { timeout: 30_000 });
+	const { featured } = await (await page.request.get('/api/projects-ribbon/')).json();
+	await expect(embedded.locator('#slide-number')).toHaveText(`01 / ${String(featured.length).padStart(2, '0')}`, {
+		timeout: 30_000,
+	});
 	await expect(embedded.locator('.view-switch')).toBeHidden();
 	await expect(embedded.locator('#vertical')).toBeChecked();
 	await expect(embedded.locator('#stacked')).toBeChecked();
@@ -56,6 +72,8 @@ test('mobile uses all projects in the vertical stacked ribbon', async ({ page })
 	await expect(page.getByRole('heading', { name: 'Pocketchange', exact: true })).toBeVisible();
 });
 
+// Protects opening a case study from both the featured ribbon and the grid, with Back returning to a working
+// ribbon each time.
 test('featured and grid selections open the Pocketchange template and support browser Back', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/projects/');
@@ -64,6 +82,7 @@ test('featured and grid selections open the Pocketchange template and support br
 	for (const grid of [false, true]) {
 		const renderer = page.frames().find(frame => frame.url().includes('/projects-ribbon/'));
 		if (!renderer) throw new Error('Projects renderer did not mount');
+		// Wait until the ribbon intro and any return-to-featured motion have finished
 		await renderer.waitForFunction(() => ready && !introduction.active && !returningToFeatured());
 		if (grid) {
 			await embedded.getByRole('button', { name: /All projects/ }).click();

@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the external-link treatment on the CSSDA Judge card: opens safely in a new tab and
+// swaps the cursor for the link icon on hover.
 test('CSSDA Judge shares the external link cursor behaviour', async ({ page }) => {
 	await page.goto('/?modalSettings');
 	await page.getByRole('button', { name: 'Show globe', exact: true }).click();
@@ -8,6 +14,7 @@ test('CSSDA Judge shares the external link cursor behaviour', async ({ page }) =
 	await expect(link).toHaveAttribute('target', '_blank');
 	await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
 	await link.hover();
+	// Hover state of the custom cursor
 	const icon = page.locator('svg[class*="linkCursor"]');
 	await expect(icon).toHaveCSS('opacity', '1');
 	await expect(icon).toHaveCSS('width', '20px');
@@ -16,6 +23,7 @@ test('CSSDA Judge shares the external link cursor behaviour', async ({ page }) =
 	await expect(icon).toHaveCSS('opacity', '0');
 });
 
+// Same external-link treatment on the Codrops card, plus a keyboard-focusable link.
 test('Codrops card links externally and fades its cursor icon on hover', async ({ page }) => {
 	await page.goto('/?modalSettings');
 	await page.getByRole('button', { name: 'Show globe', exact: true }).click();

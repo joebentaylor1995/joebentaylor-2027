@@ -10,6 +10,7 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
+// Tile artwork for the CSS Design Awards highlight
 const CssDesignAwards = ({ image, alt }: { image: string; alt: string }) => {
 	return (
 		<div className={s.cssda}>

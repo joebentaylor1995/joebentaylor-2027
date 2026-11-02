@@ -1,11 +1,20 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the desktop intro settings: the wave and trailing ripple controls accept values, the
+// replay runs the entrance to completion without page errors, and reset restores defaults.
 test('desktop wave exposes optical and trailing ripple controls with replay', async ({ page }) => {
+	// Uncaught errors from the replay would surface here
 	const errors: string[] = [];
 	page.on('pageerror', error => errors.push(error.message));
 	await page.goto('/?heroSettings');
 	await expect(page.locator('[data-loader-overlay]')).toBeHidden({ timeout: 15000 });
 	await expect(page.getByLabel('Intro settings device')).toHaveValue('desktop');
+
+	// [control label, value to type]; each number input must keep what was typed
 	for (const [name, value] of [
 		['Wave start delay (s)', '0.2'],
 		['Wave centre X (%)', '35'],
@@ -25,10 +34,14 @@ test('desktop wave exposes optical and trailing ripple controls with replay', as
 		await control.fill(value);
 		await expect(control).toHaveValue(value);
 	}
+
+	// Replay runs the entrance through to the end
 	await page.getByRole('button', { name: 'Replay introduction', exact: true }).click();
 	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'running');
 	await expect(page.locator('[data-scene-cover]')).toHaveAttribute('data-complete', 'true', { timeout: 10000 });
 	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete');
+
+	// Reset brings a changed control back to its default
 	await page.getByRole('button', { name: 'Reset intro', exact: true }).click();
 	await expect(page.getByRole('spinbutton', { name: 'Trailing ripple strength value', exact: true })).toHaveValue(
 		'0'
@@ -36,6 +49,8 @@ test('desktop wave exposes optical and trailing ripple controls with replay', as
 	expect(errors).toEqual([]);
 });
 
+// Protects the device split in the intro settings: mobile has no wave controls, and edits made for
+// desktop are kept separately from it.
 test('mobile intro keeps independent settings without wave controls', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/?heroSettings');
@@ -45,6 +60,8 @@ test('mobile intro keeps independent settings without wave controls', async ({ p
 	await expect(target).toHaveValue('mobile');
 	await expect(strength).toHaveCount(0);
 	await expect(page.getByText('Mobile uses a quick loader fade', { exact: false })).toBeVisible();
+
+	// A desktop edit survives switching the device selector away and back
 	await target.selectOption('desktop');
 	await strength.fill('0.5');
 	await target.selectOption('mobile');

@@ -1,8 +1,15 @@
+// Types + State
+// ------------
+// NOTE • Per-scene intro progress, each value running 0 to 1: the portrait zoom,
+// the marquee speed boost, the water reveal and the colour flip.
 export const sceneIntros = new WeakMap<
 	HTMLElement,
 	{ portrait: number; marqueeBoost: number; waterReveal: number; colour: number }
 >();
 
+// Easings
+// ------------
+// GSAP ease name to the label shown in the intro tweak panel
 export const introEasings = {
 	'power1.inOut': 'Balanced — gentle acceleration and settle',
 	'power4.inOut': 'Extreme — slow edges, fast centre',
@@ -20,6 +27,11 @@ export const introEasings = {
 	'expo.out': 'Surge — explosive launch',
 	none: 'Constant — steady travel',
 } as const;
+
+// Settings
+// ------------
+// Every value is a tunable in the intro tweak panel. Times are in seconds, origins
+// in percent of the viewport, and the rest are unitless multipliers.
 export interface IntroSettings {
 	start: number;
 	originX: number;
@@ -54,6 +66,9 @@ export interface IntroSettings {
 	copyrightLineDuration: number;
 	copyrightDigitStagger: number;
 }
+
+// Defaults (desktop)
+// ------------
 export const introDefaults: IntroSettings = {
 	start: 0.1,
 	originX: 50,
@@ -88,7 +103,15 @@ export const introDefaults: IntroSettings = {
 	copyrightLineDuration: 0.55,
 	copyrightDigitStagger: 0.07,
 };
+
+// Registries
+// ------------
+// Keyed by the scene element
 export const introSettings = new WeakMap<HTMLElement, IntroSettings>();
+
+// Defaults (mobile)
+// ------------
+// The desktop defaults with the lens, wave and timings retuned for small screens
 export const mobileIntroDefaults: IntroSettings = {
 	...introDefaults,
 	originY: 52,
@@ -99,10 +122,12 @@ export const mobileIntroDefaults: IntroSettings = {
 	decay: 2,
 	speed: 0.95,
 	ease: 'none',
-	headingStart: 0.5,
-	starStart: 1.05,
-	paragraphStart: 1.05,
+	// The loader's fade lasts 0.36s: the heading wipe picks up as it ends, the copy just after
+	headingStart: 0.3,
+	starStart: 0.7,
+	paragraphStart: 0.5,
 	portraitScale: 2.06,
 	portraitFinish: 90,
 };
+
 export const introReplays = new WeakMap<HTMLElement, () => void>();

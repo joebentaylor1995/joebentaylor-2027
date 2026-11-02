@@ -1,13 +1,21 @@
+// Imports
+// ------------
+
 import { simplifyRing } from '../src/components/Profile/Usps/Map/geometry';
 import { framing, projectLocation, rotation, SETTLED } from '../src/components/Profile/Usps/Map/projection';
 import { defaults } from '../src/components/ProfileReveal/Settings/store';
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the approved globe framing with plain maths (no browser): the settled position projects to a
+// fixed point at the reference size, and stays inside the same part of the frame at other sizes.
 test('the globe preserves the manually selected position', () => {
 	const capturedFrame = framing(433.5, 325);
 	const capturedPoint = projectLocation(rotation(SETTLED));
 	expect(capturedFrame.x + capturedPoint.x * capturedFrame.radius).toBeCloseTo(256.54823846, 5);
 	expect(capturedFrame.y - capturedPoint.y * capturedFrame.radius).toBeCloseTo(197.61357671, 5);
+	// Marker must land in the 50% to 70% band of each axis and face the camera (z > 0)
 	for (const [width, height] of [
 		[440, 325],
 		[320, 325],
@@ -23,6 +31,8 @@ test('the globe preserves the manually selected position', () => {
 	}
 });
 
+// Protects the Profile globe: the marker sits where the saved settings place it, keyboard keys explore and
+// reset the view, and closing and reopening starts again from the settled position.
 for (const width of [1440, 440]) {
 	test(`profile globe preserves Doncaster's position, supports keyboard exploration and resets on reopen at ${width}px`, async ({
 		page,
@@ -37,6 +47,8 @@ for (const width of [1440, 440]) {
 		await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
 		await map.scrollIntoViewIfNeeded();
 		await expect(map).toHaveAttribute('data-state', 'ready');
+		// Recomputes where the marker should be from the saved defaults and the globe framing, and compares it
+		// with the real marker position
 		const centred = async () => {
 			const area = await map.boundingBox();
 			const pin = await marker.boundingBox();
@@ -59,12 +71,16 @@ for (const width of [1440, 440]) {
 		await centred();
 		await expect(marker).toHaveCSS('opacity', '1');
 		await expect(map.locator('div').first()).toHaveCSS('background-image', /linear-gradient/);
+
+		// Arrow keys explore; Home returns to the settled view
 		await canvas.press('ArrowLeft');
 		await expect(map).toHaveAttribute('data-state', 'exploring');
 		await canvas.press('Home');
 		await expect(map).toHaveAttribute('data-state', 'ready');
 		await centred();
 		await page.screenshot({ path: `test-results/profile-map-${width}.png` });
+
+		// Escape resets, and reopening shows the settled globe again
 		await canvas.press('Escape');
 		await expect(map).toHaveAttribute('data-state', 'loading');
 		await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
@@ -75,10 +91,13 @@ for (const width of [1440, 440]) {
 	});
 }
 
+// Protects the globe entrance and pointer easing: the canvas fades in rather than popping, and moving the
+// pointer to the edge shifts the marker, then easing back when the pointer leaves.
 test('globe journey settles and pointer movement eases back to Doncaster', async ({ page }) => {
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
 	const map = page.locator('[data-globe]');
+	// Records the canvas opacity on every attribute change until ready, to prove an in-between value occurred
 	const revealSamples = map.evaluate(
 		element =>
 			new Promise<number[]>(resolve => {
@@ -101,6 +120,8 @@ test('globe journey settles and pointer movement eases back to Doncaster', async
 	await expect(map).toHaveAttribute('data-state', 'ready', { timeout: 8000 });
 	expect((await revealSamples).some(opacity => opacity > 0 && opacity < 1)).toBe(true);
 	await expect(map.locator('canvas')).toHaveCSS('opacity', '1');
+
+	// Pointer near the right edge pushes the marker more than 5px; leaving brings it back within 0.1px
 	const marker = map.locator('[data-globe-marker]');
 	const resting = await marker.boundingBox();
 	const bounds = await map.boundingBox();
@@ -113,6 +134,7 @@ test('globe journey settles and pointer movement eases back to Doncaster', async
 	await expect.poll(async () => Math.abs(((await marker.boundingBox())?.x ?? 0) - resting.x)).toBeLessThan(0.1);
 });
 
+// Pure geometry check: tiny wiggles are dropped, the sharp bend and the endpoints are kept.
 test('coastline simplification removes subpixel detail while preserving significant bends', () => {
 	const ring: [number, number][] = [
 		[0, 0],
@@ -129,6 +151,8 @@ test('coastline simplification removes subpixel detail while preserving signific
 	expect(result.at(-1)).toEqual(ring.at(-1));
 });
 
+// Protects scrolling while the globe prepares: the geometry is processed in a worker (not on the main
+// thread), the modal layout does not shift, and scroll position changes smoothly each frame.
 test('globe preparation stays off the scroll thread and preserves modal layout', async ({ page }) => {
 	let geometryWorkerStarted = false;
 	page.on('worker', worker => {
@@ -150,6 +174,7 @@ test('globe preparation stays off the scroll thread and preserves modal layout',
 	const bounds = await panel.boundingBox();
 	if (!bounds) throw new Error('Profile bounds unavailable');
 	await page.mouse.move(bounds.x + 30, bounds.y + bounds.height / 2);
+	// Sample the Profile scroll position every animation frame for a second while the wheel scrolls up
 	const samplesPromise = panel.evaluate(async element => {
 		const samples: number[] = [];
 		const end = performance.now() + 1000;
@@ -162,5 +187,6 @@ test('globe preparation stays off the scroll thread and preserves modal layout',
 	await page.mouse.wheel(0, -400);
 	const samples = await samplesPromise;
 	expect(samples.at(-1)).toBeLessThan(samples[0]);
+	// Scrolling up never jumps back down by more than a pixel between frames
 	for (let i = 1; i < samples.length; i++) expect(samples[i]).toBeLessThanOrEqual(samples[i - 1] + 1);
 });

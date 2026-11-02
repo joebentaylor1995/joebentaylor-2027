@@ -1,8 +1,15 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the preload: the portrait is fetched once, using the same optimised URL the page displays,
+// at the right quality for the device (75 on phones, 90 on desktop).
 for (const width of [390, 1440]) {
 	test(`hero preload reuses the displayed portrait at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 844 });
+		// Every optimised-image request for the portrait
 		const portraits: string[] = [];
 		page.on('request', request => {
 			const url = new URL(request.url());

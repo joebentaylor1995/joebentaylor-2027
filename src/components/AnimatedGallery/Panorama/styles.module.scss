@@ -1,0 +1,34 @@
+// NOTE • The camera sits one stage-width in front of the cards (perspective
+// = 100cqw), and each card turns about that point — matching layout.ts
+.scene {
+	position: absolute;
+	inset: 0;
+	perspective: 100cqw;
+}
+
+.card {
+	position: absolute;
+	inset: 0;
+	width: calc(var(--card-width, 0.64) * 100cqw);
+	height: calc(var(--card-width, 0.64) * 100cqw / var(--card-aspect, 0.75));
+	margin: auto;
+	overflow: hidden;
+	border-radius: 5.5cqw;
+	transform: translateZ(100cqw) rotateY(var(--turn, 0deg)) translateZ(-100cqw);
+	will-change: transform;
+	backface-visibility: hidden;
+}
+
+// NOTE • The image layer slides inside the card (--slide, set per frame) and is
+// overscanned (--parallax-scale) so the card's edges never uncover it
+.media {
+	position: absolute;
+	inset: 0;
+	transform: translateX(var(--slide, 0%)) scale(var(--parallax-scale, 1.07));
+	will-change: transform;
+
+	img {
+		object-fit: cover;
+		object-position: var(--focus, 50% 50%);
+	}
+}

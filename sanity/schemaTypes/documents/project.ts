@@ -15,12 +15,24 @@ import {
 } from 'sanity';
 import { AwardInput } from '../../components/AwardInput';
 import { CompressedVideoInput } from '../../components/CompressedVideoInput';
+import { insertPreviewUrl } from '../objects/caseBlocks';
+import { videoRenditionsField } from '../objects/videoRenditions';
 
 // Helpers
 // ------------
 const isListingOnly = ({ document }: ConditionalPropertyCallbackContext) => !document?.hasCaseStudy;
 const requiredForCaseStudy = (message: string) => (value: unknown, context: ValidationContext) =>
 	context.document?.hasCaseStudy && (value === undefined || (Array.isArray(value) && !value.length)) ? message : true;
+// NOTE • Sanity's API version for the Featured lookup below
+const VALIDATION_API_VERSION = '2025-06-01';
+// NOTE • Featured lives on the Projects page, not the project — ask it whether this one is listed
+const isFeatured = async (context: ValidationContext) => {
+	const id = context.document?._id?.replace(/^drafts\./, '');
+	if (!id) return false;
+	return context
+		.getClient({ apiVersion: VALIDATION_API_VERSION })
+		.fetch<boolean>('count(*[_id == "projectsPage"][0].featured[_ref == $id]) > 0', { id });
+};
 
 // Exports
 // ------------
@@ -142,7 +154,8 @@ export const project = defineType({
 			type: 'file',
 			group: 'listing',
 			options: { accept: 'video/mp4,video/webm' },
-			// NOTE • Compresses in the browser before upload (H.264, ≤1280px, sound removed)
+			fields: [videoRenditionsField],
+			// NOTE • Compresses in the browser before upload (H.264, several widths, sound removed)
 			components: { input: CompressedVideoInput },
 			description: 'Muted MP4 that loops on the tile. Keep it short, 16:10 and under ~10 MB.',
 			hidden: ({ document }) => document?.thumbnailType !== 'video',
@@ -181,10 +194,16 @@ export const project = defineType({
 			type: 'text',
 			rows: 5,
 			group: 'caseStudy',
+			description:
+				'Featured case studies only — shown under the title in the hero. Mini case studies (not featured) open straight to the overview and don’t use it.',
 			placeholder:
 				'One or two sentences on the client, the brief and what you made — shown under the title in the hero.',
 			hidden: isListingOnly,
-			validation: rule => rule.custom(requiredForCaseStudy('Case studies need an introduction')),
+			validation: rule =>
+				rule.custom(async (value, context) => {
+					if (!context.document?.hasCaseStudy || value) return true;
+					return (await isFeatured(context)) ? 'Featured case studies need an introduction' : true;
+				}),
 		}),
 		defineField({
 			name: 'objectives',
@@ -312,11 +331,27 @@ export const project = defineType({
 			title: 'Case study builder',
 			type: 'array',
 			group: 'builder',
-			description: 'Stack full-width and two-up media blocks. Drag to reorder. At least one is required.',
-			of: [defineArrayMember({ type: 'caseSingle' }), defineArrayMember({ type: 'caseDual' })],
+			description:
+				'Stack full-width, two-up, 3D model and animated gallery blocks. Drag to reorder. At least one is required.',
+			of: [
+				defineArrayMember({ type: 'caseSingle' }),
+				defineArrayMember({ type: 'caseDual' }),
+				defineArrayMember({ type: 'caseModel' }),
+				defineArrayMember({ type: 'caseGalleryScatterDrift' }),
+				defineArrayMember({ type: 'caseGalleryPanorama' }),
+				defineArrayMember({ type: 'caseGalleryOrbit' }),
+			],
 			options: {
 				insertMenu: {
-					views: [{ name: 'list' }, { name: 'grid' }],
+					groups: [
+						{ name: 'media', title: 'Media', of: ['caseSingle', 'caseDual', 'caseModel'] },
+						{
+							name: 'animated',
+							title: 'Animated galleries',
+							of: ['caseGalleryScatterDrift', 'caseGalleryPanorama', 'caseGalleryOrbit'],
+						},
+					],
+					views: [{ name: 'list' }, { name: 'grid', previewImageUrl: insertPreviewUrl }],
 				},
 			},
 			hidden: isListingOnly,

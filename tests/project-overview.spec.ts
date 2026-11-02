@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the overview section layout at desktop and mobile: headings and 15 list items render, icons are
+// 48px, body text uses the responsive size, and nothing overflows sideways.
 for (const width of [1440, 440]) {
 	test(`project overview matches its responsive layout at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
@@ -8,6 +14,7 @@ for (const width of [1440, 440]) {
 		await expect(page.locator('[data-loader-overlay]')).not.toBeVisible({ timeout: 15000 });
 		const overview = page.locator('[data-project-overview]');
 		const heroHeight = await page.locator('[data-project-hero-layer]').evaluate(el => el.clientHeight);
+		// Scroll to the overview; desktop must clear the pinned hero first
 		const scroll = width === 1440 ? heroHeight - 900 + 810 + 900 : heroHeight;
 		await page
 			.locator('#page .lenis')

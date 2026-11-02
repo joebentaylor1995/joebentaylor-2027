@@ -3,7 +3,7 @@
 import type { MetadataRoute } from 'next';
 import { isSiteUrlConfigured, siteUrl } from '@/config';
 
-// Robots
+// Constants
 // ------------
 // NOTE • Served at /robots.txt. Non-production deploys (Netlify sets
 // CONTEXT to deploy-preview / branch-deploy) are blocked from indexing so
@@ -19,8 +19,12 @@ const AI_TRAINING_CRAWLERS = [
 	'Bytespider',
 ];
 
+// Helpers
+// ------------
 const isProduction = !process.env.CONTEXT || process.env.CONTEXT === 'production';
 
+// Route
+// ------------
 const robots = (): MetadataRoute.Robots => {
 	if (!isProduction || !isSiteUrlConfigured) {
 		return {

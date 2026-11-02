@@ -29,6 +29,8 @@ ${profile.name} (${profile.tagline}) designs brand identities and websites and b
 ${profile.sameAs.map(url => `- [${new URL(url).hostname.replace('www.', '')}](${url}): Elsewhere online.`).join('\n')}
 `;
 
+// Exports
+// ------------
 export const GET = () =>
 	new Response(content, {
 		headers: { 'Content-Type': 'text/markdown; charset=utf-8' },

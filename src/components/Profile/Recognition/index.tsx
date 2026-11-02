@@ -12,14 +12,21 @@ import type { ProfileImage } from '@/data/site';
 // ------------
 import s from './styles.module.scss';
 
-// Component
+// Constants
 // ------------
 // NOTE • Shown instead of the spiral when WebGL is unavailable
 const FALLBACK_POSTERS = 3;
 
+// Component
+// ------------
+// Awards section: posters wound into a rising 3D spiral that the visitor can drag, scroll or
+// inspect. The three.js engine loads lazily once the section is prepared; until then (or without
+// WebGL) a few static posters are shown.
 const Recognition = ({ intro, outro, awards }: { intro: string; outro: string; awards: ProfileImage[] }) => {
-	// Context + Refs
+	// Context
 	const present = use(ProfilePresenceContext);
+
+	// Refs
 	const sectionRef = useRef<HTMLElement>(null);
 
 	// Derived
@@ -29,12 +36,16 @@ const Recognition = ({ intro, outro, awards }: { intro: string; outro: string; a
 	const posters = useMemo(() => awards.map(({ src }) => src), [posterKey]);
 
 	// Effects
+	// Builds the scene when the profile is present, and pauses its rendering while off screen
 	useEffect(() => {
 		const section = sectionRef.current;
 		if (!section || !present) return;
+
 		const controller = new AbortController();
 		let visible = false;
 		let scene: ReturnType<typeof import('./engine').createRecognition> | undefined;
+
+		// Import and create the scene when prepareScene says it is time; a failed import falls back to the static posters
 		const stopPreparing = prepareScene(
 			section,
 			async () => {
@@ -49,6 +60,7 @@ const Recognition = ({ intro, outro, awards }: { intro: string; outro: string; a
 			},
 			3
 		);
+
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				visible = entry.isIntersecting;
@@ -57,6 +69,7 @@ const Recognition = ({ intro, outro, awards }: { intro: string; outro: string; a
 			{ root: section.closest('#profile-panel') }
 		);
 		observer.observe(section);
+
 		return () => {
 			controller.abort();
 			stopPreparing();

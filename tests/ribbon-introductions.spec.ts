@@ -1,8 +1,14 @@
+// Imports
+// ------------
 import { expect, type Frame, type FrameLocator, test } from './helpers/test';
 
+// Constants
+// ------------
 // NOTE • The longest cascade, so a slow CI runner can't finish it between polls
 const LONGEST_DURATION = '3';
 
+// Helpers
+// ------------
 // Observes one full play: status, mid-play progress without GL errors, then ready.
 const expectCascadePlays = async (ribbon: FrameLocator, frame: Frame) => {
 	await expect(ribbon.locator('#intro-status')).toContainText('Playing');
@@ -15,6 +21,10 @@ const expectCascadePlays = async (ribbon: FrameLocator, frame: Frame) => {
 	expect(await frame.evaluate('introduction.progress')).toBe(1);
 };
 
+// Tests
+// ------------
+// Protects the Projects ribbon Slide Cascade (?projectSettings): it replays to completion with no GL errors,
+// and a changed duration replays it and is remembered after a reload.
 for (const width of [1440, 440]) {
 	test(`ribbon slide cascade replays and keeps its saved timing at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });

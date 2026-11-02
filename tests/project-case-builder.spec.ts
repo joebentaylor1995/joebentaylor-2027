@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the case study media gallery: the right number of layouts and images render, paired images sit
+// side by side on desktop and stacked on mobile with an 8px gap, and the gallery scrolls into place.
 for (const width of [1440, 440]) {
 	test(`case study media layouts and scrolling at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
@@ -9,6 +15,7 @@ for (const width of [1440, 440]) {
 		const gallery = page.locator('[data-project-case-builder]');
 		await expect(gallery.locator('[data-media-layout]')).toHaveCount(9);
 		await expect(gallery.locator('img')).toHaveCount(12);
+		// A dual layout: 8px gap, beside each other on desktop and one above the other on mobile
 		const pair = gallery.locator('[data-media-layout="dual"]').first();
 		const a = await pair.locator('figure').nth(0).boundingBox();
 		const b = await pair.locator('figure').nth(1).boundingBox();
@@ -23,6 +30,8 @@ for (const width of [1440, 440]) {
 			expect(a.width).toBe(408);
 			expect(a.width / a.height).toBeCloseTo(443 / 560, 2);
 		}
+
+		// Scroll the gallery to the top of the viewport (Lenis wrapper), allowing for the hero above it
 		const offset = await gallery.evaluate(el => (el as HTMLElement).offsetTop);
 		const heroHeight = await page.locator('[data-project-hero-layer]').evaluate(el => el.clientHeight);
 		const target = width === 1440 ? heroHeight - 900 + 810 + offset : heroHeight + offset;
@@ -47,6 +56,8 @@ for (const width of [1440, 440]) {
 			const full = await pair.locator('figure').first().boundingBox();
 			expect((full?.width ?? 0) / (full?.height ?? 1)).toBeCloseTo(443 / 642, 2);
 		}
+
+		// Screenshot kept in test-results for visual review
 		await page.screenshot({ path: `test-results/project-case-builder-${width}.png` });
 		await page
 			.locator('#page .lenis')

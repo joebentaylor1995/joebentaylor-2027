@@ -1,3 +1,5 @@
+// Events
+// ------------
 // Persistent layout: reveal once per document, then let route entrances start immediately.
 export const LOADER_REVEAL = 'site-loader:reveal';
 export const LOADER_SETTLED = 'site-loader:settled';
@@ -5,9 +7,15 @@ export const LOADER_RESET = 'site-loader:reset';
 // Fires when the intro's logo lands and holds still, before the wipe — a quiet
 // moment for heavy setup (WebGL, textures) the loader still covers
 export const LOADER_LANDED = 'site-loader:landed';
+
+// State
+// ------------
 let pending = true;
 let landed = false;
 let settled = false;
+
+// Exports
+// ------------
 export const resetLoader = () => {
 	pending = true;
 	landed = false;

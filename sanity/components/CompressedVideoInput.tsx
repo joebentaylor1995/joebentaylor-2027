@@ -1,7 +1,8 @@
 // Compressed video input
 // ------------
 // NOTE • Replaces the upload for video file fields: the chosen video is
-// compressed in the browser (sanity/lib/compressVideo.ts) and then uploaded.
+// compressed in the browser into several widths (sanity/lib/compressVideo.ts)
+// and each is uploaded. The field's asset is the widest; the rest go in renditions.
 // If it can't be compressed, the original is uploaded and the reason shown.
 // The current file (preview, remove) still uses Sanity's own input.
 
@@ -10,13 +11,14 @@
 import { Box, Button, Card, Flex, Stack, Text } from '@sanity/ui';
 import { type ChangeEvent, useRef, useState } from 'react';
 import { type FileInputProps, set, useClient } from 'sanity';
-import { compressVideo, MAX_WIDTH, TARGET_BITRATE } from '../lib/compressVideo';
+import { compressVideo, VIDEO_LADDER } from '../lib/compressVideo';
 
 // Constants
 // ------------
 const API_VERSION = '2025-06-01';
 const MEGABYTE = 1024 * 1024;
 const PERCENT = 100;
+const LADDER_WIDTHS = VIDEO_LADDER.map(rung => rung.width).join(', ');
 
 // Types
 // ------------
@@ -60,20 +62,35 @@ export const CompressedVideoInput = (props: FileInputProps) => {
 
 		setStatus({ state: 'uploading' });
 		try {
-			const asset = await client.assets.upload('file', result.file, {
-				filename: result.file.name,
-				contentType: result.file.type || 'video/mp4',
-			});
-			props.onChange(set({ _type: 'file', asset: { _type: 'reference', _ref: asset._id } }));
+			const upload = (file: File) =>
+				client.assets.upload('file', file, { filename: file.name, contentType: file.type || 'video/mp4' });
 
 			if (result.kind === 'compressed') {
-				const saved = Math.round((1 - result.file.size / result.originalBytes) * PERCENT);
+				const assets = await Promise.all(result.renditions.map(({ file }) => upload(file)));
+				const toFile = (id: string) => ({ _type: 'file', asset: { _type: 'reference', _ref: id } });
+				props.onChange(
+					set({
+						...toFile(assets[assets.length - 1]._id),
+						renditions: result.renditions.map(({ width }, index) => ({
+							_key: `w${width}`,
+							_type: 'videoRendition',
+							width,
+							file: toFile(assets[index]._id),
+						})),
+					})
+				);
+
+				const sizes = result.renditions
+					.map(({ width, file }) => `${width}px ${formatSize(file.size)}`)
+					.join(', ');
 				setStatus({
 					state: 'done',
 					tone: 'positive',
-					message: `Compressed ${formatSize(result.originalBytes)} → ${formatSize(result.file.size)} (${saved}% smaller).`,
+					message: `Compressed ${formatSize(result.originalBytes)} into ${sizes}.`,
 				});
 			} else {
+				const asset = await upload(result.file);
+				props.onChange(set({ _type: 'file', asset: { _type: 'reference', _ref: asset._id } }));
 				setStatus({
 					state: 'done',
 					tone: 'caution',
@@ -114,8 +131,9 @@ export const CompressedVideoInput = (props: FileInputProps) => {
 
 					<Box>
 						<Text size={1} muted>
-							Compressed in your browser before upload: H.264 MP4, up to {MAX_WIDTH}px wide, ~
-							{TARGET_BITRATE / 1_000_000} Mbps, sound removed. Keep the tab open until it finishes.
+							Compressed in your browser before upload: H.264 MP4 at {LADDER_WIDTHS}px wide (never larger
+							than the original), sound removed. Visitors get the size that fits. Keep the tab open until
+							it finishes.
 						</Text>
 					</Box>
 				</Stack>

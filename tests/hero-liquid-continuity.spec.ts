@@ -1,6 +1,13 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the water simulation from needless restarts: re-styling the hero text keeps its buffers,
+// while a real viewport resize reallocates them.
 test('hero decoration refresh preserves water buffers while viewport resize reallocates them', async ({ page }) => {
+	// Count framebuffer deletions (a buffer reallocation) on <html>
 	await page.addInitScript(() => {
 		const original = WebGLRenderingContext.prototype.deleteFramebuffer;
 		WebGLRenderingContext.prototype.deleteFramebuffer = function (framebuffer) {
@@ -12,9 +19,12 @@ test('hero decoration refresh preserves water buffers while viewport resize real
 	});
 	await page.goto('/');
 	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1, { timeout: 15000 });
+	// Baseline after the first load
 	const initialBuffers = Number(await page.locator('html').getAttribute('data-water-buffer-deletes'));
 	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete', { timeout: 15000 });
 	await page.waitForTimeout(300);
+
+	// Settled: no further deletions
 	const count = () => page.locator('html').getAttribute('data-water-buffer-deletes');
 	const before = Number(await count());
 	expect(before).toBe(initialBuffers);
@@ -23,6 +33,8 @@ test('hero decoration refresh preserves water buffers while viewport resize real
 		.evaluate(element => (element as HTMLElement).style.setProperty('color', 'rgb(245, 245, 245)'));
 	await page.waitForTimeout(500);
 	expect(Number(await count())).toBe(before);
+
+	// A resize does reallocate
 	await page.setViewportSize({ width: 1500, height: 920 });
 	await expect.poll(async () => Number(await count())).toBeGreaterThan(before);
 	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);

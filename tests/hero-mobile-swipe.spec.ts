@@ -1,9 +1,17 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Emulate a 2x touch phone
 test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
 
+// Protects the mobile portrait: it loads a high-resolution image and a native touch swipe feeds the
+// scroll velocity into the shader.
 test('mobile portrait loads a detailed image and responds to native swipes', async ({ page }) => {
 	await page.addInitScript(() => {
+		// Track the peak value written to the scrollVelocity uniform on window
 		const names = new WeakMap<WebGLUniformLocation, string>();
 		const getLocation = WebGLRenderingContext.prototype.getUniformLocation;
 		const uniform = WebGLRenderingContext.prototype.uniform1f;
@@ -25,10 +33,14 @@ test('mobile portrait loads a detailed image and responds to native swipes', asy
 	const portrait = page.getByTestId('hero-depth');
 	await expect(portrait).toHaveAttribute('data-ready', 'true', { timeout: 30000 });
 	await expect(page.locator('[data-loader-overlay]')).not.toBeVisible({ timeout: 15000 });
+
+	// Image is at least full cover width
 	const source = await portrait.locator('img').evaluate(image => (image as HTMLImageElement).currentSrc);
 	expect(Number(new URL(source).searchParams.get('w'))).toBeGreaterThanOrEqual(1920);
 	// Phones get the lighter encode (see PORTRAIT_QUALITY in Hero/Background) — still full cover width
 	expect(new URL(source).searchParams.get('q')).toBe('75');
+
+	// Dispatch a real touch swipe through the DevTools protocol so it takes the native touch path
 	const client = await page.context().newCDPSession(page);
 	await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 195, y: 650 }] });
 	for (const y of [625, 590, 550, 500, 440]) {

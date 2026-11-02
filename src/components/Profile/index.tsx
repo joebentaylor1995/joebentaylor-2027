@@ -1,6 +1,5 @@
 // Imports
 // ------------
-
 import { getProfilePanel } from '@/data/content';
 import About from './About';
 import CallToAction from './CallToAction';
@@ -8,9 +7,6 @@ import Introduction from './Introduction';
 import Recognition from './Recognition';
 import Reviews from './Reviews';
 import Services from './Services';
-
-// Styles
-// ------------
 import s from './styles.module.scss';
 import Usps from './Usps';
 

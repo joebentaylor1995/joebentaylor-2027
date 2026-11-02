@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the case study outro: it rises as the page reaches the end (progress 0 to 1), reveals its quote,
+// portrait and credit, and fully reverses when scrolling back up.
 for (const mobile of [false, true]) {
 	test(`project outro rises and reverses on ${mobile ? 'mobile' : 'desktop'}`, async ({ page }) => {
 		if (mobile) await page.setViewportSize({ width: 440, height: 780 });
@@ -10,8 +16,11 @@ for (const mobile of [false, true]) {
 		const quote = outro.locator('[data-reveal-variant="words"]');
 		await expect(quote.locator('[data-reveal-word]').first()).toBeAttached();
 		const scroller = page.locator('#page .lenis').first();
+		// --project-outro-progress is 0 when the outro is hidden and 1 when fully risen
 		const progress = () =>
 			outro.evaluate(el => Number(getComputedStyle(el).getPropertyValue('--project-outro-progress')));
+
+		// Before scrolling: outro hidden, text waiting, portrait scaled to nothing
 		await expect.poll(progress).toBe(0);
 		await expect(outro.locator('[data-page-title-reveal]').first()).toHaveAttribute('data-wave-state', 'waiting');
 		await expect
@@ -19,6 +28,8 @@ for (const mobile of [false, true]) {
 				outro.locator('[data-outro-portrait]').evaluate(el => new DOMMatrix(getComputedStyle(el).transform).a)
 			)
 			.toBe(0);
+
+		// Scroll to the end: outro complete and everything revealed
 		await scroller.evaluate(el => el.scrollTo({ top: el.scrollHeight, behavior: 'instant' }));
 		await expect.poll(progress).toBeCloseTo(1, 2);
 		await expect(outro.getByText('Jillian Phyllis')).toBeVisible();
@@ -39,19 +50,26 @@ for (const mobile of [false, true]) {
 					.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)
 			)
 			.toBe(true);
+
+		// It fills one viewport
 		const bounds = await outro.boundingBox();
 		expect(bounds?.height).toBeCloseTo(mobile ? 780 : 900, 0);
 		await page.screenshot({ path: `test-results/project-outro-${mobile ? 'mobile' : 'desktop'}.png` });
+		// Hover fill needs a real pointer, so desktop only
 		if (!mobile) {
 			await next.hover();
 			await expect(next).toHaveCSS('--hover-fill', '111');
 			await page.mouse.move(10, 10);
 			await expect(next).toHaveCSS('--hover-fill', '-16');
 		}
+
+		// Scroll back up: half way after 17.5% of a viewport, gone after another 32.5%
 		await scroller.evaluate(el => el.scrollTo({ top: el.scrollTop - innerHeight * 0.175, behavior: 'instant' }));
 		await expect.poll(progress).toBeCloseTo(0.5, 1);
 		await scroller.evaluate(el => el.scrollTo({ top: el.scrollTop - innerHeight * 0.325, behavior: 'instant' }));
 		await expect.poll(progress).toBe(0);
+
+		// At the top the quote resets so it plays again on the next visit
 		await scroller.evaluate(el => el.scrollTo({ top: 0, behavior: 'instant' }));
 		await expect.poll(progress).toBe(0);
 		await expect(quote).toHaveAttribute('data-wave-state', 'waiting');

@@ -1,5 +1,10 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Helpers
+// ------------
+// Globals of the standalone ribbon document, declared so the page.evaluate bodies type-check
 declare const IdleMotion: new (
 	wake: () => void
 ) => {
@@ -11,13 +16,21 @@ declare const IdleMotion: new (
 };
 declare const position: number;
 
+// Tests
+// ------------
+// Protects navigation responsiveness: on repeat visits the transition wave starts within 300ms of the
+// click and no frame during it takes 100ms or more.
 test('home and projects respond promptly and keep the wave moving on repeat visits', async ({ page }) => {
 	await page.goto('/projects/');
 	await page.getByRole('button', { name: 'Accept Necessary' }).click();
 	await expect(page.locator('[data-site-loader]')).toBeHidden({ timeout: 20_000 });
 	await expect(page.locator('iframe[title="Interactive projects"]')).toHaveAttribute('data-ribbon-ready', 'true');
+	// Per-navigation timings, logged at the end
 	const measurements: { delay: number; longestFrame: number }[] = [];
+	// Alternate between home and Projects
 	for (const name of ['Go to home page', 'Projects', 'Go to home page', 'Projects']) {
+		// Arm a one-shot click listener that samples animation frames while the wave runs; the result is
+		// written to <html> so Playwright can wait on it
 		await page.evaluate(() => {
 			const root = document.documentElement;
 			delete root.dataset.testWaveFrames;
@@ -47,6 +60,7 @@ test('home and projects respond promptly and keep the wave moving on repeat visi
 		await page.getByRole('link', { name, exact: true }).click();
 		await expect(page.locator('html')).toHaveAttribute('data-test-wave-frames', /longestFrame/);
 		const measurement = JSON.parse((await page.locator('html').getAttribute('data-test-wave-frames')) || '{}');
+		// Wave starts quickly and no frame stalls
 		expect(measurement.delay).toBeGreaterThan(0);
 		expect(measurement.delay).toBeLessThan(300);
 		expect(measurement.longestFrame).toBeGreaterThan(0);
@@ -57,7 +71,11 @@ test('home and projects respond promptly and keep the wave moving on repeat visi
 	console.log('Repeated navigation timing:', measurements);
 });
 
+// Protects the first Projects visit on a slow ribbon: the transition wave starts straight away without
+// waiting for the ribbon posters, and the ribbon then fades in once its first frame is rendered.
 test('navigation starts while the ribbon loads, then fades in its first rendered frame', async ({ page }) => {
+	// Runs in every frame. In the ribbon iframe, hold image src assignments until a test event releases them;
+	// in the top document, measure the time from a Projects click to the wave starting.
 	await page.addInitScript(() => {
 		// Delay the actual poster loads without disabling the browser's HTTP
 		// cache (request interception makes Next's dev server bypass its caches).
@@ -103,6 +121,8 @@ test('navigation starts while the ribbon loads, then fades in its first rendered
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Accept Necessary' }).click();
 	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 20_000 });
+
+	// Click Projects while the ribbon is held back
 	const frame = page.locator('iframe[title="Interactive projects"]');
 	await page.getByRole('link', { name: 'Projects', exact: true }).click();
 	await expect(page.locator('html')).toHaveAttribute('data-navigation-wave', 'running');
@@ -110,9 +130,13 @@ test('navigation starts while the ribbon loads, then fades in its first rendered
 	console.log('Click to wave with ribbon still loading:', Math.round(delay), 'ms');
 	expect(delay).toBeGreaterThan(0);
 	expect(delay).toBeLessThan(300);
+
+	// The ribbon stays hidden while the wave finishes
 	await expect(frame).toHaveCSS('opacity', '0');
 	await expect(frame).not.toHaveAttribute('data-ready', 'true');
 	await expect(page.locator('html')).not.toHaveAttribute('data-navigation-wave', 'running');
+
+	// Release the posters; the ribbon must fade in rather than pop
 	const renderer = page.frames().find(candidate => candidate.url().includes('/projects-ribbon/index.html'));
 	if (!renderer) throw new Error('Missing ribbon');
 	await renderer.evaluate(() => window.dispatchEvent(new Event('test:release-posters')));
@@ -126,6 +150,8 @@ test('navigation starts while the ribbon loads, then fades in its first rendered
 	await page.screenshot({ path: 'test-results/projects-late-fade.png' });
 });
 
+// Protects the idle ribbon motion: drift speed is capped however long the page sits idle, and the
+// ribbon stops moving once it is off screen.
 test('idle ribbon drift stays slow after a long idle and stops off-page', async ({ page }) => {
 	await page.goto('/projects/');
 	await page.getByRole('button', { name: 'Accept Necessary' }).click();
@@ -134,6 +160,7 @@ test('idle ribbon drift stays slow after a long idle and stops off-page', async 
 	});
 	const frame = page.frames().find(candidate => candidate.url().includes('/projects-ribbon/index.html'));
 	if (!frame) throw new Error('Missing ribbon');
+	// Feed the ribbon IdleMotion class idle times of 4s, 30s and 2min; the speed must never ramp up
 	const speeds = await frame.evaluate(() => {
 		// The runtime class is intentionally global in the standalone document.
 		const motion = new IdleMotion(() => {});
@@ -143,6 +170,8 @@ test('idle ribbon drift stays slow after a long idle and stops off-page', async 
 		return [4000, 30_000, 120_000].map(time => motion.update(time, 1 / 60, 'featured', false).delta * 60);
 	});
 	expect(speeds).toEqual([0.08, 0.08, 0.08]);
+
+	// After navigating home the ribbon is cached, and its position must not change
 	await page.getByRole('link', { name: 'Go to home page' }).click();
 	await expect(page).toHaveURL(/\/$/);
 	await expect(page.locator('html')).toHaveAttribute('data-navigation-wave', 'running');

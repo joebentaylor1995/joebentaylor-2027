@@ -1,5 +1,11 @@
+// Imports
+// ------------
 import { expect, test } from './helpers/test';
 
+// Tests
+// ------------
+// Protects the gallery media reveal: a tile reveals once when it scrolls into view, finishes by itself
+// without further scrolling, leaves no animation behind, and does not replay on re-entry.
 for (const width of [440, 1440]) {
 	test(`media reveals once on entry and stays revealed at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
@@ -9,6 +15,8 @@ for (const width of [440, 1440]) {
 		const gallery = page.locator('[data-project-case-builder]');
 		await expect(gallery.locator('canvas')).toHaveCount(0);
 		const tile = page.locator('[data-media-tile]').first();
+		// Scrolls so the tile sits at a given progress through the reveal zone (the bottom 30% of the viewport).
+		// Negative progress is below the viewport. Enhanced layouts scroll the hero away first, so the offset differs.
 		const move = async (progress: number) => {
 			const scroll = await tile.evaluate((e, p) => {
 				const scroller = document.querySelector('#page .lenis');
@@ -30,9 +38,13 @@ for (const width of [440, 1440]) {
 				.first()
 				.evaluate((e, y) => e.scrollTo({ top: y, behavior: 'instant' }), scroll);
 		};
+
+		// Just before the tile enters: ready but not revealed
 		await move(-0.5);
 		await expect(gallery).toHaveAttribute('data-reveal-ready', 'true');
 		await expect(tile).not.toHaveAttribute('data-reveal-complete', 'true');
+
+		// Tile enters
 		await move(0.3);
 		// No further scroll: the timed reveal must finish on its own.
 		await expect(tile).toHaveAttribute('data-reveal-complete', 'true', { timeout: 2000 });
@@ -41,10 +53,14 @@ for (const width of [440, 1440]) {
 		expect(await tile.locator('figure').evaluate(element => element.getAnimations().length)).toBe(0);
 		await expect(page.getByRole('complementary', { name: 'Media reveal settings' })).toHaveCount(0);
 		await expect(tile.locator('figure')).toHaveCSS('opacity', '1');
+
+		// Scroll away and back: stays revealed
 		await move(-1);
 		await move(0.3);
 		await expect(tile).toHaveAttribute('data-reveal-complete', 'true');
 		await expect(tile).not.toHaveAttribute('data-revealing', 'true');
+
+		// Reduced motion keeps everything revealed
 		await page.emulateMedia({ reducedMotion: 'reduce' });
 		await expect(tile).not.toHaveAttribute('data-revealing', 'true');
 		await expect(tile.locator('figure')).toHaveCSS('opacity', '1');
