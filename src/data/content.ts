@@ -25,6 +25,8 @@ import type { ToolkitItem, ToolkitLayer } from '@parts/Profile/Usps/Toolkit/inte
 import { getYouTubeId } from '@utils/youtube';
 import { stegaClean } from 'next-sanity';
 import {
+	BLOCK_ASPECT_RATIOS,
+	type BlockAspect,
 	fallbackProjects,
 	type NextProject,
 	type Project,
@@ -75,6 +77,12 @@ const cleanMediaType = <T extends ProjectMedia>(media: T): T => {
 	const type = stegaClean(media.type);
 	return { ...media, type, ...(type === 'youtube' && { src: stegaClean(media.src) }) };
 };
+// NOTE • An unknown shape falls back to the default landscape one
+const toBlockAspect = (aspect: string): BlockAspect => {
+	const clean = stegaClean(aspect);
+	return clean in BLOCK_ASPECT_RATIOS ? (clean as BlockAspect) : '16:10';
+};
+const clampPercent = (value: number) => Math.min(100, Math.max(0, Number.isFinite(value) ? value : 50));
 // NOTE • A two-up side may be a gallery, whose animation name picks a component
 const isGalleryMedia = (media: ProjectDualMedia | null | undefined): media is ProjectGalleryMedia =>
 	stegaClean(media?.type) === 'gallery';
@@ -87,6 +95,11 @@ const cleanBlock = (block: Project['caseBuilder'][number]): Project['caseBuilder
 	if (block.type === 'dual')
 		return { ...block, media: [cleanDualMedia(block.media[0]), cleanDualMedia(block.media[1])] };
 	if (block.type === 'model') return block;
+	// NOTE • The shape picks a ratio, so it must compare cleanly
+	if (block.type === 'parallax')
+		return { ...block, aspect: toBlockAspect(block.aspect), images: block.images.filter(hasSrc) };
+	if (block.type === 'beforeAfter')
+		return { ...block, aspect: toBlockAspect(block.aspect), start: clampPercent(block.start) };
 	// NOTE • The animation name picks a component, so it must compare cleanly
 	return { ...block, animation: stegaClean(block.animation), images: block.images.filter(hasSrc) };
 };
@@ -176,6 +189,9 @@ const isCompleteBlock = (block: Project['caseBuilder'][number]) => {
 		);
 	// NOTE • A model needs both its file and the poster that stands in for it
 	if (block.type === 'model') return Boolean(block.src && block.poster);
+	// NOTE • A slideshow needs two slides; a before/after needs both sides
+	if (block.type === 'parallax') return (block.images?.filter(hasSrc).length ?? 0) >= 2;
+	if (block.type === 'beforeAfter') return hasSrc(block.before) && hasSrc(block.after);
 	return Boolean(block.images?.some(hasSrc));
 };
 

@@ -15,6 +15,8 @@ export interface DualMediaProps {
 }
 export type ModelMediaProps = Omit<Extract<ProjectCaseBlock, { type: 'model' }>, 'id' | 'type'>;
 export type GalleryMediaProps = Omit<Extract<ProjectCaseBlock, { type: 'gallery' }>, 'id' | 'type'>;
+export type ParallaxMediaProps = Omit<Extract<ProjectCaseBlock, { type: 'parallax' }>, 'id' | 'type'>;
+export type BeforeAfterMediaProps = Omit<Extract<ProjectCaseBlock, { type: 'beforeAfter' }>, 'id' | 'type'>;
 export interface MediaProps {
 	media: ProjectDualMedia;
 	sizes: string;

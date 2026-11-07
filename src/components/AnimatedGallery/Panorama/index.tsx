@@ -42,7 +42,7 @@ const Panorama = ({ images, background, sizes }: I.GalleryAnimationProps) => {
 	// Animations
 	// NOTE • Each step rests on a card, then turns the ring one card along
 	const render = useCallback<GalleryRender>(
-		elapsed => {
+		(elapsed, size) => {
 			const step = Math.floor(elapsed / TIMING.step);
 			const turn = (elapsed - step * TIMING.step - HOLD) / TIMING.move;
 			const progress = step + easeTurn(Math.min(1, Math.max(0, turn)));
@@ -50,7 +50,7 @@ const Panorama = ({ images, background, sizes }: I.GalleryAnimationProps) => {
 				const element = cardRefs.current[index];
 				if (!element) return;
 				const angle = angleFor(card, count, progress);
-				const isVisible = isOnStage(angle);
+				const isVisible = isOnStage(angle, size);
 				// NOTE • Off-stage cards skip their style write and leave the compositor
 				element.style.visibility = isVisible ? '' : 'hidden';
 				if (!isVisible) return;

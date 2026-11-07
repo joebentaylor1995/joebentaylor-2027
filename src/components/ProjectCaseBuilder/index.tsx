@@ -3,19 +3,24 @@
 // Imports
 // ------------
 import AnimatedGallery from '@parts/AnimatedGallery';
+import BeforeAfter from '@parts/BeforeAfter';
 import ModelViewer from '@parts/ModelViewer';
+import ParallaxGallery from '@parts/ParallaxGallery';
 import { preloadNearbyMedia } from '@utils/preloadNearbyMedia';
 import { YOUTUBE_ASPECT } from '@utils/youtube';
 import Image from 'next/image';
 import { type ComponentType, type CSSProperties, useEffect, useRef, useState } from 'react';
+import { BLOCK_ASPECT_RATIOS } from '@/data/projects';
 
 // Styles + Interfaces
 // ------------
 import type {
+	BeforeAfterMediaProps,
 	DualMediaProps,
 	GalleryMediaProps,
 	MediaProps,
 	ModelMediaProps,
+	ParallaxMediaProps,
 	ProjectCaseBuilderProps,
 	SingleMediaProps,
 } from './interface';
@@ -59,13 +64,37 @@ const Media = ({ media, sizes }: MediaProps) => {
 	);
 };
 
+// NOTE • Image widths for a full-width tile
+const SINGLE_SIZES = '(max-width: 1023px) calc(100vw - 32px), (max-width: 1440px) calc(67.65vw - 80px), 894px';
+
 // Layouts: one full-width tile
 export const SingleMedia = ({ media }: SingleMediaProps) => (
 	<div className={s.jacket} data-media-layout='single'>
-		<Media
-			media={media}
-			sizes='(max-width: 1023px) calc(100vw - 32px), (max-width: 1440px) calc(67.65vw - 80px), 894px'
-		/>
+		<Media media={media} sizes={SINGLE_SIZES} />
+	</div>
+);
+
+// NOTE • Interactive blocks fill a full-width tile in the shape the editor picked
+const aspectStyle = (aspect: ParallaxMediaProps['aspect']) =>
+	({ '--media-aspect': BLOCK_ASPECT_RATIOS[aspect] }) as CSSProperties;
+
+export const ParallaxMedia = ({ aspect, images }: ParallaxMediaProps) => (
+	<div className={s.jacket} data-media-layout='single'>
+		<div className={s.mediaSlot} data-media-tile>
+			<figure className={s.media} style={aspectStyle(aspect)}>
+				<ParallaxGallery images={images} sizes={SINGLE_SIZES} />
+			</figure>
+		</div>
+	</div>
+);
+
+export const BeforeAfterMedia = ({ aspect, before, after, start }: BeforeAfterMediaProps) => (
+	<div className={s.jacket} data-media-layout='single'>
+		<div className={s.mediaSlot} data-media-tile>
+			<figure className={s.media} style={aspectStyle(aspect)}>
+				<BeforeAfter before={before} after={after} start={start} sizes={SINGLE_SIZES} />
+			</figure>
+		</div>
 	</div>
 );
 
@@ -209,6 +238,10 @@ const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
 					<DualMedia key={block.id} media={block.media} />
 				) : block.type === 'model' ? (
 					<ModelMedia key={block.id} {...block} />
+				) : block.type === 'parallax' ? (
+					<ParallaxMedia key={block.id} {...block} />
+				) : block.type === 'beforeAfter' ? (
+					<BeforeAfterMedia key={block.id} {...block} />
 				) : (
 					<GalleryMedia key={block.id} {...block} />
 				)

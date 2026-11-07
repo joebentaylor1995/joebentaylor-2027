@@ -341,13 +341,15 @@ export const project = defineType({
 			type: 'array',
 			group: 'builder',
 			description:
-				'Stack full-width, two-up, 3D model and animated gallery blocks. Drag to reorder. At least one is required. The Scatter Drift animation is a side of a Two up block.',
+				'Stack full-width, two-up, 3D model, animated gallery, parallax gallery and before/after blocks. Drag to reorder. At least one is required. The Scatter Drift animation is a side of a Two up block.',
 			of: [
 				defineArrayMember({ type: 'caseSingle' }),
 				defineArrayMember({ type: 'caseDual' }),
 				defineArrayMember({ type: 'caseModel' }),
 				defineArrayMember({ type: 'caseGalleryPanorama' }),
 				defineArrayMember({ type: 'caseGalleryOrbit' }),
+				defineArrayMember({ type: 'caseParallaxGallery' }),
+				defineArrayMember({ type: 'caseBeforeAfter' }),
 			],
 			options: {
 				insertMenu: {
@@ -358,6 +360,7 @@ export const project = defineType({
 							title: 'Animated galleries',
 							of: ['caseGalleryPanorama', 'caseGalleryOrbit'],
 						},
+						{ name: 'interactive', title: 'Interactive', of: ['caseParallaxGallery', 'caseBeforeAfter'] },
 					],
 					// NOTE • Grid first, so editors see each block's animated preview straight away
 					views: [{ name: 'grid', previewImageUrl: insertPreviewUrl }, { name: 'list' }],

@@ -115,6 +115,18 @@ export const GET_PROJECT = defineQuery(`
 				"aspect": poster.asset->metadata.dimensions.aspectRatio,
 				"background": background.hex
 			},
+			_type == "caseParallaxGallery" => {
+				"type": "parallax",
+				"aspect": coalesce(aspect, "16:10"),
+				"images": images[defined(asset)]${GALLERY_IMAGE}
+			},
+			_type == "caseBeforeAfter" => {
+				"type": "beforeAfter",
+				"aspect": coalesce(aspect, "16:10"),
+				"start": coalesce(start, 50),
+				"before": before${GALLERY_IMAGE},
+				"after": after${GALLERY_IMAGE}
+			},
 			// NOTE • Each animated gallery is its own block type, named after its animation.
 			// Scatter Drift now lives inside Two up; its mapping stays for any block not yet migrated
 			_type match "caseGallery*" => {

@@ -1,0 +1,88 @@
+// NOTE • Osmo's values, converted from its 16px rem to this site's 10px rem.
+// The block's shape comes from the tile it sits in (ProjectCaseBuilder).
+.jacket {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	justify-content: center;
+	align-items: flex-end;
+	// NOTE • Horizontal swipes belong to the slideshow; vertical ones still scroll the page
+	touch-action: pan-y;
+	user-select: none;
+}
+
+.list {
+	display: grid;
+	grid-template-rows: 100%;
+	grid-template-columns: 100%;
+	place-items: center;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+.slide {
+	position: relative;
+	display: grid;
+	grid-area: 1 / 1 / -1 / -1;
+	place-items: center;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	opacity: 0;
+	pointer-events: none;
+	will-change: transform, opacity;
+
+	&[data-state='current'] {
+		opacity: 1;
+		pointer-events: auto;
+	}
+}
+
+.inner {
+	object-fit: cover;
+	object-position: var(--focus, 50% 50%);
+	will-change: transform;
+}
+
+// NOTE • Thumbnails are desktop and tablet only — phones swipe, or let it play
+.nav {
+	position: absolute;
+	bottom: 3.2rem;
+	z-index: 2;
+	display: none;
+	flex-flow: wrap;
+	justify-content: center;
+	align-items: center;
+	gap: 0.8rem;
+	max-width: 95%;
+	pointer-events: none;
+
+	@include bp(m) { display: flex; }
+}
+
+.thumb {
+	position: relative;
+	flex: none;
+	width: 11.2rem;
+	aspect-ratio: 1.5;
+	padding: 0;
+	overflow: hidden;
+	border: 1px solid alpha(--brand-c5, 20);
+	border-radius: 0.5rem;
+	background: var(--brand-c4);
+	cursor: pointer;
+	pointer-events: auto;
+	transition: border-color var(--time-s);
+
+	&:hover { border-color: alpha(--brand-c5, 40); }
+
+	&:focus-visible {
+		outline: 2px solid var(--brand-c5);
+		outline-offset: 2px;
+	}
+
+	&[data-state='current'] { border-color: var(--brand-c5); }
+
+	img { object-fit: cover; }
+}

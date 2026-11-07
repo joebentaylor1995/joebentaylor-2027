@@ -22,6 +22,11 @@ export type GalleryAnimation = (typeof GALLERY_ANIMATIONS)[number];
 // NOTE • Each animation crops its cards to a fixed shape; the hotspot (0–1 from the top left) keeps the subject in frame
 export type GalleryImage = { src: string; alt: string; hotspot?: { x: number; y: number } | null };
 
+// NOTE • The shapes an interactive block can take (width:height), as picked in
+// Sanity (sanity/schemaTypes/objects/caseInteractive.ts), and their ratios
+export const BLOCK_ASPECT_RATIOS = { '16:10': 16 / 10, '4:3': 4 / 3, '3:4': 3 / 4 } as const;
+export type BlockAspect = keyof typeof BLOCK_ASPECT_RATIOS;
+
 // An animated gallery playing in one tile of a Two up
 export type ProjectGalleryMedia = {
 	type: 'gallery';
@@ -41,6 +46,16 @@ export type ProjectCaseBlock =
 			images: GalleryImage[];
 			// NOTE • A hex colour behind the cards; the stage falls back to a light neutral
 			background?: string | null;
+	  }
+	| { id: string; type: 'parallax'; aspect: BlockAspect; images: GalleryImage[] }
+	| {
+			id: string;
+			type: 'beforeAfter';
+			aspect: BlockAspect;
+			// NOTE • Where the handle starts, as a percent from the left
+			start: number;
+			before: GalleryImage;
+			after: GalleryImage;
 	  }
 	| {
 			id: string;

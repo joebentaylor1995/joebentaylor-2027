@@ -13,6 +13,7 @@ import { projectTag } from './documents/projectTag';
 import { review } from './documents/review';
 import { caseDual, caseSingle } from './objects/caseBlocks';
 import { caseGalleryOrbit, caseGalleryPanorama, caseGalleryScatterDrift } from './objects/caseGalleries';
+import { caseBeforeAfter, caseParallaxGallery } from './objects/caseInteractive';
 import { caseModel } from './objects/caseModel';
 import { mediaItem } from './objects/mediaItem';
 import { seo } from './objects/seo';
@@ -47,6 +48,8 @@ export const schemaTypes = [
 	caseGalleryScatterDrift,
 	caseGalleryPanorama,
 	caseGalleryOrbit,
+	caseParallaxGallery,
+	caseBeforeAfter,
 	toolkit,
 	toolLayer,
 ];

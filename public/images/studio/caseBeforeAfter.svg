@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+	<!-- Before / after: a full-width tile with the "after" image masked from the handle to the
+	     right edge; the handle sweeps across and back, as a visitor would drag it. -->
+	<style>
+		.stage { fill: #808080; fill-opacity: 0.12; }
+		.before { fill: #808080; fill-opacity: 0.25; }
+		.after { fill: #808080; fill-opacity: 0.5; }
+		.sweep { animation: sweep 4s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate; }
+		@keyframes sweep { from { transform: translateX(-70px); } to { transform: translateX(70px); } }
+		.bar { fill: #fff; }
+		.knob { fill: #fff; }
+		@media (prefers-reduced-motion: reduce) { .sweep { animation: none; } }
+	</style>
+	<clipPath id="tile"><rect x="20" y="119" width="260" height="162" rx="10" /></clipPath>
+	<!-- The mask starts at the handle and runs to the right, moving with it -->
+	<clipPath id="after"><rect class="sweep" x="150" y="119" width="260" height="162" /></clipPath>
+	<rect class="stage" width="300" height="400" rx="10" />
+	<g clip-path="url(#tile)">
+		<rect class="before" x="20" y="119" width="260" height="162" />
+		<rect class="after" x="20" y="119" width="260" height="162" clip-path="url(#after)" />
+		<g class="sweep">
+			<rect class="bar" x="148.5" y="119" width="3" height="162" />
+			<circle class="knob" cx="150" cy="200" r="13" />
+		</g>
+	</g>
+</svg>

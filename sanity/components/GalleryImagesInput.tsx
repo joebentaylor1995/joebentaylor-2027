@@ -44,7 +44,15 @@ const toItem = (asset: Pick<Asset, '_id' | 'altText'>) => ({
 
 // Component
 // ------------
-export const GalleryImagesInput = (props: ArrayOfObjectsInputProps) => {
+// NOTE • Built per limit, so galleries with different image caps share one input
+export const createGalleryImagesInput = (maxImages: number) => {
+	// biome-ignore lint/correctness/noComponentHookFactories: called once per schema at module load, so the component is stable
+	const Input = (props: ArrayOfObjectsInputProps) => <GalleryImagesInputBody {...props} maxImages={maxImages} />;
+	Input.displayName = 'GalleryImagesInput';
+	return Input;
+};
+
+const GalleryImagesInputBody = ({ maxImages, ...props }: ArrayOfObjectsInputProps & { maxImages: number }) => {
 	// Context
 	const client = useClient({ apiVersion: API_VERSION });
 
@@ -61,7 +69,7 @@ export const GalleryImagesInput = (props: ArrayOfObjectsInputProps) => {
 	// Derived
 	const { readOnly, onChange } = props;
 	const count = props.value?.length ?? 0;
-	const remaining = Math.max(0, MAX_GALLERY_IMAGES - count);
+	const remaining = Math.max(0, maxImages - count);
 	const isUploading = status.state === 'uploading';
 	const isFull = remaining === 0;
 	const visibleLibrary = useMemo(() => {
@@ -141,7 +149,7 @@ export const GalleryImagesInput = (props: ArrayOfObjectsInputProps) => {
 					/>
 					<Text size={1} muted>
 						{isFull
-							? `All ${MAX_GALLERY_IMAGES} slots are full.`
+							? `All ${maxImages} slots are full.`
 							: `Pick several at once — up to ${remaining} more. You can also drop files onto the grid.`}
 					</Text>
 					<input ref={fileInputRef} type='file' accept='image/*' multiple hidden onChange={handleFiles} />
@@ -243,3 +251,6 @@ export const GalleryImagesInput = (props: ArrayOfObjectsInputProps) => {
 		</Stack>
 	);
 };
+
+// NOTE • The animated galleries' input (6–9 images)
+export const GalleryImagesInput = createGalleryImagesInput(MAX_GALLERY_IMAGES);
