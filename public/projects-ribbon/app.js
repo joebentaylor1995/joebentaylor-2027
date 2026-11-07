@@ -624,10 +624,51 @@ canvas.addEventListener(
 	},
 	{ passive: false }
 );
-// Active ribbon drag, or null. Grid drags live in `gridView.drag`.
+// Touch paging: with Snap on, one touch swipe moves exactly one slide, however far or fast the finger travels.
+// The drag follows the finger up to one slide either side of where it began (resisting beyond that); on release
+// a flick, or a drag past `threshold` of a slide, steps one slide that way, otherwise it springs back.
+// Speeds are in slides per second, measured over the last `sampleMs` of movement so a held finger has no flick.
+const TOUCH_PAGING = { threshold: 0.3, flickSpeed: 1.2, overdrag: 0.2, sampleMs: 100, flickDeadZone: 0.05 };
+// Damps travel past one slide so the finger can't drag a second slide into view.
+function resistOverdrag(travel) {
+	const excess = Math.abs(travel) - 1;
+	return excess <= 0 ? travel : Math.sign(travel) * (1 + excess * TOUCH_PAGING.overdrag);
+}
+// Finger speed over the recent samples, or 0 when it has been still (or there is only one sample).
+function flickVelocity(samples, now) {
+	const recent = samples.filter(sample => now - sample.time <= TOUCH_PAGING.sampleMs);
+	if (recent.length < 2) return 0;
+	const first = recent[0],
+		last = recent[recent.length - 1];
+	const seconds = (last.time - first.time) / 1000;
+	return seconds > 0 ? (last.travel - first.travel) / seconds : 0;
+}
+// -1, 0 or 1 slides from the anchor. A flick against the drag's direction cancels it rather than reversing.
+function pageStep(travel, velocity) {
+	if (Math.abs(velocity) > TOUCH_PAGING.flickSpeed)
+		return Math.abs(travel) < TOUCH_PAGING.flickDeadZone || Math.sign(velocity) === Math.sign(travel)
+			? Math.sign(velocity)
+			: 0;
+	return Math.abs(travel) > TOUCH_PAGING.threshold ? Math.sign(travel) : 0;
+}
+// Ends the ribbon drag: a paging touch settles on its page at once (a cancelled one ignores its flick),
+// anything else snaps once scrolling stops.
+function releaseDrag(e, cancelled) {
+	// A tap that opened a project leaves the ribbon where it is, as `scheduleSnap` does
+	const opening = projectTransition.loading || projectTransition.active;
+	if (drag?.paging && !opening) {
+		const velocity = cancelled || !drag.moved ? 0 : flickVelocity(drag.samples, e.timeStamp);
+		target = drag.anchor + pageStep(drag.travel, velocity);
+		requestRender();
+	} else scheduleSnap();
+	drag = null;
+}
+
+// Active ribbon drag, or null. Grid drags live in `gridView.drag`. Only the finger that started it moves it.
 let drag = null;
 canvas.addEventListener('pointerdown', e => {
 	if (returningToFeatured()) return;
+	if (drag && drag.pointerId !== e.pointerId) return;
 	tooltipInput = e.pointerType === 'touch' ? 'touch' : 'pointer';
 	tooltipPoint = { x: e.clientX, y: e.clientY };
 	tooltipDismissed = false;
@@ -638,7 +679,20 @@ canvas.addEventListener('pointerdown', e => {
 		gridView.pointerDown(e);
 		return;
 	}
-	drag = { x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, moved: false };
+	// `anchor` is the slide the drag pages from; `travel` is the finger's unresisted travel from it, in slides
+	const anchor = Math.round(target);
+	drag = {
+		pointerId: e.pointerId,
+		paging: e.pointerType === 'touch' && document.querySelector('#snap').checked,
+		anchor,
+		travel: target - anchor,
+		samples: [{ time: e.timeStamp, travel: target - anchor }],
+		x: e.clientX,
+		y: e.clientY,
+		startX: e.clientX,
+		startY: e.clientY,
+		moved: false,
+	};
 	canvas.style.cursor = 'grabbing';
 });
 // Dragging converts pointer travel to slides: 30% of the viewport (at least 220 px) is one slide, scaled by
@@ -656,13 +710,20 @@ canvas.addEventListener('pointermove', e => {
 		refreshFeaturedTooltip();
 		return;
 	}
+	if (e.pointerId !== drag.pointerId) return;
 	clearProjectTooltip();
-	target +=
+	const delta =
 		((state.vertical
 			? (e.clientY - drag.y) / Math.max(220, innerHeight * 0.3)
 			: (drag.x - e.clientX) / Math.max(220, innerWidth * 0.3)) *
 			state.speed) /
 		100;
+	if (drag.paging) {
+		drag.travel += delta;
+		target = drag.anchor + resistOverdrag(drag.travel);
+		drag.samples = drag.samples.filter(sample => e.timeStamp - sample.time <= TOUCH_PAGING.sampleMs);
+		drag.samples.push({ time: e.timeStamp, travel: drag.travel });
+	} else target += delta;
 	drag.x = e.clientX;
 	drag.y = e.clientY;
 	drag.moved ||= Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > 5;
@@ -711,15 +772,17 @@ canvas.addEventListener('pointerup', e => {
 			if (hit) projectClick(hit.project, { ...hit, grid: true });
 		}
 	} else {
+		if (drag && e.pointerId !== drag.pointerId) return;
 		if (drag && !drag.moved) projectClick(pickFeatured(e.clientX, e.clientY));
-		drag = null;
-		scheduleSnap();
+		releaseDrag(e, false);
 	}
 	requestRender();
 });
-canvas.addEventListener('pointercancel', () => {
-	drag = null;
+// The browser took the gesture (a system swipe, say): still settle on a whole slide.
+canvas.addEventListener('pointercancel', e => {
 	if (gridView) gridView.drag = null;
+	if (!drag || e.pointerId !== drag.pointerId) return;
+	releaseDrag(e, true);
 });
 canvas.addEventListener('pointerleave', e => {
 	if (e.pointerType === 'touch') return;
