@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+	<!-- Panorama: one 3:4 card at rest, then it swings away to the left, growing, while the
+	     next swings in from the right and glides to rest. Two cards take turns (2.5s a step). -->
+	<style>
+		.stage { fill: #808080; fill-opacity: 0.12; }
+		.card { fill: #808080; fill-opacity: 0.45; transform-box: fill-box; transform-origin: center; animation: pan 5s infinite; }
+		.card + .card { animation-delay: -2.5s; }
+		@keyframes pan {
+			0%, 10% { transform: none; animation-timing-function: cubic-bezier(0.48, 0, 0.7, 0.6); }
+			50% { transform: translateX(-250px) scale(1.25, 1.18) skewY(8deg); }
+			50.01%, 60% { transform: translateX(250px) scale(0.85) skewY(-8deg); animation-timing-function: cubic-bezier(0.2, 0.5, 0, 1.04); }
+			100% { transform: none; }
+		}
+		@media (prefers-reduced-motion: reduce) { .card { animation: none; } .card + .card { display: none; } }
+	</style>
+	<clipPath id="frame"><rect width="300" height="400" rx="10" /></clipPath>
+	<rect class="stage" width="300" height="400" rx="10" />
+	<g clip-path="url(#frame)">
+		<rect class="card" x="60" y="80" width="180" height="240" rx="8" />
+		<rect class="card" x="60" y="80" width="180" height="240" rx="8" />
+	</g>
+</svg>

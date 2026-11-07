@@ -360,7 +360,8 @@ export const project = defineType({
 							of: ['caseGalleryScatterDrift', 'caseGalleryPanorama', 'caseGalleryOrbit'],
 						},
 					],
-					views: [{ name: 'list' }, { name: 'grid', previewImageUrl: insertPreviewUrl }],
+					// NOTE • Grid first, so editors see each block's animated preview straight away
+					views: [{ name: 'grid', previewImageUrl: insertPreviewUrl }, { name: 'list' }],
 				},
 			},
 			hidden: isListingOnly,

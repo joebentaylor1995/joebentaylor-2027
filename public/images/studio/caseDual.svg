@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+	<!-- Two-up: two portrait tiles side by side, each opening from a thin centre line -->
+	<style>
+		.tile { fill: #808080; fill-opacity: 0.4; transform-box: fill-box; transform-origin: center; animation: reveal 3s cubic-bezier(0.33, 1, 0.68, 1) infinite; }
+		.tile + .tile { animation-delay: 0.12s; }
+		@keyframes reveal {
+			0%, 8% { transform: scale(0.5, 0.02); opacity: 1; }
+			30%, 88% { transform: scale(1); opacity: 1; }
+			100% { transform: scale(1); opacity: 0; }
+		}
+		@media (prefers-reduced-motion: reduce) { .tile { animation: none; } }
+	</style>
+	<rect class="tile" x="20" y="117" width="124" height="166" rx="10" />
+	<rect class="tile" x="156" y="117" width="124" height="166" rx="10" />
+</svg>

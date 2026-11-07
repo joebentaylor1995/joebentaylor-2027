@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+	<!-- Orbit: square cards evenly round a circle, the ring making one eased revolution per loop.
+	     Each card counter-turns so it stays upright, as on the site. -->
+	<style>
+		.stage { fill: #808080; fill-opacity: 0.12; }
+		.card { fill: #808080; fill-opacity: 0.45; transform-box: fill-box; transform-origin: center; animation: upright 8s cubic-bezier(0.52, 0, 0.5, 1) infinite; }
+		.ring { transform-origin: 150px 200px; animation: spin 8s cubic-bezier(0.52, 0, 0.5, 1) infinite; }
+		@keyframes spin { to { transform: rotate(360deg); } }
+		@keyframes upright { to { transform: rotate(-360deg); } }
+		@media (prefers-reduced-motion: reduce) { .ring, .card { animation: none; } }
+	</style>
+	<rect class="stage" width="300" height="400" rx="10" />
+	<g class="ring">
+		<rect class="card" x="124" y="79" width="52" height="52" rx="5" />
+		<rect class="card" x="191" y="107" width="52" height="52" rx="5" />
+		<rect class="card" x="219" y="174" width="52" height="52" rx="5" />
+		<rect class="card" x="191" y="241" width="52" height="52" rx="5" />
+		<rect class="card" x="124" y="269" width="52" height="52" rx="5" />
+		<rect class="card" x="57" y="241" width="52" height="52" rx="5" />
+		<rect class="card" x="29" y="174" width="52" height="52" rx="5" />
+		<rect class="card" x="57" y="107" width="52" height="52" rx="5" />
+	</g>
+</svg>

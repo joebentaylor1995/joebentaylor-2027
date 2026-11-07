@@ -13,11 +13,11 @@ import { KIND_LABELS, previewMedia } from './mediaItem';
 
 // Exports
 // ------------
-// NOTE • Insert-menu grid thumbnails, served from public/images/studio by the
-// Next app hosting the Studio — add a block's name here once it has one
-const BLOCKS_WITH_THUMBNAILS = ['caseModel', 'caseGalleryScatterDrift', 'caseGalleryPanorama', 'caseGalleryOrbit'];
-export const insertPreviewUrl = (schemaTypeName: string) =>
-	BLOCKS_WITH_THUMBNAILS.includes(schemaTypeName) ? `/images/studio/${schemaTypeName}.webp` : undefined;
+// NOTE • Insert-menu grid thumbnails: animated SVG skeletons (grey boxes
+// playing each block's reveal or gallery motion), served from
+// public/images/studio by the Next app hosting the Studio. A new block needs
+// its own <name>.svg.
+export const insertPreviewUrl = (schemaTypeName: string) => `/images/studio/${schemaTypeName}.svg`;
 
 export const caseSingle = defineType({
 	name: 'caseSingle',
