@@ -17,6 +17,10 @@ import { MAX_GALLERY_IMAGES as MAX_IMAGES, MIN_GALLERY_IMAGES as MIN_IMAGES } fr
 // Constants
 // ------------
 export const GALLERY_PREFIX = 'Animated Gallery — ';
+// NOTE • One preview selection per possible image: { image0: 'images.0.asset', … }
+const IMAGE_SLOTS = Object.fromEntries(
+	Array.from({ length: MAX_IMAGES }, (_, index) => [`image${index}`, `images.${index}.asset`])
+);
 
 // Helpers
 // ------------
@@ -80,9 +84,12 @@ const defineGallery = ({
 			}),
 		],
 		preview: {
-			select: { images: 'images', first: 'images.0' },
-			prepare: ({ images, first }) => {
-				const count = Array.isArray(images) ? images.length : 0;
+			// NOTE • Selecting the whole `images` list alongside `images.0` hands
+			// prepare an object rather than an array, so it counted 0. Each slot
+			// is selected on its own instead and the filled ones are counted.
+			select: { first: 'images.0', ...IMAGE_SLOTS },
+			prepare: ({ first, ...slots }) => {
+				const count = Object.values(slots).filter(Boolean).length;
 				return {
 					title: `${GALLERY_PREFIX}${title}`,
 					subtitle: `${count} image${count === 1 ? '' : 's'} · ${description}`,
