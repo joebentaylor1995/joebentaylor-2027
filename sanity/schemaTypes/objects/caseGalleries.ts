@@ -3,8 +3,9 @@
 // NOTE • Code-driven alternatives to a video loop: editors upload stills and
 // the site animates them, so a case study ships a few images instead of a
 // heavy video. Each animation is its own "Animated Gallery — …" block in the
-// builder's insert menu, rendered by src/components/AnimatedGallery. To add
-// one, define it with `defineGallery` below, register it in schemaTypes and
+// builder's insert menu, rendered by src/components/AnimatedGallery — except
+// Scatter Drift, which is picked as one side of a Two up (caseBlocks.ts). To
+// add one, define it with `defineGallery` below, register it in schemaTypes and
 // project.caseBuilder, and map its _type in the project query.
 
 // Imports
@@ -104,7 +105,8 @@ const defineGallery = ({
 export const caseGalleryScatterDrift = defineGallery({
 	name: 'caseGalleryScatterDrift',
 	title: 'Scatter Drift',
-	description: 'One card at a time: each swings up and away as the next turns in from below and settles.',
+	description:
+		'One side of a Two up, one card at a time: each swings up and away as the next turns in from below and settles.',
 	aspect: '4:3',
 });
 

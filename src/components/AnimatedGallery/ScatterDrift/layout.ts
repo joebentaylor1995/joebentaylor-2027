@@ -54,13 +54,9 @@ export const CARD_WIDTH = 0.66;
 const TILT = 108;
 
 const ENTER: Move = { start: 0.25, end: 1.59, from: 0.83, to: 0, ease: cubicBezier([0.35, 0.2, 0, 0.95]) };
-// NOTE • Measured, the card stops at -0.77 with a corner on the edge; -0.8 makes sure it clears
+// NOTE • Measured, the card stops at -0.77 with a corner on the edge; -0.8 makes sure it clears.
+// A taller stage than the reference's 4:5 (a two-up tile) only gives it more room
 const LEAVE: Move = { start: 0.07, end: 1.06, from: 0, to: -0.8, ease: cubicBezier([0.61, 0.04, 0.19, 0.8]) };
-
-// The card's half-size in stage heights, for a 3:4 stage
-const STAGE_ASPECT = 3 / 4;
-const HALF_WIDTH = (CARD_WIDTH * STAGE_ASPECT) / 2;
-const HALF_HEIGHT = HALF_WIDTH / CARD_ASPECT;
 
 // Helpers
 // ------------
@@ -70,10 +66,13 @@ const valueAt = (move: Move, time: number) => {
 	return move.from + (move.to - move.from) * move.ease(t);
 };
 
-// How far the turned card reaches above and below its centre
-const halfExtent = (degrees: number) => {
+// NOTE • How far the turned card reaches above and below its centre, in stage
+// heights — the card is sized off the width, so this depends on the stage's shape
+const halfExtent = (degrees: number, stage: { width: number; height: number }) => {
 	const radians = (degrees * Math.PI) / 180;
-	return HALF_WIDTH * Math.abs(Math.sin(radians)) + HALF_HEIGHT * Math.abs(Math.cos(radians));
+	const halfWidth = (CARD_WIDTH * stage.width) / stage.height / 2;
+	const halfHeight = halfWidth / CARD_ASPECT;
+	return halfWidth * Math.abs(Math.sin(radians)) + halfHeight * Math.abs(Math.cos(radians));
 };
 
 // Exports
@@ -84,10 +83,15 @@ export const buildCards = (images: GalleryImage[]): Card[] =>
 // NOTE • A card's life starts one step before it reaches the centre: its first
 // step is the entrance, its second the rest and exit; after that it waits
 // off the top until its turn comes round again. Slot 0 starts at rest.
-export const frameFor = (card: Card, count: number, elapsed: number): Frame => {
+export const frameFor = (
+	card: Card,
+	count: number,
+	elapsed: number,
+	stage: { width: number; height: number }
+): Frame => {
 	const cycle = count * STEP;
 	const life = (((elapsed - (card.slot - 1) * STEP) % cycle) + cycle) % cycle;
 	const y = life < STEP ? valueAt(ENTER, life) : valueAt(LEAVE, life - STEP);
 	const rotation = -TILT * y;
-	return { y, rotation, isVisible: Math.abs(y) - halfExtent(rotation) < 0.5 };
+	return { y, rotation, isVisible: Math.abs(y) - halfExtent(rotation, stage) < 0.5 };
 };

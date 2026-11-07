@@ -27,19 +27,27 @@ import YouTube from './YouTube';
 
 // Media tiles
 // ------------
-// One tile: a figure that holds a video, YouTube embed or image. The `sizes` strings
-// are the responsive image widths for the layout the tile sits in.
+// One tile: a figure that holds a video, YouTube embed, image or (in a two-up) an
+// animated gallery. The `sizes` strings are the responsive image widths for the
+// layout the tile sits in.
 const Media = ({ media, sizes }: MediaProps) => {
 	// Derived
 	// NOTE • Only full-width tiles read this; two-up tiles keep their fixed shape
-	const aspect = media.type === 'youtube' ? YOUTUBE_ASPECT : media.aspect;
+	const aspect = media.type === 'youtube' ? YOUTUBE_ASPECT : media.type === 'gallery' ? null : media.aspect;
 	const style = aspect ? ({ '--media-aspect': aspect } as CSSProperties) : undefined;
 
 	// Render
 	return (
 		<div className={s.mediaSlot} data-media-tile>
 			<figure className={s.media} style={style}>
-				{media.type === 'video' ? (
+				{media.type === 'gallery' ? (
+					<AnimatedGallery
+						animation={media.animation}
+						images={media.images}
+						background={media.background}
+						sizes={DUAL_GALLERY_SIZES}
+					/>
+				) : media.type === 'video' ? (
 					<Video key={media.src} media={media} />
 				) : media.type === 'youtube' ? (
 					<YouTube key={media.src} media={media} sizes={sizes} />
@@ -61,12 +69,18 @@ export const SingleMedia = ({ media }: SingleMediaProps) => (
 	</div>
 );
 
+// NOTE • Gallery cards are two-thirds of a two-up tile's width
+const DUAL_GALLERY_SIZES = '(max-width: 1023px) 66vw, (max-width: 1440px) 23vw, 300px';
+// NOTE • A gallery has no single src, so it's keyed by its first image
+const dualKey = (media: DualMediaProps['media'][number]) =>
+	media.type === 'gallery' ? `gallery-${media.images[0]?.src}` : media.src;
+
 // Two tiles side by side
 export const DualMedia = ({ media }: DualMediaProps) => (
 	<div className={s.jacket} data-media-layout='dual'>
 		{media.map(item => (
 			<Media
-				key={item.src}
+				key={dualKey(item)}
 				media={item}
 				sizes='(max-width: 1023px) calc(100vw - 32px), (max-width: 1440px) calc(33.825vw - 44px), 443px'
 			/>

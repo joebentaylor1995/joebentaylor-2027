@@ -39,7 +39,7 @@ const ScatterDrift = ({ images, background, sizes }: I.GalleryAnimationProps) =>
 			cards.forEach((card, index) => {
 				const element = cardRefs.current[index];
 				if (!element) return;
-				const frame = frameFor(card, count, elapsed);
+				const frame = frameFor(card, count, elapsed, size);
 				// NOTE • Off-stage cards skip their style write and leave the compositor
 				element.style.visibility = frame.isVisible ? '' : 'hidden';
 				if (frame.isVisible)

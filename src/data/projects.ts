@@ -15,15 +15,25 @@ export type ProjectMedia =
 	| { type: 'youtube'; src: string; alt: string };
 
 // NOTE • Each value is one code-driven animation, picked in Sanity as its own
-// "Animated Gallery — …" block (sanity/schemaTypes/objects/caseGalleries.ts)
+// "Animated Gallery — …" block (sanity/schemaTypes/objects/caseGalleries.ts),
+// or — for Scatter Drift — as one side of a Two up
 export const GALLERY_ANIMATIONS = ['scatterDrift', 'panorama', 'orbit'] as const;
 export type GalleryAnimation = (typeof GALLERY_ANIMATIONS)[number];
 // NOTE • Each animation crops its cards to a fixed shape; the hotspot (0–1 from the top left) keeps the subject in frame
 export type GalleryImage = { src: string; alt: string; hotspot?: { x: number; y: number } | null };
 
+// An animated gallery playing in one tile of a Two up
+export type ProjectGalleryMedia = {
+	type: 'gallery';
+	animation: GalleryAnimation;
+	images: GalleryImage[];
+	background?: string | null;
+};
+export type ProjectDualMedia = ProjectMedia | ProjectGalleryMedia;
+
 export type ProjectCaseBlock =
 	| { id: string; type: 'single'; media: ProjectMedia }
-	| { id: string; type: 'dual'; media: [ProjectMedia, ProjectMedia] }
+	| { id: string; type: 'dual'; media: [ProjectDualMedia, ProjectDualMedia] }
 	| {
 			id: string;
 			type: 'gallery';

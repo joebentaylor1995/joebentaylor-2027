@@ -24,7 +24,15 @@ import {
 import type { ToolkitItem, ToolkitLayer } from '@parts/Profile/Usps/Toolkit/interface';
 import { getYouTubeId } from '@utils/youtube';
 import { stegaClean } from 'next-sanity';
-import { fallbackProjects, type NextProject, type Project, type ProjectMedia, projectDummy } from './projects';
+import {
+	fallbackProjects,
+	type NextProject,
+	type Project,
+	type ProjectDualMedia,
+	type ProjectGalleryMedia,
+	type ProjectMedia,
+	projectDummy,
+} from './projects';
 import {
 	type AboutImage,
 	fallbackHome,
@@ -67,10 +75,17 @@ const cleanMediaType = <T extends ProjectMedia>(media: T): T => {
 	const type = stegaClean(media.type);
 	return { ...media, type, ...(type === 'youtube' && { src: stegaClean(media.src) }) };
 };
+// NOTE • A two-up side may be a gallery, whose animation name picks a component
+const isGalleryMedia = (media: ProjectDualMedia | null | undefined): media is ProjectGalleryMedia =>
+	stegaClean(media?.type) === 'gallery';
+const cleanDualMedia = (media: ProjectDualMedia): ProjectDualMedia =>
+	isGalleryMedia(media)
+		? { ...media, type: 'gallery', animation: stegaClean(media.animation), images: media.images.filter(hasSrc) }
+		: cleanMediaType(media);
 const cleanBlock = (block: Project['caseBuilder'][number]): Project['caseBuilder'][number] => {
 	if (block.type === 'single') return { ...block, media: cleanMediaType(block.media) };
 	if (block.type === 'dual')
-		return { ...block, media: [cleanMediaType(block.media[0]), cleanMediaType(block.media[1])] };
+		return { ...block, media: [cleanDualMedia(block.media[0]), cleanDualMedia(block.media[1])] };
 	if (block.type === 'model') return block;
 	// NOTE • The animation name picks a component, so it must compare cleanly
 	return { ...block, animation: stegaClean(block.animation), images: block.images.filter(hasSrc) };
@@ -154,7 +169,11 @@ const isPlayable = (media: ProjectMedia | null | undefined) =>
 // NOTE • A block whose asset hasn't been uploaded yet is skipped, not crashed on
 const isCompleteBlock = (block: Project['caseBuilder'][number]) => {
 	if (block.type === 'single') return isPlayable(block.media);
-	if (block.type === 'dual') return block.media?.length === 2 && block.media.every(isPlayable);
+	if (block.type === 'dual')
+		return (
+			block.media?.length === 2 &&
+			block.media.every(media => (isGalleryMedia(media) ? media.images?.some(hasSrc) : isPlayable(media)))
+		);
 	// NOTE • A model needs both its file and the poster that stands in for it
 	if (block.type === 'model') return Boolean(block.src && block.poster);
 	return Boolean(block.images?.some(hasSrc));

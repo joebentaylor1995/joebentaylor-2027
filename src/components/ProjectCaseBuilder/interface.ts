@@ -1,6 +1,6 @@
 // Imports
 // ------------
-import type { ProjectCaseBlock, ProjectMedia } from '@/data/projects';
+import type { ProjectCaseBlock, ProjectDualMedia, ProjectMedia } from '@/data/projects';
 
 // Types
 // ------------
@@ -11,12 +11,12 @@ export interface SingleMediaProps {
 	media: ProjectMedia;
 }
 export interface DualMediaProps {
-	media: [ProjectMedia, ProjectMedia];
+	media: [ProjectDualMedia, ProjectDualMedia];
 }
 export type ModelMediaProps = Omit<Extract<ProjectCaseBlock, { type: 'model' }>, 'id' | 'type'>;
 export type GalleryMediaProps = Omit<Extract<ProjectCaseBlock, { type: 'gallery' }>, 'id' | 'type'>;
 export interface MediaProps {
-	media: ProjectMedia;
+	media: ProjectDualMedia;
 	sizes: string;
 }
 export interface VideoProps {

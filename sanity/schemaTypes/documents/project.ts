@@ -341,12 +341,11 @@ export const project = defineType({
 			type: 'array',
 			group: 'builder',
 			description:
-				'Stack full-width, two-up, 3D model and animated gallery blocks. Drag to reorder. At least one is required.',
+				'Stack full-width, two-up, 3D model and animated gallery blocks. Drag to reorder. At least one is required. The Scatter Drift animation is a side of a Two up block.',
 			of: [
 				defineArrayMember({ type: 'caseSingle' }),
 				defineArrayMember({ type: 'caseDual' }),
 				defineArrayMember({ type: 'caseModel' }),
-				defineArrayMember({ type: 'caseGalleryScatterDrift' }),
 				defineArrayMember({ type: 'caseGalleryPanorama' }),
 				defineArrayMember({ type: 'caseGalleryOrbit' }),
 			],
@@ -357,7 +356,7 @@ export const project = defineType({
 						{
 							name: 'animated',
 							title: 'Animated galleries',
-							of: ['caseGalleryScatterDrift', 'caseGalleryPanorama', 'caseGalleryOrbit'],
+							of: ['caseGalleryPanorama', 'caseGalleryOrbit'],
 						},
 					],
 					// NOTE • Grid first, so editors see each block's animated preview straight away
