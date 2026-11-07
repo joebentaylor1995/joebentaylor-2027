@@ -51,25 +51,47 @@ const ProjectOverview = ({ overview, eyebrow }: ProjectOverviewProps) => (
 					<div className={s.group}>
 						<h3 data-type='bodyM'>Credits</h3>
 						<ul className={s.credits}>
-							{overview.credits.map(credit => (
-								<li className={s.credit} key={credit.name}>
-									{credit.image && (
-										<Image
-											src={credit.image}
-											alt=''
-											// NOTE • Drawn at 48px: twice that so a face holds its detail on any screen
-											width={96}
-											height={96}
-											quality={90}
-											data-cursor-sticky
-											data-cursor-fit
-										/>
-									)}
-									<p data-type='bodyM'>
-										{credit.name} <span data-type='bodyS'>{credit.role}</span>
-									</p>
-								</li>
-							))}
+							{overview.credits.map(credit => {
+								const body = (
+									<>
+										{credit.image && (
+											<Image
+												src={credit.image}
+												alt=''
+												// NOTE • Drawn at 48px: twice that so a face holds its detail on any screen
+												width={96}
+												height={96}
+												quality={90}
+												data-cursor-sticky
+												data-cursor-fit
+											/>
+										)}
+										<p data-type='bodyM'>
+											<span className={s.creditName}>{credit.name}</span>{' '}
+											<span data-type='bodyS'>{credit.role}</span>
+										</p>
+									</>
+								);
+
+								return (
+									<li className={s.credit} key={credit.name}>
+										{/* NOTE • Linked when the person (or this credit) has a URL */}
+										{credit.url ? (
+											<a
+												className={s.creditLink}
+												href={credit.url}
+												target='_blank'
+												rel='noopener noreferrer'
+											>
+												{body}
+												<span className={s.srOnly}> (opens in a new tab)</span>
+											</a>
+										) : (
+											body
+										)}
+									</li>
+								);
+							})}
 						</ul>
 					</div>
 				)}

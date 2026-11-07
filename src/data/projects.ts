@@ -54,7 +54,7 @@ export interface Project {
 	overview: {
 		objectives: string[];
 		deliverables: string[];
-		credits: { name: string; role: string; image?: string | null }[];
+		credits: { name: string; role: string; image?: string | null; url?: string | null }[];
 		recognition: { name: string; organisation: string }[];
 		website?: string | null;
 	};

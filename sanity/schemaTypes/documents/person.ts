@@ -1,7 +1,7 @@
 // Person Schema
 // ------------
 // NOTE • A collaborator, added once and picked from the pool in any case
-// study's Credits — the role is written per project.
+// study's Credits — the role (and, optionally, a link) is written per project.
 
 // Imports
 // ------------
@@ -29,6 +29,14 @@ export const person = defineType({
 			type: 'image',
 			options: { hotspot: true },
 			description: 'Square headshot — shown as a small circle beside the name.',
+		}),
+		defineField({
+			name: 'url',
+			title: 'Link (optional)',
+			type: 'url',
+			placeholder: 'https://',
+			description: 'Their website or profile. Their name links here in every case study they’re credited in.',
+			validation: rule => rule.uri({ scheme: ['https', 'http'] }),
 		}),
 	],
 	orderings: [{ title: 'Name', name: 'nameAsc', by: [{ field: 'name', direction: 'asc' }] }],

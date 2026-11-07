@@ -128,7 +128,9 @@ export const GET_PROJECT = defineQuery(`
 			"credits": credits[defined(person) || defined(name)]{
 				"name": coalesce(person->name, name),
 				"role": coalesce(role, ""),
-				"image": coalesce(person->image.asset->url, image.asset->url)
+				"image": coalesce(person->image.asset->url, image.asset->url),
+				// NOTE • This project's link wins over the person's own
+				"url": coalesce(url, person->url)
 			},
 			// NOTE • organisation is the legacy free-text field, read until migrations/awards-to-organisations has run
 			"recognition": recognition[defined(name)]{ name, "organisation": coalesce(body->name, organisation, "") },

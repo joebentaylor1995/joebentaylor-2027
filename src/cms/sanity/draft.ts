@@ -11,8 +11,18 @@
 import { defineEnableDraftMode } from 'next-sanity/draft-mode';
 import { client } from './client';
 
+// Constants
+// ------------
+const previewToken = process.env.SANITY_API_READ_TOKEN;
+
+// NOTE • next-sanity throws (a bare 500) when the client has no token, which
+// hides the cause — answer with a 503 that names the missing variable instead
+const missingToken = () => new Response('Draft mode unavailable: SANITY_API_READ_TOKEN is not set', { status: 503 });
+
+const enableDraftMode = previewToken
+	? defineEnableDraftMode({ client: client.withConfig({ token: previewToken }) }).GET
+	: missingToken;
+
 // Exports
 // ------------
-export const { GET } = defineEnableDraftMode({
-	client: client.withConfig({ token: process.env.SANITY_API_READ_TOKEN }),
-});
+export const GET = enableDraftMode;
