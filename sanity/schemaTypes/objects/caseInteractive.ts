@@ -1,7 +1,7 @@
 // Interactive Case Blocks
 // ------------
 // NOTE • Full-width case builder blocks visitors drive themselves: a parallax
-// slideshow with thumbnails, and a before/after split slider. Rendered by
+// slideshow (up to 6 images) with thumbnails, and a before/after split slider. Rendered by
 // src/components/ParallaxGallery and src/components/BeforeAfter, both from
 // Osmo resources. Each takes one of a few fixed shapes, picked by the editor.
 
@@ -9,7 +9,7 @@
 // ------------
 import { ImagesIcon } from '@sanity/icons/Images';
 import { SplitVerticalIcon } from '@sanity/icons/SplitVertical';
-import { defineArrayMember, defineField, defineType } from 'sanity';
+import { defineArrayMember, defineField, defineType, type ImageRule } from 'sanity';
 import { createGalleryImagesInput } from '../../components/GalleryImagesInput';
 
 // Constants
@@ -22,10 +22,26 @@ export const BLOCK_ASPECTS = [
 ];
 const DEFAULT_ASPECT = '16:10';
 const MIN_SLIDES = 2;
-const MAX_SLIDES = 12;
+const MAX_SLIDES = 6;
+// NOTE • These blocks are up to 894px wide, so about 1800px on a retina screen;
+// anything narrower is stretched and looks soft
+const MIN_IMAGE_WIDTH = 1800;
+const IMAGE_SIZE_HINT = 'Upload images around 2000px wide (at least 1800px) so they stay sharp on large screens.';
 
 // Helpers
 // ------------
+// NOTE • An image ref spells out its size (image-<id>-<width>x<height>-<ext>), so no fetch is needed
+const widthOf = (ref: string | undefined) => Number(ref?.split('-').at(-2)?.split('x')[0]) || 0;
+const sharpEnough = (rule: ImageRule) =>
+	rule
+		.custom((value: { asset?: { _ref?: string } } | undefined) => {
+			const width = widthOf(value?.asset?._ref);
+			return width && width < MIN_IMAGE_WIDTH
+				? `Only ${width}px wide — it will look soft. ${IMAGE_SIZE_HINT}`
+				: true;
+		})
+		.warning();
+
 const aspectField = () =>
 	defineField({
 		name: 'aspect',
@@ -54,15 +70,22 @@ export const caseParallaxGallery = defineType({
 	type: 'object',
 	icon: ImagesIcon,
 	description:
-		'A full-width slideshow: each image wipes in over the last with a parallax slide. Thumbnails below on desktop; it plays by itself on phones until swiped.',
+		'A full-width slideshow: each image wipes in over the last with a parallax slide. It plays by itself until a visitor takes over; thumbnails below on desktop.',
 	fields: [
 		aspectField(),
 		defineField({
 			name: 'images',
 			title: 'Images',
 			type: 'array',
-			description: `Add ${MIN_SLIDES}–${MAX_SLIDES} images, in order — upload or pick several at once, then drag to reorder.`,
-			of: [defineArrayMember({ type: 'image', options: { hotspot: true }, fields: [altField()] })],
+			description: `Add ${MIN_SLIDES}–${MAX_SLIDES} images, in order — upload or pick several at once, then drag to reorder. ${IMAGE_SIZE_HINT}`,
+			of: [
+				defineArrayMember({
+					type: 'image',
+					options: { hotspot: true },
+					fields: [altField()],
+					validation: sharpEnough,
+				}),
+			],
 			options: { layout: 'grid' },
 			components: { input: createGalleryImagesInput(MAX_SLIDES) },
 			validation: rule =>
@@ -98,19 +121,19 @@ export const caseBeforeAfter = defineType({
 			name: 'before',
 			title: 'Before',
 			type: 'image',
-			description: 'Shown on the left of the handle.',
+			description: `Shown on the left of the handle. ${IMAGE_SIZE_HINT}`,
 			options: { hotspot: true },
 			fields: [altField()],
-			validation: rule => rule.required(),
+			validation: rule => [rule.required(), sharpEnough(rule)],
 		}),
 		defineField({
 			name: 'after',
 			title: 'After',
 			type: 'image',
-			description: 'Shown on the right of the handle.',
+			description: `Shown on the right of the handle. ${IMAGE_SIZE_HINT}`,
 			options: { hotspot: true },
 			fields: [altField()],
-			validation: rule => rule.required(),
+			validation: rule => [rule.required(), sharpEnough(rule)],
 		}),
 		defineField({
 			name: 'start',

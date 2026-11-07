@@ -22,7 +22,8 @@ gsap.registerPlugin(Observer, CustomEase);
 CustomEase.create('slideshow-wipe', '0.6, 0.08, 0.02, 0.99');
 const ANIMATION_DURATION = 0.9;
 const PARALLAX = 50;
-// NOTE • Phones have no thumbnails, so the slideshow plays itself until the visitor swipes
+// NOTE • The slideshow plays itself until the visitor takes over — a swipe, drag,
+// sideways scroll or thumbnail click stops it for good
 const AUTOPLAY_SECONDS = 4;
 const WHEEL_THRESHOLD = 50;
 
@@ -36,11 +37,11 @@ const ParallaxGallery = ({ images, sizes }: I.ParallaxGalleryProps) => {
 	const wrapRef = useRef<HTMLDivElement>(null);
 	// NOTE • Survives breakpoint changes, which rebuild the animation context
 	const currentRef = useRef(0);
-	const hasSwipedRef = useRef(false);
+	const hasTakenOverRef = useRef(false);
 
 	// Animations
 	useAnimation(
-		({ isMobile }) => {
+		() => {
 			const el = wrapRef.current;
 			if (!el) return;
 			const ui = {
@@ -109,7 +110,7 @@ const ParallaxGallery = ({ images, sizes }: I.ParallaxGalleryProps) => {
 					.fromTo(ui.inner[current] as HTMLElement, { xPercent: -direction * PARALLAX }, { xPercent: 0 }, 0);
 			};
 
-			// Autoplay (phones only): stops for good once the visitor swipes, and waits while off screen
+			// Autoplay: stops for good once the visitor navigates, and waits while off screen
 			let autoplay: gsap.core.Tween | null = null;
 			const scheduleAutoplay = () => {
 				autoplay = gsap.delayedCall(AUTOPLAY_SECONDS, () => {
@@ -118,19 +119,19 @@ const ParallaxGallery = ({ images, sizes }: I.ParallaxGalleryProps) => {
 				});
 			};
 			const stopAutoplay = () => {
-				hasSwipedRef.current = true;
+				hasTakenOverRef.current = true;
 				autoplay?.kill();
 				autoplay = null;
 			};
 			const visibility = new IntersectionObserver(([entry]) => {
 				autoplay?.paused(!entry?.isIntersecting);
 			});
-			if (isMobile && !isReduced && !hasSwipedRef.current) {
+			if (!isReduced && !hasTakenOverRef.current) {
 				scheduleAutoplay();
 				visibility.observe(el);
 			}
 
-			// Swipe or drag left/right, or scroll sideways; a swipe also ends the autoplay
+			// Swipe or drag left/right, or scroll sideways; any of these also ends the autoplay
 			const swipe = (direction: 1 | -1) => {
 				if (animating) return;
 				stopAutoplay();
@@ -156,6 +157,7 @@ const ParallaxGallery = ({ images, sizes }: I.ParallaxGalleryProps) => {
 			const onClick = (event: Event) => {
 				const targetIndex = ui.thumbs.indexOf(event.currentTarget as HTMLElement);
 				if (targetIndex === currentRef.current || animating) return;
+				stopAutoplay();
 				navigate(targetIndex > currentRef.current ? 1 : -1, targetIndex);
 			};
 			for (const thumb of ui.thumbs) thumb.addEventListener('click', onClick);
@@ -206,7 +208,7 @@ const ParallaxGallery = ({ images, sizes }: I.ParallaxGalleryProps) => {
 						aria-label={`Show image ${index + 1} of ${images.length}`}
 						className={s.thumb}
 					>
-						<Image src={image.src} alt='' fill sizes='112px' quality={60} draggable={false} />
+						<Image src={image.src} alt='' fill sizes='72px' quality={90} draggable={false} />
 					</button>
 				))}
 			</div>
