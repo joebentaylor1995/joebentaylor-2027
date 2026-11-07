@@ -10,19 +10,17 @@ import { type CSSProperties, useCallback, useMemo, useRef, useState } from 'reac
 import type * as I from '../interface';
 import Stage from '../Stage';
 import { type GalleryRender, useGalleryLoop } from '../useGalleryLoop';
-import { cubicBezier, focusOf, MIN_CARDS } from '../utils';
-import { buildCards, CARD_ASPECT, CARD_WIDTH, frameFor, TIMING } from './layout';
+import { focusOf, MIN_CARDS } from '../utils';
+import { buildCards, CARD_ASPECT, CARD_WIDTH, frameFor } from './layout';
 import s from './styles.module.scss';
 
 // Constants
 // ------------
-const easePosition = cubicBezier(TIMING.position);
-const easeRotation = cubicBezier(TIMING.rotation);
 const CARD_STYLE = { '--card-width': CARD_WIDTH, '--card-aspect': CARD_ASPECT } as CSSProperties;
 
 // Component
 // ------------
-// Three lanes of cards drifting in opposite directions, gliding a slot at a time (layout maths lives in ./layout)
+// One card at a time, tossed off the top as the next rises in from below (layout maths lives in ./layout)
 const ScatterDrift = ({ images, background, sizes }: I.GalleryAnimationProps) => {
 	// Refs
 	const stageRef = useRef<HTMLDivElement>(null);
@@ -36,23 +34,16 @@ const ScatterDrift = ({ images, background, sizes }: I.GalleryAnimationProps) =>
 	const count = Math.max(MIN_CARDS, images.length);
 
 	// Animations
-	// NOTE • Whole steps plus the eased part of the current one — every step is all motion
 	const render = useCallback<GalleryRender>(
 		(elapsed, size) => {
-			const steps = elapsed / TIMING.step;
-			const step = Math.floor(steps);
-			const progress = {
-				position: step + easePosition(steps - step),
-				rotation: step + easeRotation(steps - step),
-			};
 			cards.forEach((card, index) => {
 				const element = cardRefs.current[index];
 				if (!element) return;
-				const frame = frameFor(card, count, progress, size);
+				const frame = frameFor(card, count, elapsed);
 				// NOTE • Off-stage cards skip their style write and leave the compositor
 				element.style.visibility = frame.isVisible ? '' : 'hidden';
 				if (frame.isVisible)
-					element.style.transform = `translate3d(${frame.x}px, ${frame.y}px, 0) rotate(${frame.rotation}deg)`;
+					element.style.transform = `translate3d(0, ${frame.y * size.height}px, 0) rotate(${frame.rotation}deg)`;
 			});
 		},
 		[cards, count]
@@ -68,8 +59,8 @@ const ScatterDrift = ({ images, background, sizes }: I.GalleryAnimationProps) =>
 			onTogglePause={() => setIsPaused(paused => !paused)}
 		>
 			{cards.map((card, index) => {
-				// NOTE • Each image is described once; side-lane and repeat cards are decoration
-				const isDescribed = card.isHero && card.slot < images.length;
+				// NOTE • Each image is described once; repeats that pad out a short gallery are decoration
+				const isDescribed = card.slot < images.length;
 				return (
 					<div
 						key={card.key}
@@ -77,7 +68,6 @@ const ScatterDrift = ({ images, background, sizes }: I.GalleryAnimationProps) =>
 							cardRefs.current[index] = element;
 						}}
 						className={s.card}
-						data-lane={card.isHero ? 'hero' : 'side'}
 						aria-hidden={!isDescribed || undefined}
 						style={{ ...CARD_STYLE, ...focusOf(card.image) }}
 					>

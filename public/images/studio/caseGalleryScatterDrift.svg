@@ -1,40 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
-	<!-- Scatter Drift: tilted 4:3 cards in three lanes — the centre lane rising, the sides
-	     falling — stepping one card at a time with no rest, so it reads as one motion. -->
+	<!-- Scatter Drift: one 4:3 card rests in the centre, then rises off the top as the next
+	     comes up from below, as if both rode the rim of a wheel — each card's tilt is tied to
+	     its height (-108° per stage height), so the new one enters nearly sideways and unwinds
+	     upright. Timings and curves are AnimatedGallery/ScatterDrift/layout.ts (2.4s a card).
+	     Each card's 4.8s life is its entrance, then its rest and exit, so two cards half a
+	     life apart make the whole loop. Moving and turning share one easing, which keeps the
+	     tilt in step with the height. -->
 	<style>
 		.stage { fill: #808080; fill-opacity: 0.12; }
-		.card { fill: #808080; fill-opacity: 0.45; }
-		.lane { animation: 1.05s cubic-bezier(0.4, 0, 0, 1.08) infinite; }
-		.rise { animation-name: rise; }
-		.fall { animation-name: fall; }
-		@keyframes rise { to { transform: translateY(-130px); } }
-		@keyframes fall { to { transform: translateY(130px); } }
-		@media (prefers-reduced-motion: reduce) { .lane { animation: none; } }
+		.card {
+			fill: #808080;
+			fill-opacity: 0.45;
+			transform-box: fill-box;
+			transform-origin: center;
+			animation: life 4.8s linear infinite;
+		}
+		.later { animation-delay: -2.4s; }
+		@keyframes life {
+			0%, 5.208% { transform: translateY(332px) rotate(-89.64deg); animation-timing-function: cubic-bezier(0.35, 0.2, 0, 0.95); }
+			33.125%, 51.458% { transform: translateY(0) rotate(0deg); animation-timing-function: cubic-bezier(0.61, 0.04, 0.19, 0.8); }
+			72.083%, 100% { transform: translateY(-320px) rotate(86.4deg); }
+		}
+		@media (prefers-reduced-motion: reduce) { .card { animation: none; } }
 	</style>
 	<clipPath id="frame"><rect width="300" height="400" rx="10" /></clipPath>
 	<rect class="stage" width="300" height="400" rx="10" />
 	<g clip-path="url(#frame)">
-		<!-- Each lane repeats its cards every 130px, so a one-step shift loops seamlessly -->
-		<g class="lane fall">
-			<rect class="card" x="-40" y="-200" width="104" height="78" rx="6" transform="rotate(-7 12 -161)" />
-			<rect class="card" x="-40" y="-70" width="104" height="78" rx="6" transform="rotate(5 12 -31)" />
-			<rect class="card" x="-40" y="60" width="104" height="78" rx="6" transform="rotate(-7 12 99)" />
-			<rect class="card" x="-40" y="190" width="104" height="78" rx="6" transform="rotate(5 12 229)" />
-			<rect class="card" x="-40" y="320" width="104" height="78" rx="6" transform="rotate(-7 12 359)" />
-		</g>
-		<g class="lane rise">
-			<rect class="card" x="86" y="-5" width="128" height="96" rx="7" transform="rotate(4 150 43)" />
-			<rect class="card" x="86" y="125" width="128" height="96" rx="7" transform="rotate(-5 150 173)" />
-			<rect class="card" x="86" y="255" width="128" height="96" rx="7" transform="rotate(4 150 303)" />
-			<rect class="card" x="86" y="385" width="128" height="96" rx="7" transform="rotate(-5 150 433)" />
-			<rect class="card" x="86" y="515" width="128" height="96" rx="7" transform="rotate(4 150 563)" />
-		</g>
-		<g class="lane fall">
-			<rect class="card" x="236" y="-135" width="104" height="78" rx="6" transform="rotate(6 288 -96)" />
-			<rect class="card" x="236" y="-5" width="104" height="78" rx="6" transform="rotate(-6 288 34)" />
-			<rect class="card" x="236" y="125" width="104" height="78" rx="6" transform="rotate(6 288 164)" />
-			<rect class="card" x="236" y="255" width="104" height="78" rx="6" transform="rotate(-6 288 294)" />
-			<rect class="card" x="236" y="385" width="104" height="78" rx="6" transform="rotate(6 288 424)" />
-		</g>
+		<rect class="card" x="51" y="125.75" width="198" height="148.5" rx="8" />
+		<rect class="card later" x="51" y="125.75" width="198" height="148.5" rx="8" />
 	</g>
 </svg>

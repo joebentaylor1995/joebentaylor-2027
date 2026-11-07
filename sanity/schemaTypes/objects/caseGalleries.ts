@@ -104,7 +104,7 @@ const defineGallery = ({
 export const caseGalleryScatterDrift = defineGallery({
 	name: 'caseGalleryScatterDrift',
 	title: 'Scatter Drift',
-	description: 'A tilted collage of cards that drifts upward one card at a time, in a seamless loop.',
+	description: 'One card at a time: each swings up and away as the next turns in from below and settles.',
 	aspect: '4:3',
 });
 
