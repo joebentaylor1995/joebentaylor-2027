@@ -24,6 +24,7 @@ import {
 import type { ToolkitItem, ToolkitLayer } from '@parts/Profile/Usps/Toolkit/interface';
 import { getYouTubeId } from '@utils/youtube';
 import { stegaClean } from 'next-sanity';
+import { MAX_PARALLAX_IMAGES } from '../../sanity/lib/galleryLimits';
 import {
 	BLOCK_ASPECT_RATIOS,
 	type BlockAspect,
@@ -96,8 +97,13 @@ const cleanBlock = (block: Project['caseBuilder'][number]): Project['caseBuilder
 		return { ...block, media: [cleanDualMedia(block.media[0]), cleanDualMedia(block.media[1])] };
 	if (block.type === 'model') return block;
 	// NOTE • The shape picks a ratio, so it must compare cleanly
+	// NOTE • Content saved before the 6-image cap may hold more; only the first 6 show
 	if (block.type === 'parallax')
-		return { ...block, aspect: toBlockAspect(block.aspect), images: block.images.filter(hasSrc) };
+		return {
+			...block,
+			aspect: toBlockAspect(block.aspect),
+			images: block.images.filter(hasSrc).slice(0, MAX_PARALLAX_IMAGES),
+		};
 	if (block.type === 'beforeAfter')
 		return { ...block, aspect: toBlockAspect(block.aspect), start: clampPercent(block.start) };
 	// NOTE • The animation name picks a component, so it must compare cleanly

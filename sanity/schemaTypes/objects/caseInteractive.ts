@@ -11,6 +11,7 @@ import { ImagesIcon } from '@sanity/icons/Images';
 import { SplitVerticalIcon } from '@sanity/icons/SplitVertical';
 import { defineArrayMember, defineField, defineType, type ImageRule } from 'sanity';
 import { createGalleryImagesInput } from '../../components/GalleryImagesInput';
+import { MAX_PARALLAX_IMAGES as MAX_SLIDES, MIN_PARALLAX_IMAGES as MIN_SLIDES } from '../../lib/galleryLimits';
 
 // Constants
 // ------------
@@ -21,8 +22,6 @@ export const BLOCK_ASPECTS = [
 	{ title: 'Portrait 3:4', value: '3:4' },
 ];
 const DEFAULT_ASPECT = '16:10';
-const MIN_SLIDES = 2;
-const MAX_SLIDES = 6;
 // NOTE • These blocks are up to 894px wide, so about 1800px on a retina screen;
 // anything narrower is stretched and looks soft
 const MIN_IMAGE_WIDTH = 1800;
