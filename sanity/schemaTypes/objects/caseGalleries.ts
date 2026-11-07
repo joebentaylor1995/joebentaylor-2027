@@ -11,11 +11,11 @@
 // ------------
 import { ImagesIcon } from '@sanity/icons/Images';
 import { defineArrayMember, defineField, defineType } from 'sanity';
+import { GalleryImagesInput } from '../../components/GalleryImagesInput';
+import { MAX_GALLERY_IMAGES as MAX_IMAGES, MIN_GALLERY_IMAGES as MIN_IMAGES } from '../../lib/galleryLimits';
 
 // Constants
 // ------------
-const MIN_IMAGES = 6;
-const MAX_IMAGES = 9;
 export const GALLERY_PREFIX = 'Animated Gallery — ';
 
 // Helpers
@@ -43,7 +43,7 @@ const defineGallery = ({
 				name: 'images',
 				title: 'Images',
 				type: 'array',
-				description: `Upload ${MIN_IMAGES}–${MAX_IMAGES} images; drag to set their order. Every card is shown at ${aspect} — set the hotspot to keep the subject in frame. Around 2000px wide is plenty.`,
+				description: `Add ${MIN_IMAGES}–${MAX_IMAGES} images — upload or pick several at once, or drop them all onto the grid — then drag to set their order. Every card is shown at ${aspect} — set the hotspot to keep the subject in frame. Around 2000px wide is plenty.`,
 				of: [
 					defineArrayMember({
 						type: 'image',
@@ -60,6 +60,8 @@ const defineGallery = ({
 					}),
 				],
 				options: { layout: 'grid' },
+				// NOTE • Bulk upload / multi-pick from the library, on top of Sanity's grid
+				components: { input: GalleryImagesInput },
 				validation: rule =>
 					rule
 						.required()
