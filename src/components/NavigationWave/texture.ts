@@ -49,6 +49,14 @@ export function lensScale(settings: WaveSettings, height: number) {
 	return height * LENS_SCALE * settings.bend * settings.strength;
 }
 
+// The lens's strength (0–1) for an eased point of the wave: it peaks mid-wave and falls to zero at
+// both ends. It follows the eased progress, as the wave's radius does, so the bend grows in
+// proportion to the wave: on raw time it was near full strength while the wave was still a dot,
+// which churned the centre for the first ~100ms.
+export function lensEnvelope(eased: number) {
+	return Math.sin(Math.PI * eased);
+}
+
 // Radial "lens" displacement map: a ring (peak at 0.65 of the radius) that pushes pixels
 // outward from the centre. `lensWidth` thickens the ring; `lensFalloff` sharpens its edges.
 function wavePlan(settings: WaveSettings): TexturePlan {

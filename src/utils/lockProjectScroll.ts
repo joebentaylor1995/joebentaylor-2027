@@ -19,8 +19,15 @@ export function lockProjectScroll(lenis?: Lenis) {
 	const overflow = scroller?.style.overflow ?? '';
 	if (scroller) scroller.style.overflow = 'hidden';
 
-	const preventScroll = (event: Event) => event.preventDefault();
+	// NOTE • Tools that drive a transition while it runs (the ?waveTuner panel) opt out with
+	// data-scroll-lock-exempt, so their own scrolling and keys still work
+	const isExempt = (event: Event) =>
+		event.target instanceof Element && event.target.closest('[data-scroll-lock-exempt]') !== null;
+	const preventScroll = (event: Event) => {
+		if (!isExempt(event)) event.preventDefault();
+	};
 	const preventKeys = (event: KeyboardEvent) => {
+		if (isExempt(event)) return;
 		if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key))
 			event.preventDefault();
 	};

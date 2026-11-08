@@ -7,11 +7,19 @@ import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { mq } from '@tackl';
 import { lockProjectScroll } from '@utils/lockProjectScroll';
 import { releaseNavigationScene } from '@utils/navigationScene';
-import { gsap } from 'gsap';
 import { type ReactNode, use, useEffect, useMemo, useRef, ViewTransition } from 'react';
-import { readWaveSettings, WAVE_SETTINGS_CHANGED, type WaveSettings, wavePreview } from './settings';
+import { waveEase } from './easing';
+import {
+	holdWave,
+	readWaveSettings,
+	WAVE_SETTINGS_CHANGED,
+	WAVE_TIMELINE,
+	type WaveSettings,
+	wavePreview,
+	waveTimeline,
+} from './settings';
 import s from './styles.module.scss';
-import { edgeGuardTexture, lensScale, prepareTextures, waveTexture } from './texture';
+import { edgeGuardTexture, lensEnvelope, lensScale, prepareTextures, waveTexture } from './texture';
 
 // Constants
 // ------------
@@ -37,10 +45,10 @@ function prepareLens(settings: WaveSettings, map: SVGFEImageElement | null, guar
 
 // One frame of the wave: the reveal mask and the lens, for a point (0–1) through it.
 // The page transition and the settings panel's preview both draw with it. `ease` is
-// settings.ease, parsed once by the caller rather than on every frame.
+// settings.ease, resolved once by the caller rather than on every frame.
 function paintWave(
 	settings: WaveSettings,
-	ease: gsap.EaseFunction,
+	ease: (progress: number) => number,
 	progress: number,
 	map: SVGFEImageElement | null,
 	displacement: SVGFEDisplacementMapElement | null,
@@ -57,7 +65,8 @@ function paintWave(
 	const end = Math.hypot(Math.max(x, width - x), Math.max(y, height - y)) + feather;
 	// Grow from zero immediately; a negative radius hides the first part
 	// of the animation and feels like a delay after the click.
-	const radius = end * ease(progress);
+	const eased = ease(progress);
+	const radius = end * eased;
 	const edge = Math.min(feather, radius);
 
 	// Reveal mask: opaque inside the wave, fading to transparent across the feathered edge
@@ -72,8 +81,8 @@ function paintWave(
 	setAttributeIfChanged(map, 'width', String(size * 2));
 	setAttributeIfChanged(map, 'height', String(size * 2));
 
-	// Lens strength peaks mid-wave and eases to zero at both ends
-	setAttributeIfChanged(displacement, 'scale', String(lensScale(settings, height) * Math.sin(Math.PI * progress)));
+	// Lens strength, from the same eased point as the radius (see lensEnvelope)
+	setAttributeIfChanged(displacement, 'scale', String(lensScale(settings, height) * lensEnvelope(eased)));
 }
 
 // Component
@@ -145,7 +154,7 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 			prepareLens(settings, map.current, guard.current);
 			root.dataset.navigationWavePreview = 'true';
 			root.dataset.navigationWaveLens = String(settings.bend > 0 && settings.strength > 0);
-			paintWave(settings, gsap.parseEase(settings.ease), progress, map.current, displacement.current, mask =>
+			paintWave(settings, waveEase(settings.ease), progress, map.current, displacement.current, mask =>
 				root.style.setProperty('--navigation-wave-mask', mask)
 			);
 		};
@@ -245,13 +254,22 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 						reveal.setKeyframes([frame, frame]);
 					};
 
-					// Redraw the wave each frame from the animation's own clock
-					const ease = gsap.parseEase(settings.ease);
+					// Hand the clock to the tuner (?waveTuner): held at its playhead, or slowed down
+					if (!crossfade) {
+						for (const animation of animations) animation.playbackRate = waveTimeline.rate;
+						waveTimeline.current = { animations, duration, ease: settings.ease };
+						if (waveTimeline.hold !== null) holdWave(waveTimeline.hold);
+						window.dispatchEvent(new Event(WAVE_TIMELINE));
+					}
+
+					// Redraw the wave each frame from the animation's own clock. A paused clock (the
+					// tuner holding it) keeps drawing, even at the end, so scrubbing it back still shows.
+					const ease = waveEase(settings.ease);
 					let raf = 0;
 					const tick = () => {
 						const progress = Math.min(1, Number(animations[0]?.currentTime || 0) / duration);
 						paintWave(settings, ease, progress, map.current, displacement.current, applyMask);
-						if (progress < 1) raf = requestAnimationFrame(tick);
+						if (progress < 1 || animations[0]?.playState === 'paused') raf = requestAnimationFrame(tick);
 					};
 					if (!crossfade) tick();
 
@@ -265,6 +283,9 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 						setAttributeIfChanged(displacement.current, 'scale', '0');
 						delete root.dataset.navigationWave;
 						delete root.dataset.navigationWaveLens;
+						if (waveTimeline.current?.animations !== animations) return;
+						waveTimeline.current = null;
+						window.dispatchEvent(new Event(WAVE_TIMELINE));
 					};
 					const finished = crossfade
 						? new Promise(resolve => setTimeout(resolve, duration))

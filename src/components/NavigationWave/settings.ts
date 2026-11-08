@@ -1,15 +1,22 @@
 // Imports
 // ------------
-import { introEasings } from '@parts/Hero/Background/scene-intro';
+import { isWaveEase, type WaveEase } from './easing';
 
 // Constants
 // ------------
-export const WAVE_STORAGE_KEY = 'jbt-navigation-wave-v1';
+// NOTE • v2 came with the cinematic default: v1 held whole snapshots of the old settings, which
+// would have kept the old easing and duration in any browser that had tuned the wave before
+export const WAVE_STORAGE_KEY = 'jbt-navigation-wave-v2';
 export const WAVE_SETTINGS_CHANGED = 'navigation-wave:settings';
+// Fired when a page change's wave starts or ends, for the tuner (see waveTimeline)
+export const WAVE_TIMELINE = 'navigation-wave:timeline';
+
+// The duration setting's range in ms, which the tuner's slider shares
+export const WAVE_DURATION = { min: 250, max: 3000, step: 50 } as const;
 
 // Defaults: duration in ms, origin as a percent of the viewport, the rest tune the wave's shape
 export const waveDefaults = {
-	duration: 850,
+	duration: 1500,
 	originX: 50,
 	originY: 50,
 	width: 0.75,
@@ -18,7 +25,7 @@ export const waveDefaults = {
 	strength: 0.95,
 	lensWidth: 0.6,
 	lensFalloff: 1.45,
-	ease: 'sine.inOut' as keyof typeof introEasings,
+	ease: 'cinematicSoft' as WaveEase,
 };
 
 // Types
@@ -27,7 +34,7 @@ export type WaveSettings = typeof waveDefaults;
 
 // [key, label, min, max, step] for each numeric setting; saved values are clamped to these
 export const waveRanges = [
-	['duration', 'Duration (ms)', 250, 3000, 50],
+	['duration', 'Duration (ms)', WAVE_DURATION.min, WAVE_DURATION.max, WAVE_DURATION.step],
 	['originX', 'Origin X (%)', 0, 100, 1],
 	['originY', 'Origin Y (% from bottom)', 0, 100, 1],
 	['width', 'Wave width', 0.1, 3, 0.05],
@@ -52,11 +59,24 @@ export function readWaveSettings(): WaveSettings {
 			if (typeof value === 'number' && Number.isFinite(value))
 				settings[key] = Math.min(max, Math.max(min, value));
 		}
-		if ('ease' in saved && typeof saved.ease === 'string' && Object.hasOwn(introEasings, saved.ease))
-			settings.ease = saved.ease as WaveSettings['ease'];
+		const ease = 'ease' in saved ? saved.ease : undefined;
+		if (isWaveEase(ease)) settings.ease = ease;
 	} catch {
 		// Unavailable storage or invalid settings should not prevent navigation.
 	}
+	return settings;
+}
+
+// Saves changes over what is stored, so two panels never revert each other, and tells the live wave
+// and the panels to re-read them. The saved settings, or null if storage is unavailable.
+export function saveWaveSettings(changes: Partial<WaveSettings>) {
+	const settings = { ...readWaveSettings(), ...changes };
+	try {
+		localStorage.setItem(WAVE_STORAGE_KEY, JSON.stringify(settings));
+	} catch {
+		return null;
+	}
+	window.dispatchEvent(new Event(WAVE_SETTINGS_CHANGED));
 	return settings;
 }
 
@@ -68,3 +88,24 @@ export const wavePreview: {
 	paint: ((progress: number) => void) | null;
 	clear: (() => void) | null;
 } = { paint: null, clear: null };
+
+// NOTE • The tuner's handle on a running page change. NavigationWave publishes the wave's two
+// clock animations (new page, old page) while it plays; scrubbing them moves both pages, since
+// the wave redraws from their clock every frame. It also publishes the easing and duration that
+// wave started with, which the saved settings may since have moved on from. `hold` (0–1) pauses
+// each new wave at that point as it starts, and `rate` plays it in slow motion. Neither is saved.
+export const waveTimeline: {
+	current: { animations: Animation[]; duration: number; ease: WaveEase } | null;
+	hold: number | null;
+	rate: number;
+} = { current: null, hold: null, rate: 1 };
+
+// Holds the running wave at a point (0–1) of its timeline
+export function holdWave(point: number) {
+	const current = waveTimeline.current;
+	if (!current) return;
+	for (const animation of current.animations) {
+		animation.pause();
+		animation.currentTime = point * current.duration;
+	}
+}

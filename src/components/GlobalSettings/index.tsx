@@ -2,11 +2,11 @@
 
 // Imports
 // ------------
-import { introEasings } from '@parts/Hero/Background/scene-intro';
+import { waveEasings } from '@parts/NavigationWave/easing';
 import {
 	readWaveSettings,
+	saveWaveSettings,
 	WAVE_SETTINGS_CHANGED,
-	WAVE_STORAGE_KEY,
 	type WaveSettings,
 	waveDefaults,
 	wavePreview,
@@ -58,6 +58,12 @@ export default function GlobalSettings() {
 	// Effects
 	// Load saved settings after mount (localStorage is unavailable during server render)
 	useEffect(() => setWave(readWaveSettings()), []);
+	// Follow saves made elsewhere (the ?waveTuner panel), so this panel never shows stale values
+	useEffect(() => {
+		const reload = () => setWave(readWaveSettings());
+		window.addEventListener(WAVE_SETTINGS_CHANGED, reload);
+		return () => window.removeEventListener(WAVE_SETTINGS_CHANGED, reload);
+	}, []);
 	useEffect(() => setFill(readFillSettings()), []);
 
 	// Hold the fill at the chosen point, redrawn as any setting changes
@@ -80,16 +86,15 @@ export default function GlobalSettings() {
 	useEffect(() => () => wavePreview.clear?.(), []);
 
 	// Handlers
-	// Save to localStorage and announce the change so the live wave re-reads it
-	const updateWave = (settings: WaveSettings) => {
-		try {
-			localStorage.setItem(WAVE_STORAGE_KEY, JSON.stringify(settings));
-			window.dispatchEvent(new Event(WAVE_SETTINGS_CHANGED));
-			setWave(settings);
-			setWaveStatus('Saved. Navigate between Home and Projects to preview.');
-		} catch {
+	// Save the changed settings over what is stored; the live wave re-reads them
+	const updateWave = (changes: Partial<WaveSettings>) => {
+		const saved = saveWaveSettings(changes);
+		if (!saved) {
 			setWaveStatus('Browser storage is unavailable; settings could not be saved.');
+			return;
 		}
+		setWave(saved);
+		setWaveStatus('Saved. Navigate between Home and Projects to preview.');
 	};
 
 	// Save to localStorage; the ribbon reads it again when the next fill begins
@@ -154,11 +159,9 @@ export default function GlobalSettings() {
 						<select
 							aria-label='Wave easing'
 							value={wave.ease}
-							onChange={event =>
-								updateWave({ ...wave, ease: event.target.value as WaveSettings['ease'] })
-							}
+							onChange={event => updateWave({ ease: event.target.value as WaveSettings['ease'] })}
 						>
-							{Object.entries(introEasings).map(([value, label]) => (
+							{Object.entries(waveEasings).map(([value, label]) => (
 								<option key={value} value={value}>
 									{label}
 								</option>
@@ -178,7 +181,7 @@ export default function GlobalSettings() {
 								max={max}
 								step={step}
 								value={wave[key]}
-								onChange={event => updateWave({ ...wave, [key]: Number(event.target.value) })}
+								onChange={event => updateWave({ [key]: Number(event.target.value) })}
 							/>
 						</label>
 					))}
