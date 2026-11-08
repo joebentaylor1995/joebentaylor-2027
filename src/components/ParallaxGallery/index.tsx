@@ -51,6 +51,7 @@ const ParallaxGallery = ({ images, sizes }: I.ParallaxGalleryProps) => {
 				slides: Array.from(el.querySelectorAll<HTMLElement>('[data-slideshow="slide"]')),
 				inner: Array.from(el.querySelectorAll<HTMLElement>('[data-slideshow="parallax"]')),
 				thumbs: Array.from(el.querySelectorAll<HTMLElement>('[data-slideshow="thumb"]')),
+				progress: Array.from(el.querySelectorAll<HTMLElement>('[data-slideshow="progress"]')),
 			};
 			const length = ui.slides.length;
 			if (length < 2) return;
@@ -113,18 +114,32 @@ const ParallaxGallery = ({ images, sizes }: I.ParallaxGalleryProps) => {
 					.fromTo(ui.inner[current] as HTMLElement, { xPercent: -direction * PARALLAX }, { xPercent: 0 }, 0);
 			};
 
-			// Autoplay: stops for good once the visitor navigates, and waits while off screen
+			// Autoplay: the current thumbnail's overlay sweeps across as the timer, and the slide moves on
+			// when it's full. Stops for good once the visitor navigates, and waits while off screen.
 			let autoplay: gsap.core.Tween | null = null;
 			const scheduleAutoplay = () => {
-				autoplay = gsap.delayedCall(AUTOPLAY_SECONDS, () => {
-					navigate(1);
-					scheduleAutoplay();
-				});
+				const bar = ui.progress[currentRef.current];
+				if (!bar) return;
+				autoplay = gsap.fromTo(
+					bar,
+					{ scaleX: 0 },
+					{
+						scaleX: 1,
+						duration: AUTOPLAY_SECONDS,
+						ease: 'none',
+						onComplete: () => {
+							gsap.set(bar, { scaleX: 0 });
+							navigate(1);
+							scheduleAutoplay();
+						},
+					}
+				);
 			};
 			const stopAutoplay = () => {
 				hasTakenOverRef.current = true;
 				autoplay?.kill();
 				autoplay = null;
+				gsap.set(ui.progress, { scaleX: 0 });
 			};
 			const visibility = new IntersectionObserver(([entry]) => {
 				autoplay?.paused(!entry?.isIntersecting);
@@ -212,6 +227,7 @@ const ParallaxGallery = ({ images, sizes }: I.ParallaxGalleryProps) => {
 						className={s.thumb}
 					>
 						<Image src={image.src} alt='' fill sizes={THUMBNAIL_SIZES} quality={90} draggable={false} />
+						<span data-slideshow='progress' className={s.progress} aria-hidden='true' />
 					</button>
 				))}
 			</div>

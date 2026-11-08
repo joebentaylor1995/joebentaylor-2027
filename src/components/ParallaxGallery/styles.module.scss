@@ -84,5 +84,26 @@
 
 	&[data-state='current'] { border-color: var(--brand-c5); }
 
-	img { object-fit: cover; }
+	img {
+		object-fit: cover;
+		transition: scale var(--time-l) var(--easing-bezzy2);
+	}
+
+	// NOTE • A gentle zoom on hover, only where there is a pointer to hover with
+	@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+		&:hover img,
+		&:focus-visible img { scale: 1.12; }
+	}
+}
+
+// NOTE • The autoplay timer: a dark layer that sweeps left to right across the
+// current thumbnail (scaleX, driven by GSAP) and moves on to the next slide when full
+.progress {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	background: alpha(--brand-c4, 55);
+	transform: scaleX(0);
+	transform-origin: left center;
+	pointer-events: none;
 }
