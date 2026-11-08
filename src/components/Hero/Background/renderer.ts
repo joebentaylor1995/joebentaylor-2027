@@ -10,7 +10,7 @@ import { HERO_DESKTOP_QUERY } from '../layout';
 import { type DepthSettings, depthUrl, scrollKeys } from './effect-settings';
 import type { LiquidLayer } from './liquid';
 import type { LiquidSettings } from './liquid-settings';
-import { portraitBottomSpan } from './portrait-layout';
+import { portraitFitWidth } from './portrait-layout';
 import { introDefaults, introSettings, sceneIntros } from './scene-intro';
 import { ScrollMotion } from './scroll-motion';
 import { fragment, vertex } from './shaders';
@@ -566,15 +566,11 @@ export function mountDepthEffect({
 			const settleProgress = Math.min(1, reveal / (introConfig.portraitFinish / 100));
 			const scaleEase = gsap.parseEase(introConfig.portraitEase)(settleProgress);
 
-			// Keep tall windows from enlarging the portrait into the text column.
-			// Zoom and position are overridden from commonUniforms to blend in the intro scale.
+			// Zoom is overridden from commonUniforms to blend in the intro scale.
 			if (desktopLayout.matches) {
 				const portraitAspect = photo.naturalWidth / photo.naturalHeight;
 				const coverWidth = Math.max(cssWidth, cssHeight * portraitAspect);
-				const widthScale = cssWidth / coverWidth;
-				const bottomSpan = cssWidth * portraitBottomSpan(s, portraitAspect);
-				const bottomOffset = Math.max(0, (cssHeight - bottomSpan) / 2);
-				gl.uniform2f(u.positionShift, s.positionX / 100, s.positionY / 100 + bottomOffset / cssHeight);
+				const widthScale = portraitFitWidth(cssWidth, cssHeight, s, portraitAspect) / coverWidth;
 				gl.uniform1f(
 					u.zoom,
 					(introConfig.portraitScale + (s.zoom - introConfig.portraitScale) * scaleEase) * widthScale
