@@ -1,19 +1,14 @@
 // Imports
 // ------------
 import type { Page } from '@playwright/test';
+import { fetchCatalogue } from './catalogue';
 
 // Helpers
 // ------------
-type CatalogueProject = { href?: string; isReady?: boolean };
-
 // Navigation tests need published, ready case studies without changing CMS content.
 export const readyProjects = async (page: Page) => {
 	await page.route('**/api/projects-ribbon/', async route => {
-		const response = await route.fetch();
-		const data = (await response.json()) as {
-			featured: CatalogueProject[];
-			all: CatalogueProject[];
-		};
+		const { response, data } = await fetchCatalogue(route);
 		for (const project of [...data.featured, ...data.all]) {
 			if (project.href?.startsWith('/projects/')) project.isReady = true;
 		}

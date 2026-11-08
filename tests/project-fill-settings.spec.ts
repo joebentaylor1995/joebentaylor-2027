@@ -1,7 +1,9 @@
 // Imports
 // ------------
-import { expect, test } from '@playwright/test';
+
+import { fetchCatalogue } from './helpers/catalogue';
 import { readyProjects } from './helpers/ready-projects';
+import { expect, test } from './helpers/test';
 
 // Helpers
 // ------------
@@ -81,8 +83,7 @@ test('the fill sliders reach the ribbon and the preview flies back without navig
 test('the timeline and preview work on a project that is not ready', async ({ page }) => {
 	// Mark every featured project except the first as not ready
 	await page.route('**/api/projects-ribbon/', async route => {
-		const response = await route.fetch();
-		const data = (await response.json()) as { featured: { isReady?: boolean }[] };
+		const { response, data } = await fetchCatalogue(route);
 		for (const [index, project] of data.featured.entries()) project.isReady = index === 0;
 		await route.fulfill({ response, json: data });
 	});

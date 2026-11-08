@@ -1,9 +1,10 @@
 // Imports
 // ------------
-import { expect, test } from '@playwright/test';
+
 import { simplifyRing } from '../src/components/Profile/Usps/Map/geometry';
 import { framing, projectLocation, rotation, SETTLED } from '../src/components/Profile/Usps/Map/projection';
 import { defaults } from '../src/components/ProfileReveal/Settings/store';
+import { expect, test } from './helpers/test';
 
 // Tests
 // ------------
