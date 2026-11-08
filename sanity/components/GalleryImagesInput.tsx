@@ -12,6 +12,7 @@ import { Box, Button, Card, Dialog, Flex, Grid, Spinner, Stack, Text, TextInput 
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { type ArrayOfObjectsInputProps, insert, setIfMissing, useClient } from 'sanity';
 import { MAX_GALLERY_IMAGES } from '../lib/galleryLimits';
+import { ValidationNotice } from './ValidationNotice';
 
 // Constants
 // ------------
@@ -130,6 +131,7 @@ const GalleryImagesInputBody = ({ maxImages, ...props }: ArrayOfObjectsInputProp
 	// Render
 	return (
 		<Stack gap={3}>
+			<ValidationNotice validation={props.validation} />
 			{props.renderDefault(props)}
 
 			{!readOnly && (

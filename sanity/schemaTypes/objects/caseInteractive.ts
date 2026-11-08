@@ -9,8 +9,9 @@
 // ------------
 import { ImagesIcon } from '@sanity/icons/Images';
 import { SplitVerticalIcon } from '@sanity/icons/SplitVertical';
-import { defineArrayMember, defineField, defineType, type ImageRule } from 'sanity';
+import { type ArrayRule, defineArrayMember, defineField, defineType, type ImageRule } from 'sanity';
 import { createGalleryImagesInput } from '../../components/GalleryImagesInput';
+import { WithValidationNotice } from '../../components/ValidationNotice';
 import { MAX_PARALLAX_IMAGES as MAX_SLIDES, MIN_PARALLAX_IMAGES as MIN_SLIDES } from '../../lib/galleryLimits';
 
 // Constants
@@ -30,14 +31,36 @@ const IMAGE_SIZE_HINT = 'Upload images around 2000px wide (at least 1800px) so t
 // Helpers
 // ------------
 // NOTE • An image ref spells out its size (image-<id>-<width>x<height>-<ext>), so no fetch is needed
-const widthOf = (ref: string | undefined) => Number(ref?.split('-').at(-2)?.split('x')[0]) || 0;
+type ImageValue = { asset?: { _ref?: string }; alt?: string };
+const widthOf = (image: ImageValue | undefined) => Number(image?.asset?._ref?.split('-').at(-2)?.split('x')[0]) || 0;
+const isSoft = (image: ImageValue | undefined) => {
+	const width = widthOf(image);
+	return width > 0 && width < MIN_IMAGE_WIDTH;
+};
+
+// One image field: warns when its file is too narrow
 const sharpEnough = (rule: ImageRule) =>
 	rule
-		.custom((value: { asset?: { _ref?: string } } | undefined) => {
-			const width = widthOf(value?.asset?._ref);
-			return width && width < MIN_IMAGE_WIDTH
-				? `Only ${width}px wide — it will look soft. ${IMAGE_SIZE_HINT}`
-				: true;
+		.custom((value: ImageValue | undefined) =>
+			isSoft(value)
+				? `This image is only ${widthOf(value)}px wide, so it will look soft. ${IMAGE_SIZE_HINT}`
+				: true
+		)
+		.warning();
+
+// NOTE • A gallery's warning sits on the list, not each tile — Sanity's grid shows a
+// tile's warning as an icon with no text — and names the images by their alt text
+const allSharpEnough = (rule: ArrayRule<ImageValue[]>) =>
+	rule
+		.custom((images: ImageValue[] | undefined) => {
+			const soft = (images ?? [])
+				.map((image, index) => ({ image, position: index + 1 }))
+				.filter(({ image }) => isSoft(image));
+			if (!soft.length) return true;
+			const names = soft.map(
+				({ image, position }) => `${image.alt || `Image ${position}`} (${widthOf(image)}px)`
+			);
+			return `${soft.length === 1 ? '1 image is' : `${soft.length} images are`} too small and will look soft: ${names.join(', ')}. ${IMAGE_SIZE_HINT}`;
 		})
 		.warning();
 
@@ -77,22 +100,17 @@ export const caseParallaxGallery = defineType({
 			title: 'Images',
 			type: 'array',
 			description: `Add ${MIN_SLIDES}–${MAX_SLIDES} images, in order — upload or pick several at once, then drag to reorder. ${IMAGE_SIZE_HINT}`,
-			of: [
-				defineArrayMember({
-					type: 'image',
-					options: { hotspot: true },
-					fields: [altField()],
-					validation: sharpEnough,
-				}),
-			],
+			of: [defineArrayMember({ type: 'image', options: { hotspot: true }, fields: [altField()] })],
 			options: { layout: 'grid' },
 			components: { input: createGalleryImagesInput(MAX_SLIDES) },
-			validation: rule =>
+			validation: rule => [
 				rule
 					.required()
 					.min(MIN_SLIDES)
 					.max(MAX_SLIDES)
 					.error(`Add between ${MIN_SLIDES} and ${MAX_SLIDES} images.`),
+				allSharpEnough(rule),
+			],
 		}),
 	],
 	preview: {
@@ -123,6 +141,7 @@ export const caseBeforeAfter = defineType({
 			description: `Shown on the left of the handle. ${IMAGE_SIZE_HINT}`,
 			options: { hotspot: true },
 			fields: [altField()],
+			components: { input: WithValidationNotice },
 			validation: rule => [rule.required(), sharpEnough(rule)],
 		}),
 		defineField({
@@ -132,6 +151,7 @@ export const caseBeforeAfter = defineType({
 			description: `Shown on the right of the handle. ${IMAGE_SIZE_HINT}`,
 			options: { hotspot: true },
 			fields: [altField()],
+			components: { input: WithValidationNotice },
 			validation: rule => [rule.required(), sharpEnough(rule)],
 		}),
 		defineField({
