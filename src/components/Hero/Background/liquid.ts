@@ -6,7 +6,7 @@ import { HERO_DESKTOP_QUERY } from '../layout';
 import { drawHeroContent } from './hero-content-texture';
 import type { LiquidSettings } from './liquid-settings';
 import * as shaders from './liquid-shaders';
-import { drawMarqueeDecoration, drawMarqueeLabelFrame, marqueePhrases } from './marquee-decoration';
+import { createLabelTransition, drawMarqueeDecoration, marqueePhrases } from './marquee-decoration';
 import { introDefaults, introSettings, sceneIntros } from './scene-intro';
 
 // Constants
@@ -31,9 +31,18 @@ export interface LiquidLayer {
 	resize: () => void;
 	beginPortrait: () => void;
 	draw: (dt: number, scrollVelocity: number, gesture: number) => void;
+	// True when draw() would only repaint the frame already on the canvas
+	isStatic: () => boolean;
 	move: (x: number, y: number) => void;
 	resetPointer: () => void;
 	destroy: () => void;
+}
+// What the display pass was last drawn with (see isStatic)
+interface DisplayState {
+	introColour: number;
+	waterReveal: number;
+	inFront: number;
+	fluidActive: number;
 }
 
 // Constants
@@ -64,12 +73,18 @@ const HEIGHT_DECAY_PERSISTENCE = 0.02;
 // Extra portrait scale at the start of the mobile intro
 const MOBILE_INTRO_ZOOM = 0.45;
 
+// Helpers
+// ------------
+// Hands the main thread back for a moment
+const nextTask = () => new Promise(resolve => setTimeout(resolve, 0));
+
 // Renderer
 // ------------
 // NOTE • The hero's WebGL layer: a portrait, the logo marquee and the hero text are
 // composited into a `scene` texture, then a display pass adds the intro water wave and,
 // on desktop, a pointer-driven fluid sim (velocity, height, pressure) that refracts it.
 // Phones skip the sim and float textures. Throws if the GPU can't do what's needed.
+// `beforeFirstRaster` runs just before the layer first reads the DOM for its textures.
 export async function createLiquidLayer(
 	gl: WebGLRenderingContext,
 	canvas: HTMLCanvasElement,
@@ -77,7 +92,8 @@ export async function createLiquidLayer(
 	settings: LiquidSettings,
 	isCancelled = () => false,
 	portraitOnly = false,
-	desktopQuery = HERO_DESKTOP_QUERY
+	desktopQuery = HERO_DESKTOP_QUERY,
+	beforeFirstRaster = () => {}
 ): Promise<LiquidLayer> {
 	// Capability checks: desktop needs filtered float textures for the sim
 	const bindProgram = gl.useProgram.bind(gl);
@@ -131,7 +147,16 @@ export async function createLiquidLayer(
 		curl: Target;
 	let simWidth = 1,
 		simHeight = 1;
+	// One texel of the sim grid, shared by every pass
+	let px = [1, 1];
 	const maxTexture = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+
+	// NOTE • Whether anything feeding the scene (the portrait or a DOM texture) changed since
+	// the last draw, and what the display pass last showed: together they tell isStatic()
+	// when a phone's frame would come out identical
+	let sceneChanged = true;
+	let displayed: DisplayState | null = null;
+
 	// Colour reads must not flush the large, GPU-backed logo raster.
 	const colourRaster = document.createElement('canvas');
 	colourRaster.width = colourRaster.height = 1;
@@ -229,6 +254,29 @@ export async function createLiquidLayer(
 		};
 	}
 
+	// NOTE • A program keeps its uniform values between draws, so a uniform is only sent
+	// again when its value differs from the one it last received (compared exactly, -0 too)
+	const uniformValues = new Map<WebGLUniformLocation, number | number[]>();
+	function setUniform(location: WebGLUniformLocation, value: number | number[]) {
+		const last = uniformValues.get(location);
+		if (typeof value === 'number') {
+			if (Object.is(last, value)) return;
+			gl.uniform1f(location, value);
+			uniformValues.set(location, value);
+			return;
+		}
+		if (Array.isArray(last) && last.length === value.length && last.every((v, i) => Object.is(v, value[i]))) return;
+		if (value.length === 2) gl.uniform2fv(location, value);
+		else if (value.length === 4) gl.uniform4fv(location, value);
+		else gl.uniform3fv(location, value);
+		uniformValues.set(location, value.slice());
+	}
+	function setSampler(location: WebGLUniformLocation, unit: number) {
+		if (uniformValues.get(location) === unit) return;
+		gl.uniform1i(location, unit);
+		uniformValues.set(location, unit);
+	}
+
 	// Runs a program over the full screen into `dest` (null is the canvas). Uniforms are bound by name: numbers, 2 to 4 component vectors, or textures.
 	function draw(p: Program, dest: Target | null, values: Record<string, Value>) {
 		bindProgram(p.program);
@@ -238,33 +286,42 @@ export async function createLiquidLayer(
 		gl.bindFramebuffer(gl.FRAMEBUFFER, dest?.fbo ?? null);
 		gl.viewport(0, 0, dest?.width ?? canvas.width, dest?.height ?? canvas.height);
 		let unit = 0;
-		const uniforms: Record<string, Value> = { px: [1 / simWidth, 1 / simHeight], ...values };
-		for (const [key, value] of Object.entries(uniforms)) {
+		// `px` first, unless the pass gives its own, then the pass's values in order
+		if (p.uniforms.px && !('px' in values)) setUniform(p.uniforms.px, px);
+		for (const key in values) {
 			const location = p.uniforms[key];
 			if (!location) continue;
-			if (typeof value === 'number') gl.uniform1f(location, value);
-			else if (Array.isArray(value)) {
-				if (value.length === 2) gl.uniform2fv(location, value);
-				else if (value.length === 4) gl.uniform4fv(location, value);
-				else gl.uniform3fv(location, value);
-			} else {
+			const value = values[key];
+			if (typeof value === 'number' || Array.isArray(value)) setUniform(location, value);
+			else {
 				gl.activeTexture(gl.TEXTURE0 + unit);
 				gl.bindTexture(gl.TEXTURE_2D, value.texture);
-				gl.uniform1i(location, unit++);
+				setSampler(location, unit++);
 			}
 		}
 		gl.drawArrays(gl.TRIANGLES, 0, 6);
 	}
 
-	// Uploads a DOM raster, flipped for GL. `rasterise` runs once the upload state is set.
-	function uploadDomTexture(tex: WebGLTexture, rasterise: () => TexImageSource) {
+	// NOTE • Uploads a DOM raster, flipped for GL. Once a texture holds a raster of the same
+	// size, texSubImage2D replaces its pixels in place: the same texels as texImage2D, without
+	// reallocating the texture. `rasterise` runs once the upload state is set.
+	const uploadedSizes = new WeakMap<WebGLTexture, { width: number; height: number }>();
+	function uploadDomTexture(tex: WebGLTexture, rasterise: () => HTMLCanvasElement) {
 		gl.bindTexture(gl.TEXTURE_2D, tex);
 		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 		try {
-			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, rasterise());
+			const raster = rasterise();
+			const size = uploadedSizes.get(tex);
+			if (size?.width === raster.width && size.height === raster.height)
+				gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, raster);
+			else {
+				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, raster);
+				uploadedSizes.set(tex, { width: raster.width, height: raster.height });
+			}
 		} finally {
 			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 		}
+		sceneChanged = true;
 	}
 
 	// Setup: compile the programs, allocate the textures and targets, then hand back the layer. Any failure frees the partial layer.
@@ -273,6 +330,8 @@ export async function createLiquidLayer(
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
 		// Passes: the fluid sim steps, then composite (builds `scene`) and display (to screen).
 		// Mobile compiles only the last two.
+		// NOTE • A portrait-only layer (the project hero) has no composite: its scene would be a
+		// texel-for-texel copy of the portrait, so the display pass reads the portrait itself
 		const names = [
 			'advect',
 			'splat',
@@ -284,7 +343,9 @@ export async function createLiquidLayer(
 			'composite',
 			'display',
 		] as const;
-		const activeNames = names.filter(name => !mobile || name === 'composite' || name === 'display');
+		const activeNames = names.filter(name =>
+			name === 'composite' ? !portraitOnly : !mobile || name === 'display'
+		);
 		const sources = {
 			advect: shaders.advect,
 			splat: shaders.splat,
@@ -293,11 +354,7 @@ export async function createLiquidLayer(
 			divergence: shaders.divergence,
 			pressure: shaders.pressure,
 			gradient: shaders.gradient,
-			composite: portraitOnly
-				? 'void main(){gl_FragColor=texture2D(source,uv);}'
-				: mobile
-					? shaders.mobileComposite
-					: shaders.composite,
+			composite: mobile ? shaders.mobileComposite : shaders.composite,
 			display: shaders.display,
 		};
 		// Drivers can compile synchronously even with the parallel extension present.
@@ -314,13 +371,26 @@ export async function createLiquidLayer(
 		const decoration = { texture: texture() };
 		let labelGesture = 0;
 		const phraseFor = (gesture: number) => marqueePhrases[gesture % marqueePhrases.length];
-		let labelTransition: { from: string; to: string; elapsed: number } | null = null;
+		let labelTransition: {
+			from: string;
+			to: string;
+			elapsed: number;
+			frame?: ReturnType<typeof createLabelTransition>;
+		} | null = null;
 		const labelPatch = document.createElement('canvas');
 		const stepLabelTransition = (dt: number) => {
 			if (!labelTransition) return;
 			labelTransition.elapsed += dt;
 			const progress = Math.min(1, labelTransition.elapsed / LABEL_TRANSITION_SECONDS);
-			const at = drawMarqueeLabelFrame(canvas, host, maxTexture, { ...labelTransition, progress }, labelPatch);
+			// The label's layout is read on the transition's first frame (see createLabelTransition)
+			labelTransition.frame ??= createLabelTransition(
+				canvas,
+				host,
+				maxTexture,
+				labelTransition.from,
+				labelTransition.to
+			);
+			const at = labelTransition.frame(progress, labelPatch);
 			if (at) {
 				gl.bindTexture(gl.TEXTURE_2D, decoration.texture);
 				gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -332,12 +402,18 @@ export async function createLiquidLayer(
 			}
 			if (progress === 1) labelTransition = null;
 		};
-		const rasteriseDecoration = () => drawMarqueeDecoration(canvas, host, maxTexture, phraseFor(labelGesture));
+		// One canvas object reused between rasters (its pixels are released after each upload)
+		const decorationRaster = document.createElement('canvas');
+		const rasteriseDecoration = () =>
+			drawMarqueeDecoration(canvas, host, maxTexture, phraseFor(labelGesture), decorationRaster);
 		// Redraws the marquee label (cycling the phrase per scroll gesture) and uploads it
 		const uploadDecoration = () => {
 			if (mobile || portraitOnly) return;
 			labelTransition = null;
 			uploadDomTexture(decoration.texture, rasteriseDecoration);
+			// Refreshes are rare (resize, fonts, theme), so the full-canvas backing store isn't kept
+			// between them; drawMarqueeDecoration sizes the raster again every time
+			decorationRaster.width = decorationRaster.height = 0;
 		};
 		const content = { texture: texture() };
 		const textRaster = document.createElement('canvas');
@@ -348,8 +424,10 @@ export async function createLiquidLayer(
 		let allocatedResolution = settings.resolution;
 		let allocatedWidth = 0;
 		let allocatedHeight = 0;
+		// NOTE • The resize raster reuses the per-frame canvas: drawHeroContent clears it and
+		// redraws everything, so the pixels match a fresh canvas
 		const rasteriseTextOnResize = () =>
-			desktopLayout.matches && !portraitOnly ? drawHeroContent(canvas, host, maxTexture) : textRaster;
+			desktopLayout.matches && !portraitOnly ? drawHeroContent(canvas, host, maxTexture, textRaster) : textRaster;
 		const rasteriseTextOnFrame = () => drawHeroContent(canvas, host, maxTexture, textRaster);
 
 		// Frees the current targets and allocates a fresh set at the current sizes
@@ -361,7 +439,7 @@ export async function createLiquidLayer(
 			}
 			targets.clear();
 			portrait = target(canvas.width, canvas.height, gl.UNSIGNED_BYTE);
-			scene = target(canvas.width, canvas.height, gl.UNSIGNED_BYTE);
+			scene = portraitOnly ? portrait : target(canvas.width, canvas.height, gl.UNSIGNED_BYTE);
 			if (mobile) {
 				// The radial intro needs no fluid simulation or float render targets.
 				// A valid sampler is still required by WebGL even with fluidActive = 0.
@@ -396,6 +474,7 @@ export async function createLiquidLayer(
 			allocatedHeight = canvas.height;
 			simWidth = nextSimWidth;
 			simHeight = nextSimHeight;
+			px = [1 / simWidth, 1 / simHeight];
 			allocateTargets();
 			previous = null;
 			queued = [];
@@ -429,8 +508,8 @@ export async function createLiquidLayer(
 			return raster;
 		};
 
-		// Rasterise only on layout/content changes. Every animation frame scrolls this texture on the GPU.
-		const rasteriseMarquee = (logoTrack: HTMLElement) => {
+		// Measures the strip and uploads its logos. Every animation frame scrolls this texture on the GPU.
+		const rasteriseLogos = (logoTrack: HTMLElement) => {
 			const bounds = logoTrack.getBoundingClientRect(),
 				hostBounds = canvas.getBoundingClientRect();
 			const style = getComputedStyle(logoTrack);
@@ -441,6 +520,11 @@ export async function createLiquidLayer(
 			initMarqueePhase(logoTrack);
 			const raster = paintLogoStrip(bounds);
 			uploadDomTexture(logos.texture, () => raster);
+		};
+
+		// Rasterise only on layout/content changes
+		const rasteriseMarquee = (logoTrack: HTMLElement) => {
+			rasteriseLogos(logoTrack);
 			uploadDecoration();
 		};
 
@@ -453,21 +537,50 @@ export async function createLiquidLayer(
 				: resolveColour(cover ? getComputedStyle(cover).backgroundColor : getComputedStyle(host).color);
 		};
 
-		// Reallocates targets only when a size changed, then re-rasterises the DOM textures
-		function resize() {
-			// Cached routes can briefly have no layout. Zero dimensions produce NaN
-			// simulation sizes and incomplete framebuffers; keep the existing targets.
-			if (gl.isContextLost() || canvas.clientWidth <= 0 || canvas.clientHeight <= 0) return;
+		// A resize in three parts, run back to back by resize(). Cached routes can briefly
+		// have no layout: zero dimensions produce NaN simulation sizes and incomplete
+		// framebuffers, so the existing targets are kept and nothing is redrawn.
+		const startResize = () => {
+			if (gl.isContextLost() || canvas.clientWidth <= 0 || canvas.clientHeight <= 0) return false;
 			cssWidth = canvas.clientWidth;
 			cssHeight = canvas.clientHeight;
 			syncTargetSizes();
 			allocatedResolution = settings.resolution;
-			if (!mobile && track && !portraitOnly) rasteriseMarquee(track);
+			sceneChanged = true;
+			return true;
+		};
+		const hasMarquee = !mobile && !portraitOnly && track;
+		const finishResize = () => {
 			uploadDomTexture(content.texture, rasteriseTextOnResize);
 			resolveSceneColours();
 			textFrame = textElement?.dataset.textFrame;
+		};
+
+		// Reallocates targets only when a size changed, then re-rasterises the DOM textures
+		function resize() {
+			if (!startResize()) return;
+			if (hasMarquee) rasteriseMarquee(hasMarquee);
+			finishResize();
 		}
-		resize();
+
+		// NOTE • The first build happens before the layer is handed back, so nothing draws
+		// from it yet: on desktop its targets, logos, label and text are built in separate
+		// tasks instead of one long one. Each part reads the DOM as it stands; anything that
+		// changes meanwhile flags the renderer's next resize (beforeFirstRaster only clears
+		// flags raised before these reads).
+		beforeFirstRaster();
+		if (!hasMarquee) resize();
+		else if (startResize()) {
+			const steps = [() => rasteriseLogos(hasMarquee), uploadDecoration, finishResize];
+			for (const step of steps) {
+				await nextTask();
+				if (isCancelled() || gl.isContextLost()) throw new Error('Liquid initialization cancelled');
+				step();
+			}
+			// The CSS marquee kept moving across those tasks: hand over from where it is now
+			phaseInitialized = false;
+			initMarqueePhase(hasMarquee);
+		}
 
 		// Re-rasterise the hero text only when the entrance bumps data-text-frame
 		const refreshHeroText = () => {
@@ -574,11 +687,12 @@ export async function createLiquidLayer(
 			solveFluid(dt);
 		};
 
-		// Composite the portrait, logo strip, label and hero text into `scene`
-		const drawScene = (blurAmount: number) => {
-			draw(passes.composite, scene, {
+		// Composite the portrait, logo strip, label and hero text into `scene` (or, see
+		// draw(), straight onto the canvas)
+		const drawScene = (blurAmount: number, inFront: number, dest: Target | null) => {
+			draw(passes.composite, dest, {
 				source: portrait,
-				inFront: Number(!desktopLayout.matches || settings.inFront),
+				inFront,
 				mobile: Number(!desktopLayout.matches),
 				logos,
 				decoration,
@@ -601,18 +715,17 @@ export async function createLiquidLayer(
 		};
 
 		// Final pass to the canvas: the intro water wave and lens, plus the liquid refraction
-		const drawToScreen = () => {
-			const introColour = sceneIntros.get(host)?.colour ?? 0;
+		const drawToScreen = (state: DisplayState, introZoom: number) => {
 			const waveConfig = introSettings.get(host) ?? introDefaults;
 			draw(passes.display, null, {
 				source: height.read,
 				scene,
 				portrait,
 				content,
-				waterReveal: sceneIntros.get(host)?.waterReveal ?? 1,
-				introColour,
-				introZoom: 1 + MOBILE_INTRO_ZOOM * mobileZoomRemaining(introColour),
-				fluidActive: Number(activeTime > 0),
+				waterReveal: state.waterReveal,
+				introColour: state.introColour,
+				introZoom,
+				fluidActive: state.fluidActive,
 				revealAspect: cssWidth / cssHeight,
 				revealDark,
 				rippleStrength: waveConfig.strength,
@@ -629,7 +742,7 @@ export async function createLiquidLayer(
 				waveRings: waveConfig.rings,
 				waveFrequency: waveConfig.frequency,
 				waveDecay: waveConfig.decay,
-				inFront: Number(!desktopLayout.matches || settings.inFront),
+				inFront: state.inFront,
 				strength: settings.intensity,
 				refraction: settings.refraction,
 				dispersion: settings.dispersion,
@@ -637,13 +750,62 @@ export async function createLiquidLayer(
 			});
 		};
 
+		// The display pass's inputs for this frame
+		const displayState = (): DisplayState => {
+			const intro = sceneIntros.get(host);
+			return {
+				introColour: intro?.colour ?? 0,
+				waterReveal: intro?.waterReveal ?? 1,
+				inFront: Number(!desktopLayout.matches || settings.inFront),
+				fluidActive: Number(activeTime > 0),
+			};
+		};
+
+		// The display pass's plain path: no wave, no fluid, portrait in front, full colour
+		const plainDisplay = (state: DisplayState) =>
+			state.waterReveal >= 1 && state.fluidActive === 0 && state.inFront === 1 && state.introColour <= 0;
+
+		// NOTE • When the display pass would take its plain path (and no intro zoom) it only copies
+		// `scene` to a canvas of the same size, texel for texel, and both are 8-bit. The composite
+		// then draws straight to the canvas: the same values land in each pixel, and a full-screen
+		// pass is saved every frame. The frame that reaches the plain path still runs the display
+		// pass, so the wave's and the colour intro's final values are drawn (and written) as before.
+		const displayIsCopy = (state: DisplayState, introZoom: number) =>
+			!portraitOnly &&
+			plainDisplay(state) &&
+			displayed !== null &&
+			plainDisplay(displayed) &&
+			introZoom === 1 &&
+			scene?.width === canvas.width &&
+			scene?.height === canvas.height;
+
 		// The layer's handle, driven frame by frame by the renderer
 		return {
 			resize,
 			beginPortrait() {
 				if (allocatedResolution !== settings.resolution) resize();
+				sceneChanged = true;
 				gl.bindFramebuffer(gl.FRAMEBUFFER, portrait.fbo);
 				gl.viewport(0, 0, portrait.width, portrait.height);
+			},
+
+			// NOTE • A phone's layer has no marquee, label, text or fluid: once the colour intro
+			// ends its frames only change when the portrait or a DOM texture does, or the
+			// display pass's inputs move. Skipping the draw keeps the identical frame on screen.
+			isStatic() {
+				if (!mobile || portraitOnly || sceneChanged || !displayed || host.dataset.liquidReady !== 'true')
+					return false;
+				if (activeTime > 0 || queued.length || labelTransition) return false;
+				// Only the display pass's plain path (wave done, no fluid, portrait in front) is skipped
+				const state = displayState();
+				return (
+					state.waterReveal >= 1 &&
+					state.inFront === 1 &&
+					state.waterReveal === displayed.waterReveal &&
+					state.introColour === displayed.introColour &&
+					state.inFront === displayed.inFront &&
+					state.fluidActive === displayed.fluidActive
+				);
 			},
 
 			// Queues a pointer segment (current and previous position) for the next draw; keeps only the latest
@@ -675,8 +837,17 @@ export async function createLiquidLayer(
 				refreshHeroText();
 				advanceMarquee(dt, scrollVelocity);
 				stepFluid(Math.min(dt, MAX_SIM_DT));
-				drawScene(marqueeBlurAmount(scrollVelocity));
-				drawToScreen();
+
+				const state = displayState();
+				const introZoom = 1 + MOBILE_INTRO_ZOOM * mobileZoomRemaining(state.introColour);
+				const blur = marqueeBlurAmount(scrollVelocity);
+				if (displayIsCopy(state, introZoom)) drawScene(blur, state.inFront, null);
+				else {
+					if (!portraitOnly) drawScene(blur, state.inFront, scene);
+					drawToScreen(state, introZoom);
+				}
+				displayed = state;
+				sceneChanged = false;
 
 				// Tells the site loader the first frame is ready
 				if (host.dataset.liquidReady !== 'true') host.dataset.liquidReady = 'true';

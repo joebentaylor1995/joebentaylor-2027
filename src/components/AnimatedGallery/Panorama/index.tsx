@@ -51,8 +51,10 @@ const Panorama = ({ images, background, sizes }: I.GalleryAnimationProps) => {
 				if (!element) return;
 				const angle = angleFor(card, count, progress);
 				const isVisible = isOnStage(angle, size);
-				// NOTE • Off-stage cards skip their style write and leave the compositor
-				element.style.visibility = isVisible ? '' : 'hidden';
+				// NOTE • Off-stage cards skip their style write and leave the compositor. Visibility is
+				// only written when it flips; rewriting it every frame still touched the inline style.
+				const visibility = isVisible ? '' : 'hidden';
+				if (element.style.visibility !== visibility) element.style.visibility = visibility;
 				if (!isVisible) return;
 				element.style.setProperty('--turn', `${-angle}deg`);
 				element.style.setProperty('--slide', `${slideFor(angle)}%`);

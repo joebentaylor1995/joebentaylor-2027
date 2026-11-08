@@ -10,33 +10,25 @@ class VideoAtlasUploader {
 	constructor(gl) {
 		this.gl = gl;
 
-		const compile = (type, source) => {
-			const shader = gl.createShader(type);
-			gl.shaderSource(shader, source);
-			gl.compileShader(shader);
-			if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(shader));
-			return shader;
-		};
-
-		this.program = gl.createProgram();
-
-		// Full-screen quad: maps clip-space -1..1 to UV 0..1.
-		const vs = compile(
-			gl.VERTEX_SHADER,
-			`
+		// NOTE • Linked without reading its status, so the GPU process compiles it while the ribbon boots; finishLink()
+		// reads the result (and throws any compile or link error) when the atlas is first attached.
+		this.linking = linkProgramAsync(gl, [
+			// Full-screen quad: maps clip-space -1..1 to UV 0..1.
+			[
+				gl.VERTEX_SHADER,
+				`
 				attribute vec2 aPosition;
 				varying vec2 vUV;
 				void main() {
 					vUV = aPosition * .5 + .5;
 					gl_Position = vec4(aPosition, 0., 1.);
 				}
-			`
-		);
-
-		// uCrop is (x, y, width, height) in video UV space: the sub-rectangle to show in the tile.
-		const fs = compile(
-			gl.FRAGMENT_SHADER,
-			`
+			`,
+			],
+			// uCrop is (x, y, width, height) in video UV space: the sub-rectangle to show in the tile.
+			[
+				gl.FRAGMENT_SHADER,
+				`
 				precision mediump float;
 				varying vec2 vUV;
 				uniform sampler2D uVideo;
@@ -44,18 +36,10 @@ class VideoAtlasUploader {
 				void main() {
 					gl_FragColor = texture2D(uVideo, uCrop.xy + vUV * uCrop.zw);
 				}
-			`
-		);
-
-		gl.attachShader(this.program, vs);
-		gl.attachShader(this.program, fs);
-		gl.linkProgram(this.program);
-		gl.deleteShader(vs);
-		gl.deleteShader(fs);
-		if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(this.program));
-
-		this.position = gl.getAttribLocation(this.program, 'aPosition');
-		this.crop = gl.getUniformLocation(this.program, 'uCrop');
+			`,
+			],
+		]);
+		this.program = this.linking.program;
 
 		// Two triangles covering clip space.
 		this.buffer = gl.createBuffer();
@@ -74,6 +58,17 @@ class VideoAtlasUploader {
 			gl.texParameteri(gl.TEXTURE_2D, key, value);
 
 		this.framebuffer = gl.createFramebuffer();
+	}
+
+	// Reads the link result, throwing the shader or link error as the constructor once did, and caches the program's
+	// input locations. Runs once; later calls do nothing.
+	finishLink() {
+		if (!this.linking) return;
+		const gl = this.gl;
+		checkProgram(gl, this.linking, true);
+		this.linking = null;
+		this.position = gl.getAttribLocation(this.program, 'aPosition');
+		this.crop = gl.getUniformLocation(this.program, 'uCrop');
 	}
 
 	// Points the framebuffer at the atlas `texture` and throws if the GPU can't render to it.

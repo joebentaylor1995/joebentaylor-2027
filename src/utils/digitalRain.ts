@@ -147,38 +147,56 @@ function buildRainGlyphs(width: number, height: number, glyphScale: number, colu
 		return (seed - 1) / (LEHMER_MODULUS - 1);
 	};
 
-	const data: number[] = [];
 	const rowSpacing = ROW_SPACING * glyphScale;
 	const wrapHeight = height + WRAP_MARGIN;
 	const rows = Math.ceil(wrapHeight / rowSpacing);
+	const spacings = LAYER_POINT_SIZES.map(
+		(_, layer) => ((layer === 0 ? NEAR_COLUMN_SPACING : FAR_COLUMN_SPACING) * glyphScale) / columnDensity
+	);
+
+	// NOTE • Why: the layout used to be pushed into a number[] (hundreds of thousands of entries
+	// at full screen) and then copied into a Float32Array. Writing the same values straight into
+	// a Float32Array stores the same float32s without the intermediate array. Sized for every
+	// cell (gaps leave some unused), and grown if the column estimate ever falls short.
+	let data = new Float32Array(
+		spacings.reduce(
+			(cells, spacing) => cells + (Math.ceil((width + spacing - FIRST_COLUMN_X) / spacing) + 1) * rows,
+			0
+		) * FLOATS_PER_GLYPH
+	);
+	let length = 0;
 
 	for (let layer = 0; layer < LAYER_POINT_SIZES.length; layer++) {
-		const spacing = ((layer === 0 ? NEAR_COLUMN_SPACING : FAR_COLUMN_SPACING) * glyphScale) / columnDensity;
+		const spacing = spacings[layer];
 		for (let x = FIRST_COLUMN_X; x < width + spacing; x += spacing) {
 			// Per column: start offset, fall speed, streak length and gap between streaks
 			const offset = random() * wrapHeight;
 			const velocity = MIN_FALL_SPEED + random() * FALL_SPEED_RANGE + layer * LAYER_FALL_SPEED;
-			const length = MIN_STREAK + Math.floor(random() * STREAK_RANGE);
+			const streak = MIN_STREAK + Math.floor(random() * STREAK_RANGE);
 			const gap = MIN_GAP + Math.floor(random() * GAP_RANGE);
 
 			for (let j = 0; j < rows; j++) {
-				const phase = j % (length + gap);
+				const phase = j % (streak + gap);
 				// Gap cells emit nothing
-				if (phase >= length) continue;
-				data.push(
-					x + (layer - 1) * LAYER_X_SHIFT,
-					(offset + j * rowSpacing) % wrapHeight,
-					velocity,
-					Math.floor(random() * GLYPH_COUNT),
-					LAYER_POINT_SIZES[layer],
-					(STREAK_BASE_LIGHT + STREAK_HEAD_LIGHT * (phase / length) ** STREAK_LIGHT_CURVE) *
-						LAYER_BRIGHTNESS[layer]
-				);
+				if (phase >= streak) continue;
+				if (length + FLOATS_PER_GLYPH > data.length) {
+					const grown = new Float32Array(Math.max(data.length * 2, FLOATS_PER_GLYPH));
+					grown.set(data);
+					data = grown;
+				}
+				data[length++] = x + (layer - 1) * LAYER_X_SHIFT;
+				data[length++] = (offset + j * rowSpacing) % wrapHeight;
+				data[length++] = velocity;
+				data[length++] = Math.floor(random() * GLYPH_COUNT);
+				data[length++] = LAYER_POINT_SIZES[layer];
+				data[length++] =
+					(STREAK_BASE_LIGHT + STREAK_HEAD_LIGHT * (phase / streak) ** STREAK_LIGHT_CURVE) *
+					LAYER_BRIGHTNESS[layer];
 			}
 		}
 	}
 
-	return data;
+	return data.subarray(0, length);
 }
 
 // Exports
@@ -201,7 +219,7 @@ export function uploadRainGlyphs(
 ) {
 	const data = buildRainGlyphs(width, height, glyphScale, columnDensity);
 	gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+	gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
 	return data.length / FLOATS_PER_GLYPH;
 }
 

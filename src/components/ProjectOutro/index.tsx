@@ -84,8 +84,11 @@ const ProjectOutro = ({ review, nextProject, cta = 'next' }: ProjectOutroProps) 
 
 		const update = () => {
 			const distance = root.getBoundingClientRect().bottom - panel.getBoundingClientRect().bottom;
-			const progress = Math.min(1, Math.max(0, 1 - distance / (panel.clientHeight * OUTRO_FILL_RANGE)));
-			root.style.setProperty('--project-outro-progress', String(progress));
+			const progress = String(Math.min(1, Math.max(0, 1 - distance / (panel.clientHeight * OUTRO_FILL_RANGE))));
+			// NOTE • Every scroll of the modal lands here, mostly with the outro screens away at 0;
+			// rewriting the same value would still re-parse it and touch the outro's inline style
+			if (root.style.getPropertyValue('--project-outro-progress') !== progress)
+				root.style.setProperty('--project-outro-progress', progress);
 		};
 
 		// NOTE • Re-measures when the panel's content first appears (it mounts hidden) or reflows

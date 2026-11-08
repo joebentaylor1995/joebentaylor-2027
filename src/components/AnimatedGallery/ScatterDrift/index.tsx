@@ -40,8 +40,10 @@ const ScatterDrift = ({ images, background, sizes }: I.GalleryAnimationProps) =>
 				const element = cardRefs.current[index];
 				if (!element) return;
 				const frame = frameFor(card, count, elapsed, size);
-				// NOTE • Off-stage cards skip their style write and leave the compositor
-				element.style.visibility = frame.isVisible ? '' : 'hidden';
+				// NOTE • Off-stage cards skip their style write and leave the compositor. Visibility is
+				// only written when it flips; rewriting it every frame still touched the inline style.
+				const visibility = frame.isVisible ? '' : 'hidden';
+				if (element.style.visibility !== visibility) element.style.visibility = visibility;
 				if (frame.isVisible)
 					element.style.transform = `translate3d(0, ${frame.y * size.height}px, 0) rotate(${frame.rotation}deg)`;
 			});

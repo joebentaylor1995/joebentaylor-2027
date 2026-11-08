@@ -7,6 +7,7 @@
 
 // Imports
 // ------------
+import { frameStep } from '@utils/frameClock';
 import { mediaScrollRoot } from '@utils/preloadNearbyMedia';
 import gsap from 'gsap';
 import { type RefObject, useEffect, useRef } from 'react';
@@ -47,11 +48,13 @@ export const useGalleryLoop = (stageRef: RefObject<HTMLElement | null>, render: 
 			size.width = stage.clientWidth;
 			size.height = stage.clientHeight;
 			draw();
-			stage.dataset.ready = 'true';
+			if (stage.dataset.ready !== 'true') stage.dataset.ready = 'true';
 		};
 
+		// NOTE • Steps by the vsync interval (see src/utils/frameClock.ts) so cards move evenly
+		// frame to frame; GSAP's own delta is whole milliseconds. Its delta covers a run's first frame.
 		const tick = (_time: number, deltaTime: number) => {
-			elapsedRef.current += Math.min(deltaTime / 1000, MAX_DELTA);
+			elapsedRef.current += Math.min((frameStep() || deltaTime) / 1000, MAX_DELTA);
 			draw();
 		};
 

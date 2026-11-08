@@ -147,9 +147,12 @@ export const fragment = `
 		vec2 channelShift = vec2(.004, 0.) * chromaFX * cursorSpeed * smoothstep(.60, .90, rawDepth);
 		channelShift.y += scrollSigned * scrollFX[0] * .014;
 
-		vec4 blueSample = portrait(uv - channelShift);
 		// Add only the displaced blue highlight. Never subtract blue: that creates a yellow fringe.
+		// NOTE • blueSample is only read inside this branch, so it's fetched there: pixels with no
+		// shift (the background, or all of them without cursor speed or scroll) skip two texture
+		// reads whose result was discarded. Checked bit-identical against the old shader.
 		if (dot(channelShift, channelShift) > .000000001) {
+			vec4 blueSample = portrait(uv - channelShift);
 			result.b = max(col.b, mix(col.b, blueSample.b, blueSample.a));
 		}
 

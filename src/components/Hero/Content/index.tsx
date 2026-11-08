@@ -41,6 +41,8 @@ const COPYRIGHT_DIGITS = 4;
 const COPYRIGHT_LINE_OFFSET = 0.12;
 const COPYRIGHT_DIGIT_OFFSET = 0.3;
 const COPYRIGHT_DIGIT_DURATION = 0.5;
+// Seconds added either side of the text tweens' span, so float rounding never trims it
+const TEXT_WINDOW_PADDING = 0.05;
 
 // Component
 // ------------
@@ -91,16 +93,6 @@ const Content = ({ heading, description }: I.ContentProps) => {
 			const intro = introStart(simpleIntro || navigationIntro);
 			sceneIntros.set(host, intro);
 
-			// Per frame: bumps data-text-frame and sizes the cover circle (--reveal-radius) to reach the viewport corners as the wave grows
-			const tick = () => {
-				root.dataset.textFrame = String(Number(root.dataset.textFrame || 0) + 1);
-				const radius =
-					Math.hypot(window.innerWidth * COVER_REACH_X, window.innerHeight * COVER_REACH_Y) *
-					COVER_OVERSHOOT *
-					intro.waterReveal;
-				cover?.style.setProperty('--reveal-radius', `${radius}px`);
-			};
-
 			// Elements the entrance animates
 			const title = root.querySelector('h1 span');
 			const star = root.querySelector('svg');
@@ -109,6 +101,62 @@ const Content = ({ heading, description }: I.ContentProps) => {
 			const copyrightIcon = host.querySelector('[data-copyright-icon]');
 			const copyrightLines = host.querySelectorAll('[data-copyright-line]');
 			const copyright = host.querySelector('[data-copyright]');
+
+			// NOTE • data-text-frame tells the WebGL layer to re-rasterise the hero text (a
+			// full-screen raster and upload). Only the heading, wipe, star and word tweens change
+			// what it draws, so a timeline frame is marked only when the playhead moved while one
+			// of them could render: before the heading starts and after the last word lands, every
+			// frame's text is identical. Forced marks (state set outside the timeline) always count.
+			const textTargets = new Set<unknown>([title, star, wipe, ...words].filter(Boolean));
+			let textWindow = { start: Number.POSITIVE_INFINITY, end: Number.NEGATIVE_INFINITY };
+			// Timeline time at the last mark check; NaN means the next check always marks
+			let textTime = Number.NaN;
+			const bumpTextFrame = () => {
+				root.dataset.textFrame = String(Number(root.dataset.textFrame || 0) + 1);
+			};
+			const measureTextWindow = () => {
+				textWindow = { start: Number.POSITIVE_INFINITY, end: Number.NEGATIVE_INFINITY };
+				for (const child of tl.getChildren(false, true, false)) {
+					if (!(child instanceof gsap.core.Tween) || !child.targets().some(target => textTargets.has(target)))
+						continue;
+					textWindow.start = Math.min(textWindow.start, child.startTime() - TEXT_WINDOW_PADDING);
+					textWindow.end = Math.max(textWindow.end, child.endTime() + TEXT_WINDOW_PADDING);
+				}
+			};
+			const markTextFrame = (time: number) => {
+				const last = textTime;
+				textTime = time;
+				// Both this frame and the last sit wholly before, or wholly after, the text tweens
+				if (Math.max(last, time) < textWindow.start || Math.min(last, time) > textWindow.end) return;
+				bumpTextFrame();
+			};
+
+			// Sizes the cover circle (--reveal-radius) to reach the viewport corners as the wave grows
+			// NOTE • A completed cover is display: none, and every path that brings it back writes
+			// its radius first, so the viewport reads (which force layout) and the write are skipped
+			// while it's gone. An unchanged radius isn't written again either.
+			const sizeCover = () => {
+				if (!cover || cover.hasAttribute('data-complete')) return;
+				const radius =
+					Math.hypot(window.innerWidth * COVER_REACH_X, window.innerHeight * COVER_REACH_Y) *
+					COVER_OVERSHOOT *
+					intro.waterReveal;
+				const value = `${radius}px`;
+				if (cover.style.getPropertyValue('--reveal-radius') !== value)
+					cover.style.setProperty('--reveal-radius', value);
+			};
+
+			// Per timeline frame: marks text frames and sizes the cover
+			const tick = () => {
+				markTextFrame(tl.time());
+				sizeCover();
+			};
+			// Outside the timeline's own frames: always marks one
+			const forceTick = () => {
+				textTime = Number.NaN;
+				bumpTextFrame();
+				sizeCover();
+			};
 			// Heading, star and words back to their hidden start; the first run also pins the star's origin
 			const hideEntrance = (starVars: gsap.TweenVars = {}) => {
 				gsap.set(title, { opacity: 0 });
@@ -142,7 +190,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				gsap.set(cover, { opacity: 0 });
 				if (cover) cover.dataset.complete = 'true';
 				root.dataset.entrance = 'complete';
-				tick();
+				forceTick();
 				prefetchProjects();
 				return;
 			}
@@ -164,7 +212,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				onComplete: () => {
 					entered.current = true;
 					root.dataset.entrance = 'complete';
-					tick();
+					forceTick();
 					prefetchProjects();
 				},
 			});
@@ -256,6 +304,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				if (heroDesktop && !navigationIntro) addSceneTweens(timing);
 				addTextTweens(timing);
 				addCopyrightTweens(timing);
+				measureTextWindow();
 			};
 			buildTimeline();
 
@@ -274,7 +323,7 @@ const Content = ({ heading, description }: I.ContentProps) => {
 				if (cover && heroDesktop) delete cover.dataset.complete;
 				hideEntrance();
 				buildTimeline();
-				tick();
+				forceTick();
 				tl.restart();
 			};
 

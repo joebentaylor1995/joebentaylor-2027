@@ -44,8 +44,12 @@ const BeforeAfter = ({ before, after, start, sizes }: I.BeforeAfterProps) => {
 
 			const setClip = (percent: number) => {
 				gsap.set(afterLayer, { clipPath: `inset(0 0 0 ${percent}%)` });
-				handle.setAttribute('aria-valuenow', String(Math.round(percent)));
-				handle.setAttribute('aria-valuetext', `${Math.round(percent)}% before`);
+				// NOTE • A drag moves many times per whole percent; the slider's value only changes
+				// (and only needs announcing) when the rounded number does
+				const value = String(Math.round(percent));
+				if (handle.getAttribute('aria-valuenow') === value) return;
+				handle.setAttribute('aria-valuenow', value);
+				handle.setAttribute('aria-valuetext', `${value}% before`);
 			};
 			const setPositions = (percent: number) => {
 				bounds = splitter.getBoundingClientRect();

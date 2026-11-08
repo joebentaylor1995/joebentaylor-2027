@@ -11,7 +11,7 @@ import { gsap } from 'gsap';
 import { type ReactNode, use, useEffect, useMemo, useRef, ViewTransition } from 'react';
 import { readWaveSettings, WAVE_SETTINGS_CHANGED, type WaveSettings, wavePreview } from './settings';
 import s from './styles.module.scss';
-import { edgeGuardTexture, lensScale, waveTexture } from './texture';
+import { edgeGuardTexture, lensScale, prepareTextures, waveTexture } from './texture';
 
 // Constants
 // ------------
@@ -21,18 +21,26 @@ const CROSSFADE_DURATION = 600;
 
 // Helpers
 // ------------
+// NOTE • Writes only real changes: every write to a filter primitive invalidates the filter, and
+// re-setting an feImage's href makes it resolve its image again, each navigation, for nothing
+function setAttributeIfChanged(element: Element | null, name: string, value: string) {
+	if (element && element.getAttribute(name) !== value) element.setAttribute(name, value);
+}
+
 // The lens's images. Both are cached, so this is cheap unless the settings or viewport changed.
 function prepareLens(settings: WaveSettings, map: SVGFEImageElement | null, guard: SVGFEImageElement | null) {
-	map?.setAttribute('href', waveTexture(settings));
-	guard?.setAttribute('href', edgeGuardTexture(settings, innerWidth, innerHeight));
-	guard?.setAttribute('width', String(innerWidth));
-	guard?.setAttribute('height', String(innerHeight));
+	setAttributeIfChanged(map, 'href', waveTexture(settings));
+	setAttributeIfChanged(guard, 'href', edgeGuardTexture(settings, innerWidth, innerHeight));
+	setAttributeIfChanged(guard, 'width', String(innerWidth));
+	setAttributeIfChanged(guard, 'height', String(innerHeight));
 }
 
 // One frame of the wave: the reveal mask and the lens, for a point (0–1) through it.
-// The page transition and the settings panel's preview both draw with it.
+// The page transition and the settings panel's preview both draw with it. `ease` is
+// settings.ease, parsed once by the caller rather than on every frame.
 function paintWave(
 	settings: WaveSettings,
+	ease: gsap.EaseFunction,
 	progress: number,
 	map: SVGFEImageElement | null,
 	displacement: SVGFEDisplacementMapElement | null,
@@ -49,7 +57,7 @@ function paintWave(
 	const end = Math.hypot(Math.max(x, width - x), Math.max(y, height - y)) + feather;
 	// Grow from zero immediately; a negative radius hides the first part
 	// of the animation and feels like a delay after the click.
-	const radius = end * gsap.parseEase(settings.ease)(progress);
+	const radius = end * ease(progress);
 	const edge = Math.min(feather, radius);
 
 	// Reveal mask: opaque inside the wave, fading to transparent across the feathered edge
@@ -59,13 +67,13 @@ function paintWave(
 
 	// Place the lens image so its ring (at 0.65 of the texture radius, see texture.ts) sits on the wave's edge
 	const size = Math.max(1, radius) / 0.65;
-	map?.setAttribute('x', String(x - size));
-	map?.setAttribute('y', String(y - size));
-	map?.setAttribute('width', String(size * 2));
-	map?.setAttribute('height', String(size * 2));
+	setAttributeIfChanged(map, 'x', String(x - size));
+	setAttributeIfChanged(map, 'y', String(y - size));
+	setAttributeIfChanged(map, 'width', String(size * 2));
+	setAttributeIfChanged(map, 'height', String(size * 2));
 
 	// Lens strength peaks mid-wave and eases to zero at both ends
-	displacement?.setAttribute('scale', String(lensScale(settings, height) * Math.sin(Math.PI * progress)));
+	setAttributeIfChanged(displacement, 'scale', String(lensScale(settings, height) * Math.sin(Math.PI * progress)));
 }
 
 // Component
@@ -99,17 +107,30 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 	// Effects
 	// Generate the lens images ahead of the first navigation, and again when settings change
 	useEffect(() => {
+		let cancelled = false;
 		// Phones crossfade, so they never draw the lens
+		const usesLens = () => !matchMedia(mq.down.m).matches;
 		const prepare = () => {
-			if (!matchMedia(mq.down.m).matches) prepareLens(readWaveSettings(), map.current, guard.current);
+			if (usesLens()) prepareLens(readWaveSettings(), map.current, guard.current);
+		};
+		// NOTE • The first maps are made in idle time: drawn and PNG-encoded synchronously, they
+		// were one long task on the very frame the loader settles, as the header, cookie bar and
+		// title entrances start. prepare() then finds them cached. A navigation before they are
+		// ready draws them synchronously in onUpdate, exactly as it always could.
+		const prepareWhenIdle = () => {
+			if (!usesLens()) return;
+			void prepareTextures(readWaveSettings(), innerWidth, innerHeight, () => cancelled).then(() => {
+				if (!cancelled) prepare();
+			});
 		};
 
-		if (isLoaderSettled()) prepare();
-		else window.addEventListener(LOADER_SETTLED, prepare, { once: true });
+		if (isLoaderSettled()) prepareWhenIdle();
+		else window.addEventListener(LOADER_SETTLED, prepareWhenIdle, { once: true });
 		window.addEventListener(WAVE_SETTINGS_CHANGED, prepare);
 
 		return () => {
-			window.removeEventListener(LOADER_SETTLED, prepare);
+			cancelled = true;
+			window.removeEventListener(LOADER_SETTLED, prepareWhenIdle);
 			window.removeEventListener(WAVE_SETTINGS_CHANGED, prepare);
 		};
 	}, []);
@@ -124,7 +145,7 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 			prepareLens(settings, map.current, guard.current);
 			root.dataset.navigationWavePreview = 'true';
 			root.dataset.navigationWaveLens = String(settings.bend > 0 && settings.strength > 0);
-			paintWave(settings, progress, map.current, displacement.current, mask =>
+			paintWave(settings, gsap.parseEase(settings.ease), progress, map.current, displacement.current, mask =>
 				root.style.setProperty('--navigation-wave-mask', mask)
 			);
 		};
@@ -132,7 +153,7 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 			delete root.dataset.navigationWavePreview;
 			delete root.dataset.navigationWaveLens;
 			root.style.removeProperty('--navigation-wave-mask');
-			displacement.current?.setAttribute('scale', '0');
+			setAttributeIfChanged(displacement.current, 'scale', '0');
 		};
 		return () => {
 			wavePreview.clear?.();
@@ -214,19 +235,22 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 								}),
 							];
 					const reveal = animations[0]?.effect;
+					// NOTE • setKeyframes copies the frame, so one object serves both keyframes and every
+					// frame. An unchanged mask (e.g. while the transition's clock hasn't started) is
+					// skipped, since re-keying the effect restyles the pseudo-element for nothing.
+					const frame = { opacity: 1, maskImage: '' };
 					const applyMask = (mask: string) => {
-						if (reveal instanceof KeyframeEffect)
-							reveal.setKeyframes([
-								{ opacity: 1, maskImage: mask },
-								{ opacity: 1, maskImage: mask },
-							]);
+						if (!(reveal instanceof KeyframeEffect) || mask === frame.maskImage) return;
+						frame.maskImage = mask;
+						reveal.setKeyframes([frame, frame]);
 					};
 
 					// Redraw the wave each frame from the animation's own clock
+					const ease = gsap.parseEase(settings.ease);
 					let raf = 0;
 					const tick = () => {
 						const progress = Math.min(1, Number(animations[0]?.currentTime || 0) / duration);
-						paintWave(settings, progress, map.current, displacement.current, applyMask);
+						paintWave(settings, ease, progress, map.current, displacement.current, applyMask);
 						if (progress < 1) raf = requestAnimationFrame(tick);
 					};
 					if (!crossfade) tick();
@@ -238,7 +262,7 @@ export default function NavigationWave({ children }: { children: ReactNode }) {
 						cleaned = true;
 						cancelAnimationFrame(raf);
 						releaseScroll();
-						displacement.current?.setAttribute('scale', '0');
+						setAttributeIfChanged(displacement.current, 'scale', '0');
 						delete root.dataset.navigationWave;
 						delete root.dataset.navigationWaveLens;
 					};

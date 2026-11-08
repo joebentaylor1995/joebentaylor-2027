@@ -4,12 +4,14 @@
 // ------------
 import { GlobalContext } from '@parts/Contexts';
 import { PerformanceContext } from '@parts/Contexts/Performance';
-import { DESKTOP_HOVER_QUERY } from '@utils/desktopHover';
+import { DESKTOP_HOVER_QUERY, touchOnlyEventsTarget } from '@utils/desktopHover';
+import { smoothFrameTime } from '@utils/frameClock';
 import { preloadNearbyMedia } from '@utils/preloadNearbyMedia';
 import { gsap } from 'gsap';
+import ScrollTrigger from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
 import Image from 'next/image';
-import { type ComponentType, use, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ComponentType, use, useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ProfilePresenceContext } from './context';
 
 // Styles + Interfaces
@@ -74,6 +76,12 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 	const isOpen = profileOpen || projectModalOpen;
 	const active = isOpen || presented;
 	const isProject = shown === 'project';
+	// NOTE • Profile sections set up the moment the panel opens, but tear down in a deferred
+	// render after it has closed: otherwise the teardown (ScrollTriggers, WebGL scenes, images)
+	// lands in the same commit that resumes the page behind it, and its first frames stutter.
+	// The panel is already hidden by then; reopening before it runs keeps the sections alive.
+	const profilePresent = active && !isProject;
+	const keptPresent = useDeferredValue(profilePresent);
 	const close = isProject ? closeProjectModal : () => setProfileOpen(false);
 	// NOTE • Read by the keyboard handler without re-binding it each render
 	const closeAction = useRef(close);
@@ -202,9 +210,19 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 			deform();
 		};
 
+		// NOTE • Tracked from 'project-panel:change' so move() can skip its hit test while no
+		// panel is open: cursorApplies() can only be true for an open profile or case-study panel
+		let projectPanelOpen = Boolean(document.querySelector('[data-project-panel][data-open="true"]'));
+
 		// Works out which cursor look applies under the pointer, then glides it there
 		const move = (event: PointerEvent) => {
 			lastPointer = event;
+			// Same outcome as cursorApplies() returning false, without a hit test (this runs on
+			// every pointer move and every scroll frame, site-wide)
+			if ((!isOpen && !projectPanelOpen) || event.pointerType !== 'mouse' || !mouse.matches) {
+				if (visible) hide();
+				return;
+			}
 			const target = document.elementFromPoint(event.clientX, event.clientY);
 			const projectPanel = target?.closest('[data-project-panel][data-open="true"]') ?? null;
 			if (!target || !cursorApplies(event, target, projectPanel)) {
@@ -231,14 +249,18 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 		const refresh = () => {
 			if (lastPointer) move(lastPointer);
 		};
-		window.addEventListener('project-panel:change', refresh);
+		const panelChange = () => {
+			projectPanelOpen = Boolean(document.querySelector('[data-project-panel][data-open="true"]'));
+			refresh();
+		};
+		window.addEventListener('project-panel:change', panelChange);
 		window.addEventListener('scroll', refresh, true);
 		window.addEventListener('blur', hide);
 		document.addEventListener('pointerleave', hide);
 		mouse.addEventListener('change', hide);
 		return () => {
 			window.removeEventListener('pointermove', move);
-			window.removeEventListener('project-panel:change', refresh);
+			window.removeEventListener('project-panel:change', panelChange);
 			window.removeEventListener('scroll', refresh, true);
 			window.removeEventListener('blur', hide);
 			document.removeEventListener('pointerleave', hide);
@@ -284,13 +306,28 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 		if (isReducedMotion) return;
 
 		// The panel gets its own Lenis, since the page's is stopped while it's open
-		const modalLenis = new Lenis({ wrapper, content, autoRaf: false, syncTouch: false });
+		// NOTE • No touch listeners on touch-only devices: the panel scrolls natively there, and
+		// they'd make every swipe wait for the main thread (see touchOnlyEventsTarget). The panel
+		// never runs a programmatic smooth scroll, so nothing needs a finger to interrupt it.
+		const eventsTarget = touchOnlyEventsTarget();
+		const modalLenis = new Lenis({
+			wrapper,
+			content,
+			autoRaf: false,
+			syncTouch: false,
+			...(eventsTarget && { eventsTarget }),
+		});
 		modalLenis.scrollTo(0, { immediate: true, force: true });
-		const update = (time: number) => modalLenis.raf(time * 1000);
-		gsap.ticker.add(update);
+		// Steps on the vsync clock and runs first in the tick, like the page's Lenis (see
+		// src/utils/frameClock.ts). The panel's scrubs update in the same frame as its scroll;
+		// left to the native scroll event they landed one frame behind the content.
+		const update = () => modalLenis.raf(smoothFrameTime());
+		modalLenis.on('scroll', ScrollTrigger.update);
+		gsap.ticker.add(update, false, true);
 
 		return () => {
 			gsap.ticker.remove(update);
+			modalLenis.off('scroll', ScrollTrigger.update);
 			modalLenis.destroy();
 		};
 	}, [isOpen, shown, isReducedMotion]);
@@ -302,7 +339,8 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 		// Pause everything animating on the page behind the panel, and resume it on close
 		const animations = new Set<Animation>();
 		const timelines = new Set<gsap.core.Animation>();
-		const pause = () => {
+		// Running CSS transitions and Web Animations (CSS animations are paused by the stylesheet)
+		const pauseAnimations = () => {
 			for (const animation of scene.getAnimations({ subtree: true })) {
 				if (
 					animation.effect instanceof KeyframeEffect &&
@@ -313,7 +351,14 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 					animation.pause();
 				}
 			}
-			for (const tween of gsap.getTweensOf(scene.querySelectorAll('*'))) {
+		};
+		// NOTE • The same tweens gsap.getTweensOf(scene.querySelectorAll('*')) finds, without
+		// comparing every page element against every tween's targets: only tweens on an element
+		// `affected` accepts, each paused through its root timeline
+		const pauseTweens = (affected: (target: Element) => boolean) => {
+			for (const tween of gsap.globalTimeline.getChildren(true, true, false)) {
+				const inScene = (target: unknown) => target instanceof Element && target !== scene && affected(target);
+				if (!tween.targets().some(inScene)) continue;
 				let animation: gsap.core.Animation = tween;
 				while (animation.parent && animation.parent !== gsap.globalTimeline) animation = animation.parent;
 				if (!animation.paused()) {
@@ -322,10 +367,24 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 				}
 			}
 		};
-		pause();
-		// Lazy content may start a reveal after the modal has already opened.
-		const additions = new MutationObserver(pause);
-		additions.observe(scene, { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
+		pauseAnimations();
+		pauseTweens(target => scene.contains(target));
+		// Lazy content may start a reveal after the modal has already opened. Any attribute change
+		// (a style, a class, a data-state) or added node can start a CSS transition, on that element
+		// or an ancestor: the scene's animation list is cheap to rescan whole. A tween behind the
+		// panel writes its target's style when it renders, so only tweens on what mutated are new.
+		// (A gallery still animating behind the panel writes a style every frame; matching every
+		// tween against the whole page each time cost far more.)
+		const additions = new MutationObserver(records => {
+			const roots: Element[] = [];
+			for (const record of records) {
+				if (record.type === 'attributes' && record.target instanceof Element) roots.push(record.target);
+				for (const node of record.addedNodes) if (node instanceof Element) roots.push(node);
+			}
+			pauseAnimations();
+			if (roots.length) pauseTweens(target => roots.some(root => root.contains(target)));
+		});
+		additions.observe(scene, { subtree: true, childList: true, attributes: true });
 		return () => {
 			additions.disconnect();
 			for (const animation of animations) animation.play();
@@ -345,7 +404,10 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 		const scrollOverflow = scrollRoot?.style.overflow ?? '';
 		// Lenis' stopped class uses overflow: clip, which resets the pinned page's scroll.
 		// Preserve its scroll container while the profile has its own scrolling instance.
-		if (scrollRoot) scrollRoot.style.overflow = 'hidden';
+		// NOTE • 'auto' (its own value) rather than 'hidden': an overflow: hidden box isn't user
+		// scrollable, so browsers drop its composited scrolling and repaint the whole page on the
+		// open frame. The page still can't scroll: it's inert, behind the overlay, Lenis is stopped.
+		if (scrollRoot) scrollRoot.style.overflow = 'auto';
 		lenis?.stop();
 		if (page) page.style.overflow = 'hidden';
 		closeRef.current?.focus({ preventScroll: true });
@@ -415,7 +477,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 						</button>
 					</div>
 					<div className={s.content} hidden={isProject}>
-						<ProfilePresenceContext.Provider value={active && !isProject}>
+						<ProfilePresenceContext.Provider value={profilePresent || keptPresent}>
 							{profile ?? <div className={s.placeholder} aria-hidden='true' />}
 						</ProfilePresenceContext.Provider>
 					</div>

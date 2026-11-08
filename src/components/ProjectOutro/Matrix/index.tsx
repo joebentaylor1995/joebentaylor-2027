@@ -74,6 +74,8 @@ export default function Matrix({ title }: MatrixProps) {
 				}
 			};
 
+			// NOTE • Two screens ahead: the shaders now link in the background without blocking, so
+			// this leaves a cold-cache link (a few hundred ms) time to finish before the outro shows
 			observer = new IntersectionObserver(
 				entries => {
 					if (entries.some(entry => entry.isIntersecting)) {
@@ -81,7 +83,7 @@ export default function Matrix({ title }: MatrixProps) {
 						void load();
 					}
 				},
-				{ root: mediaScrollRoot(host), rootMargin: '600px' }
+				{ root: mediaScrollRoot(host), rootMargin: '1200px' }
 			);
 			observer.observe(host);
 		};

@@ -420,11 +420,9 @@ const measure = (root: SVGSVGElement) => {
 	return { markPx, stagePx, toUnits: LOGO_BOX.width / markPx };
 };
 
-// The static mark's logo width, as a stage fraction
-export const restingSize = (root: SVGSVGElement) => {
-	const { markPx, stagePx } = measure(root);
-	return (markPx * LOGO.width) / LOGO_BOX.width / stagePx;
-};
+// The static mark's logo width, as a stage fraction, from its measured sizes
+const restingSizeOf = ({ markPx, stagePx }: ReturnType<typeof measure>) =>
+	(markPx * LOGO.width) / LOGO_BOX.width / stagePx;
 
 // Builds the frame renderer: it finds the SVG pieces once, then each call paints
 // one Frame from INTRO_FRAMES into them.
@@ -501,7 +499,8 @@ export const createIntro = (root: SVGSVGElement, ids: IntroIds) => {
 	const render = (frame: Frame) => {
 		if (!scene || !stage || !stageClip) return;
 		// NOTE • Measured every frame so a resize mid-intro stays correct
-		const { toUnits, stagePx } = measure(root);
+		const sizes = measure(root);
+		const { toUnits, stagePx } = sizes;
 		// NOTE • The band is a curved ultrawide screen, not a full-bleed wipe — the
 		// video's frame-wide band shrunk (width and height alike) to the landed logo's width
 		const bandStage = INTRO_SETTLE_SIZE * loaderSettings.bandWidth * stagePx;
@@ -524,7 +523,10 @@ export const createIntro = (root: SVGSVGElement, ids: IntroIds) => {
 		const word = WORDS[frame.word];
 		const href = `#${ids[frame.word]}`;
 		// Only the logo is rescaled, so it lands at the static mark's size (see INTRO_SETTLE_SIZE)
-		const landing = frame.word === 'logo' ? restingSize(root) / INTRO_SETTLE_SIZE : 1;
+		// NOTE • Reuses this frame's measurement: the attribute writes above can't change the
+		// SVG's own box (its width comes from the mark's CSS), and measuring again after them
+		// forced a second style and layout pass mid-frame
+		const landing = frame.word === 'logo' ? restingSizeOf(sizes) / INTRO_SETTLE_SIZE : 1;
 		const scale = ((frame.size ?? 1) * landing * stagePx * toUnits) / word.width;
 		const y = (frame.y ?? 0) * stagePx * toUnits;
 		const strokeWidth = STROKE_PX;

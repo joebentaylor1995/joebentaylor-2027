@@ -24,9 +24,11 @@ void main(){
   float sd=length(max(q,0.))+min(max(q.x,q.y),0.)-.025;
   float edge=1.-smoothstep(-.002,.001,sd);
   if(edge<.01)discard;
-  // Back face shows the artwork mirrored so it reads the right way round
-  vec2 uv=gl_FrontFacing?vUv:vec2(1.-vUv.x,vUv.y);
-  vec3 c=texture2D(poster,uv).rgb*mix(.09,1.,pow(depth,1.8));
+  // Both faces sample the same uv, so a back face shows the artwork as seen through the card.
+  // NOTE • This is how the cards have always rendered: three.js used to draw this transparent
+  // double-sided material in two culled passes, and its back-face pass flips the GL front face,
+  // so gl_FrontFacing was true there too and the old mirrored branch never ran.
+  vec3 c=texture2D(poster,vUv).rgb*mix(.09,1.,pow(depth,1.8));
   // Thin highlight just inside the border
   float rim=1.-smoothstep(.001,.008,abs(sd+.004));
   // Glare: a soft radial reflection plus a diagonal sheen band

@@ -48,9 +48,11 @@ export const fragment = `
 		vec2 local = fract(p * counts);
 		local = (local - .5) / mix(1., hoverSize, hover) + .5;
 		float glyph = letter(index, local);
-		// Glow: average of four offset samples gives a soft halo around the glyph
+		// Glow: average of four offset samples gives a soft halo around the glyph.
+		// NOTE • The glow is scaled by centreHover, so with no hover (always on touch screens, and
+		// whenever the pointer is off the call to action) it is exactly 0 — skip its four taps then
 		float glow = 0.;
-		if (hoverGlow > 0.) {
+		if (hoverGlow > 0. && centreHover > 0.) {
 			glow = (letter(index, local + vec2(.07, 0.)) + letter(index, local - vec2(.07, 0.)) + letter(index, local + vec2(0., .07)) + letter(index, local - vec2(0., .07))) * .25 * centreHover * hoverGlow;
 		}
 		// Combine into final colour; premultiplied alpha

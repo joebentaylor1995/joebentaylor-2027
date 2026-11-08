@@ -17,16 +17,16 @@ test('settled animation does not query shader attributes on every frame', async 
 			return original.apply(this, args);
 		};
 	});
+	// Counted from the network, which includes the texture-decode worker that now fetches it
+	// (its requests don't appear in the page's own resource timing)
+	const colourRequests: string[] = [];
+	page.on('request', request => {
+		if (request.url().includes('portrait-colour')) colourRequests.push(request.url());
+	});
 	await page.goto('/');
 	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
 
 	// The colour portrait is fetched exactly once
-	const colourRequests = await page.evaluate(() =>
-		performance
-			.getEntriesByType('resource')
-			.map(entry => entry.name)
-			.filter(url => url.includes('portrait-colour'))
-	);
 	expect(colourRequests).toHaveLength(1);
 	expect(colourRequests[0]).toContain('/portrait-colour.webp');
 	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete');

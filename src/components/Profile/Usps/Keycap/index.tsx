@@ -19,6 +19,9 @@ import s from './styles.module.scss';
 const LAST_FRAME = 32;
 const HOVER_FRAME = 4;
 
+// Frames decoding at once; every frame's file is still requested up front
+const DECODE_CONCURRENCY = 4;
+
 // Helpers
 // ------------
 // Frame files are numbered from 0001
@@ -73,6 +76,8 @@ const Keycap = () => {
 
 		// pose.frame is tweened (fractional); draw() rounds it to a whole frame
 		const pose = { frame: 0 };
+		// The frame on the canvas (-1: nothing drawn yet)
+		let drawn = -1;
 		const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 		const frames: HTMLImageElement[] = [];
 
@@ -84,10 +89,20 @@ const Keycap = () => {
 			return audio;
 		});
 
+		// NOTE • Why: the tween updates every display frame, but the rounded frame changes far less
+		// often (a 0.18s hover ease at 120Hz is ~22 updates over 4 frames), and each update
+		// repainted the 1200px canvas. The frames are opaque and drawn over the whole canvas, so
+		// drawing the frame that is already there changes nothing.
 		const draw = () => {
 			const frame = Math.max(0, Math.min(LAST_FRAME, Math.round(pose.frame)));
+			if (frame === drawn) return;
+			drawn = frame;
 			context.drawImage(frames[frame], 0, 0, canvas.width, canvas.height);
 			button.dataset.frame = String(frame);
+		};
+		// A restored 2D context comes back blank: the next update repaints, as every update did
+		const restored = () => {
+			drawn = -1;
 		};
 
 		// Ease towards a frame: quick while held, slower on release, instant under reduced motion
@@ -179,19 +194,28 @@ const Keycap = () => {
 			if (document.hidden) reset();
 		};
 
+		// NOTE • Why: 33 parallel decodes of 1200px frames all land on the decode threads at once,
+		// competing with the panel's scrolling and raster work. Every file is requested up front
+		// as before; decoding runs DECODE_CONCURRENCY at a time, in frame order.
+		const decodeFrames = async () => {
+			for (let frame = 0; frame <= LAST_FRAME; frame++) {
+				const image = new Image();
+				image.src = frameUrl(frame);
+				frames[frame] = image;
+			}
+			let next = 0;
+			const worker = async () => {
+				while (next <= LAST_FRAME && !disposed) await frames[next++].decode();
+			};
+			await Promise.all(Array.from({ length: DECODE_CONCURRENCY }, worker));
+		};
+
 		// Decode all frames only once the key is near the viewport; it stays unpressable until then
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				if (!entry.isIntersecting) return;
 				observer.disconnect();
-				void Promise.all(
-					Array.from({ length: LAST_FRAME + 1 }, (_, frame) => {
-						const image = new Image();
-						image.src = frameUrl(frame);
-						frames[frame] = image;
-						return image.decode();
-					})
-				)
+				void decodeFrames()
 					.then(() => {
 						if (disposed) return;
 						ready = true;
@@ -216,6 +240,7 @@ const Keycap = () => {
 		button.addEventListener('keydown', keyDown);
 		button.addEventListener('keyup', keyUp);
 		button.addEventListener('blur', reset);
+		canvas.addEventListener('contextrestored', restored);
 		window.addEventListener('blur', reset);
 		document.addEventListener('visibilitychange', visibility);
 
@@ -238,6 +263,7 @@ const Keycap = () => {
 			button.removeEventListener('keydown', keyDown);
 			button.removeEventListener('keyup', keyUp);
 			button.removeEventListener('blur', reset);
+			canvas.removeEventListener('contextrestored', restored);
 			window.removeEventListener('blur', reset);
 			document.removeEventListener('visibilitychange', visibility);
 			button.dataset.state = 'loading';

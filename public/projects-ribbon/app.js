@@ -6,7 +6,7 @@
 // featured ribbon (a subdivided two-sided cylinder drawn by one shader pair), the tuning panel, input,
 // the poster/video atlas, catalogue loading and the frame loop. Plain scripts share one global scope, so
 // every top-level name here is public: later scripts (export.js) and the tests reach in by name.
-// Loaded after the helper scripts in index.html (navigation, grid, video-atlas, frame-meter, intro, idle,
+// Loaded after the helper scripts in index.html (navigation, gl-async, grid, video-atlas, frame-meter, intro, idle,
 // mouse-tilt, velocity-shape, project-transition, loader-wave) and uses their classes directly.
 //
 // Frame loop: input and host messages call `requestRender()`, which schedules `render()`. Each frame
@@ -808,13 +808,14 @@ canvas.addEventListener('blur', () => {
 	requestRender();
 });
 // Hit-tests under the pointer (viewport centre for keyboard) and updates the cursor and tooltip.
+// NOTE • Runs every ribbon frame (updateUI), so the cursor and label are only written when they change.
 function refreshFeaturedTooltip() {
 	const point = tooltipInput === 'keyboard' ? { x: innerWidth / 2, y: innerHeight / 2 } : tooltipPoint;
 	const project = ready && point && !drag && !returningToFeatured() ? pickFeatured(point.x, point.y) : null;
-	canvas.style.cursor = drag ? 'grabbing' : isProjectClickable(project) ? 'pointer' : 'grab';
+	setChangedStyle(canvas, 'cursor', drag ? 'grabbing' : isProjectClickable(project) ? 'pointer' : 'grab');
 	showProjectTooltip(project, point);
 	if (!project)
-		canvas.setAttribute('aria-label', 'Featured projects. Scroll, drag, or use the arrow keys to explore.');
+		setChangedAttribute(canvas, 'aria-label', 'Featured projects. Scroll, drag, or use the arrow keys to explore.');
 }
 // Hit-test for the featured ribbon: the CPU mirror of the vertex shader's `surface()`, sharing the geometry helpers in
 // project-transition.js. Returns the project under a client position plus `ribbonHit` ({ band, slide }), or null.
@@ -946,14 +947,6 @@ panel(showRibbonSettings);
 document.querySelector('#intro-controls').open = showRibbonSettings;
 // Rendering setup
 // ------------
-// Compiles one shader; throws the info log on failure.
-function shader(type, source) {
-	const s = gl.createShader(type);
-	gl.shaderSource(s, source);
-	gl.compileShader(s);
-	if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(s));
-	return s;
-}
 // Entrance animation (intro.js). Its callback returns the view to the ribbon and settles `position` on `target`.
 const introduction = new RibbonIntroduction(requestRender, () => {
 	if (gridView?.target || gridView?.mix) {
@@ -1000,12 +993,12 @@ const projectTransition = new ProjectTransition(gl);
 // Twist leaves the central 1.24 slides flat.
 const meshSegments = mobile ? 320 : 1200,
 	meshRows = mobile ? 4 : 8;
-// Compiles the ribbon program, builds the mesh and caches the uniform locations.
+// Starts linking the ribbon program, builds the mesh and sets the fixed GL state. Returns the pending link.
+// NOTE • The link isn't read back here, so the GPU process compiles it while the ribbon boots: the boot waits for
+// whenLinked() (gl-async.js) and then finishSetup() reads the result, throwing any error as this once did.
 function setup() {
-	program = gl.createProgram();
-	gl.attachShader(
-		program,
-		shader(
+	const linking = linkProgramAsync(gl, [
+		[
 			gl.VERTEX_SHADER,
 			`
 				precision highp float;
@@ -1071,12 +1064,9 @@ function setup() {
 					// x is the slide coordinate / 6 (the fragment shader multiplies it back); y runs top to bottom.
 					vUV = vec2(angle / mix(1.0471975512, .6544984695, uVertical) / 6.0, .5 - aPosition.y * .5);
 				}
-			`
-		)
-	);
-	gl.attachShader(
-		program,
-		shader(
+			`,
+		],
+		[
 			gl.FRAGMENT_SHADER,
 			`
 				precision highp float;
@@ -1144,12 +1134,10 @@ function setup() {
 					// Fade the entire surface into the scene, including the image's dark areas.
 					gl_FragColor = vec4(colour.rgb * vLight, uOpacity * reveal * uFade);
 				}
-			`
-		)
-	);
-	gl.linkProgram(program);
-	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
-	gl.useProgram(program);
+			`,
+		],
+	]);
+	program = linking.program;
 	// Mesh: (meshSegments + 1) by (meshRows + 1) vertices over angle -PI..PI and height -1..1, two triangles per quad.
 	const vertices = [],
 		indices = [];
@@ -1168,8 +1156,22 @@ function setup() {
 	ribbonIndices = gl.createBuffer();
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ribbonIndices);
 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+	gl.enable(gl.DEPTH_TEST);
+	gl.disable(gl.CULL_FACE);
+	// Clear colour is the page background (computed rgb) so the opaque canvas blends with the host.
+	const background = getComputedStyle(document.documentElement)
+		.backgroundColor.match(/[\d.]+/g)
+		.map(Number);
+	gl.clearColor(background[0] / 255, background[1] / 255, background[2] / 255, 1);
+	return linking;
+}
+// Once the ribbon program has linked: checks it, binds it with the mesh and caches the attribute and uniform locations.
+function finishSetup(linking) {
+	checkProgram(gl, linking);
+	gl.useProgram(program);
 	const a = gl.getAttribLocation(program, 'aPosition');
 	ribbonAttrib = a;
+	gl.bindBuffer(gl.ARRAY_BUFFER, ribbonBuffer);
 	gl.enableVertexAttribArray(a);
 	gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 	// Cache every uniform location as `uniforms.<Name>` for `u<Name>`.
@@ -1201,13 +1203,6 @@ function setup() {
 	uniforms.AtlasSize = gl.getUniformLocation(program, 'uAtlasSize');
 	uniforms.CascadeEase = gl.getUniformLocation(program, 'uCascadeEase');
 	uniforms.CascadeStagger = gl.getUniformLocation(program, 'uCascadeStagger');
-	gl.enable(gl.DEPTH_TEST);
-	gl.disable(gl.CULL_FACE);
-	// Clear colour is the page background (computed rgb) so the opaque canvas blends with the host.
-	const background = getComputedStyle(document.documentElement)
-		.backgroundColor.match(/[\d.]+/g)
-		.map(Number);
-	gl.clearColor(background[0] / 255, background[1] / 255, background[2] / 255, 1);
 }
 
 // Rendering
@@ -1561,39 +1556,51 @@ function cover(ctx, img, x, y, w, h) {
 		sh = h / s;
 	ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, y, w, h);
 }
-// Packs the posters into one canvas of equal 16:10 tiles, uploads it as the ribbon texture and attaches it to the video
-// uploader. Desktop uses one row; phones wrap at 12 columns. Tile width is at most 1024 and shrinks so the atlas fits
+// Packs the posters into one canvas of equal 16:10 tiles and uploads it into a new texture, which commitAtlas() then
+// swaps in. Desktop uses one row; phones wrap at 12 columns. Tile width is at most 1024 and shrinks so the atlas fits
 // the GPU and canvas limits, rounded down to a multiple of 16.
-function makeAtlas(images) {
-	stopVideos();
+// NOTE • At boot, while nothing is on screen yet, this resolves once the GPU process has the upload (gl-async.js), so
+// commitAtlas()'s getError and framebuffer check answer at once instead of holding the main thread (the host's too)
+// until the 31 MB upload has run. A re-apply while the ribbon is showing (a breakpoint change, a file drop) swaps in the
+// same task as it always did, so no frame draws the old atlas.
+async function buildAtlas(images) {
 	// Keep the backing canvas within mobile browser memory limits as well as
 	// the GPU texture limit (the two limits are not necessarily the same).
 	const max = Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), mobile ? 8192 : 16384);
-	atlasColumns = mobile ? Math.min(12, images.length) : images.length;
-	atlasRows = Math.ceil(images.length / atlasColumns);
-	const W = Math.min(1024, Math.floor(max / atlasColumns / 16) * 16),
+	const columns = mobile ? Math.min(12, images.length) : images.length,
+		rows = Math.ceil(images.length / columns);
+	const W = Math.min(1024, Math.floor(max / columns / 16) * 16),
 		H = (W * 10) / 16;
 	const atlas = document.createElement('canvas');
-	atlas.width = W * atlasColumns;
-	atlas.height = H * atlasRows;
-	atlasWidth = W;
-	atlasHeight = H;
+	atlas.width = W * columns;
+	atlas.height = H * rows;
 	const c = atlas.getContext('2d');
 	c.imageSmoothingEnabled = true;
 	c.imageSmoothingQuality = 'high';
-	images.forEach((im, i) => cover(c, im, (i % atlasColumns) * W, Math.floor(i / atlasColumns) * H, W, H));
+	images.forEach((im, i) => cover(c, im, (i % columns) * W, Math.floor(i / columns) * H, W, H));
 
-	if (texture) gl.deleteTexture(texture);
-	texture = gl.createTexture();
+	const next = gl.createTexture();
 	gl.activeTexture(gl.TEXTURE0);
-	gl.bindTexture(gl.TEXTURE_2D, texture);
+	gl.bindTexture(gl.TEXTURE_2D, next);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas);
+	if (!ready) await whenGpuCaughtUp(gl);
+	return { texture: next, columns, rows, width: W, height: H };
+}
+// Swaps a built atlas in as the ribbon texture and attaches it to the video uploader.
+function commitAtlas(atlas) {
+	stopVideos();
+	atlasColumns = atlas.columns;
+	atlasRows = atlas.rows;
+	atlasWidth = atlas.width;
+	atlasHeight = atlas.height;
+	if (texture) gl.deleteTexture(texture);
+	texture = atlas.texture;
 	if (gl.getError() !== gl.NO_ERROR) throw Error('The project images could not be loaded into WebGL. Please reload.');
-	if (!videoUploader) videoUploader = new VideoAtlasUploader(gl);
+	videoUploader.finishLink();
 	videoUploader.attach(texture);
 	ready = !!texture;
 	requestRender();
@@ -1758,10 +1765,11 @@ document.querySelector('#files').onchange = async e => {
 	const urls = files.map(f => URL.createObjectURL(f));
 	try {
 		const images = await Promise.all(urls.map(imageLoad));
+		const atlas = await buildAtlas(images);
 		names = files.map(f => f.name.replace(/\.[^.]+$/, ''));
 		count = names.length;
 		position = target = 0;
-		makeAtlas(images, true);
+		commitAtlas(atlas);
 		featured = names.map((name, index) => ({ name, index, poster: urls[index] }));
 		gridView.setProjects(featured, featured);
 		document.querySelector('#all-count').textContent = featured.length;
@@ -1822,6 +1830,11 @@ async function applyRibbonCatalog() {
 	);
 	await waitForUncoveredScene();
 	if (revision !== catalogRevision) return;
+	const atlas = await buildAtlas(images);
+	if (revision !== catalogRevision) {
+		gl.deleteTexture(atlas.texture);
+		return;
+	}
 	featured = items.map((item, index) => ({ ...item, index }));
 	names = featured.map(item => item.name);
 	count = names.length;
@@ -1829,7 +1842,7 @@ async function applyRibbonCatalog() {
 		0,
 		featured.findIndex(item => item.poster === previousPoster)
 	);
-	makeAtlas(images);
+	commitAtlas(atlas);
 	gridView.setProjects(featured, allProjects);
 	buildDots();
 	startFeaturedVideos();
@@ -1848,8 +1861,9 @@ async function applyRibbonCatalog() {
 	try {
 		if (!gl) throw Error('WebGL is unavailable. Please open this in a browser with hardware acceleration enabled.');
 		await waitForUncoveredScene();
-		setup();
+		const ribbonLink = setup();
 		gridView = new ProjectGrid(gl, requestRender);
+		videoUploader = new VideoAtlasUploader(gl);
 		gridView.setPaused(hostSuspended());
 		syncDirection();
 		// Only the published CMS catalogue may populate the live ribbon.
@@ -1859,13 +1873,23 @@ async function applyRibbonCatalog() {
 				return response.json();
 			});
 		const preloaded = window.parent.getPreloadedProjects?.();
-		const catalog = preloaded
-			? preloaded.catch(() => loadJson('/api/projects-ribbon/'))
-			: loadJson('/api/projects-ribbon/');
-		[featuredProjects, allProjects] = await catalog.then(data => {
+		const catalog = (
+			preloaded ? preloaded.catch(() => loadJson('/api/projects-ribbon/')) : loadJson('/api/projects-ribbon/')
+		).then(data => {
 			window.ribbonPlaceholder = data.placeholder;
 			return [data.featured, data.all];
 		});
+		// A shader error below is reported instead, as before; don't also report this as unhandled.
+		catalog.catch(() => {});
+		// NOTE • The three programs compile in the GPU process while the catalogue loads; their results are read once
+		// they're done, in the order the old synchronous setup threw its errors (the video uploader's when the atlas
+		// first attaches).
+		await Promise.all(
+			[ribbonLink.program, gridView.program, videoUploader.program].map(item => whenLinked(gl, item))
+		);
+		finishSetup(ribbonLink);
+		gridView.finishCompile();
+		[featuredProjects, allProjects] = await catalog;
 		allProjects = allProjects.map((project, index) => ({ ...project, index }));
 		await applyRibbonCatalog();
 		// Internal navigation already has its page wave: only cascade the slides afterwards.

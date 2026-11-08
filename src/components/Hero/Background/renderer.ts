@@ -2,7 +2,9 @@
 // ------------
 import { mq } from '@tackl';
 import { canHover } from '@utils/desktopHover';
+import { frameStep, frameTime } from '@utils/frameClock';
 import { waitForNavigationScene } from '@utils/navigationScene';
+import { decodeTextureImage, type TextureImage, uploadTextureImage } from '@utils/webgl';
 import { gsap } from 'gsap';
 import { HERO_DESKTOP_QUERY } from '../layout';
 import { type DepthSettings, depthUrl, scrollKeys } from './effect-settings';
@@ -42,6 +44,12 @@ const MOBILE_WAVE_PIXEL_RATIO = 1.5;
 const SETTLE_EPSILON = 0.0001,
 	CURSOR_SPEED_EPSILON = 0.001;
 
+// The step the first frame is drawn with, before the ticker takes over
+const FIRST_FRAME_MS = 16;
+
+// The scroll effects' on/off switches, in `scrollKeys` order
+const scrollToggles = scrollKeys.map(key => `${key}On` as const);
+
 // Mirrors the nose flattening that used to run per texture fetch in the shader.
 // All values are fractions (0-1) of the depth map: NOSE is the ellipse centre and
 // half-size, FACE_COLUMNS are the two columns sampled to find the surrounding face depth.
@@ -58,6 +66,10 @@ function smoothstep(edge0: number, edge1: number, x: number) {
 // Hands the main thread back between heavy setup steps, so the WebGL start-up
 // is several short tasks rather than one long one
 const yieldToMain = () => new Promise(resolve => setTimeout(resolve, 0));
+
+// NOTE • The depth map is a static asset, so its bake is the same on every visit to Home.
+// Kept for the session, a client navigation back skips the decode and the bake.
+const bakedDepths = new Map<string, ReturnType<typeof bakeDepth>>();
 
 // Bakes the corrected depth once, so each ray-march step costs one fetch instead of three.
 // Returns a single-channel (0-255) map that is uploaded as a LUMINANCE texture.
@@ -166,8 +178,9 @@ export function mountDepthEffect({
 		cursorSpeed = 0;
 	const scroll = new ScrollMotion(getSettings);
 
-	// Assets and GL objects, assigned once initialize() has run
-	let colourImage: HTMLImageElement | null = null;
+	// Assets and GL objects, assigned once initialize() has run. `hasColour` is whether the
+	// full-colour portrait loaded (otherwise the colour texture holds the photo again).
+	let hasColour = false;
 	let bakedDepth: ReturnType<typeof bakeDepth>;
 	let main: Awaited<ReturnType<typeof makeProgram>>;
 	const scrollValues = new Float32Array(scrollKeys.length);
@@ -247,7 +260,15 @@ export function mountDepthEffect({
 				canvas,
 				host,
 				liquidSettings,
-				() => disposed || lost || current !== generation
+				() => disposed || lost || current !== generation,
+				false,
+				HERO_DESKTOP_QUERY,
+				// NOTE • The layer's first build rasterises the DOM as it is from here on, so a flag
+				// left over from before would only re-rasterise and re-upload everything on its first
+				// frame. Flags raised while the build runs (it spans several tasks) still apply.
+				() => {
+					liquidResize = false;
+				}
 			);
 			if (disposed || lost || current !== generation) {
 				layer.destroy();
@@ -371,10 +392,10 @@ export function mountDepthEffect({
 	const navigationPaused = () =>
 		hasPresented && document.documentElement.matches('[data-navigation-pending], [data-navigation-wave]');
 
-	// Adds or removes `draw` from the GSAP ticker so no frames run while the hero is
+	// Adds or removes `tick` from the GSAP ticker so no frames run while the hero is
 	// unloaded, offscreen, hidden, covered by a navigation, or its profile scene is paused
 	function syncTicker() {
-		gsap.ticker.remove(draw);
+		gsap.ticker.remove(tick);
 		if (
 			loaded &&
 			!disposed &&
@@ -384,7 +405,7 @@ export function mountDepthEffect({
 			!navigationPaused() &&
 			profileScene?.dataset.scenePaused !== 'true'
 		)
-			gsap.ticker.add(draw);
+			gsap.ticker.add(tick);
 	}
 
 	const pauseObserver = new MutationObserver(() => {
@@ -398,10 +419,17 @@ export function mountDepthEffect({
 	});
 
 	// SECTION • Frame loop
-	// ANCHOR • One frame, called by the GSAP ticker with the frame delta in ms. Order: size the
-	// canvas, ease the pointer, step scroll motion, skip the frame if everything is at rest,
-	// otherwise upload uniforms and draw the portrait, then let the liquid layer draw on top.
-	function draw(_time: number, deltaMs: number) {
+	// NOTE • The ticker's frame. GSAP hands listeners whole milliseconds of Date.now() time
+	// (8, 8, 9 at 120Hz), so the marquee, parallax and water stepped unevenly on evenly spaced
+	// frames. This frame's step on the vsync clock (frameClock) is even, with the same lag smoothing.
+	function tick() {
+		draw(frameStep());
+	}
+
+	// ANCHOR • One frame, given the frame delta in ms. Order: size the canvas, ease the
+	// pointer, step scroll motion, skip the frame if everything is at rest, otherwise upload
+	// uniforms and draw the portrait, then let the liquid layer draw on top.
+	function draw(deltaMs: number) {
 		// Same conditions as syncTicker, re-checked in case a state change landed mid-frame
 		if (
 			!loaded ||
@@ -415,7 +443,7 @@ export function mountDepthEffect({
 			return;
 		try {
 			// dt is in seconds, clamped to 50ms so a stalled tab doesn't jump on return
-			const now = performance.now(),
+			const now = frameTime(),
 				dt = Math.min(deltaMs / 1000, 0.05) || 0.016,
 				s = getSettings();
 			// `entering` = the intro water wave is still revealing the portrait
@@ -455,29 +483,31 @@ export function mountDepthEffect({
 			// No pointer parallax until the intro wave has landed
 			if (entering) {
 				target = [0, 0];
-				pointer = [0, 0];
+				pointer[0] = pointer[1] = 0;
 				cursorActive = 0;
 				cursorSpeed = 0;
-				previousCursor = [...cursor];
+				previousCursor[0] = cursor[0];
+				previousCursor[1] = cursor[1];
 				liquid?.resetPointer();
 			}
 
 			// Where the parallax is heading: rest while entering, a slow Lissajous drift in
 			// auto mode, otherwise the pointer. Eased framerate-independently (smooth is per 60fps frame).
-			const dest = entering
-				? [0, 0]
-				: s.auto
-					? [Math.sin(now * 0.00055) * 0.8, Math.cos(now * 0.00043) * 0.55]
-					: target;
+			// NOTE • Nothing holds on to the pointer or previousCursor arrays, so they're updated
+			// in place: the same values without allocating new arrays every frame
+			const destX = entering ? 0 : s.auto ? Math.sin(now * 0.00055) * 0.8 : target[0];
+			const destY = entering ? 0 : s.auto ? Math.cos(now * 0.00043) * 0.55 : target[1];
 			const ease = 1 - s.smooth ** (dt * 60);
-			pointer = pointer.map((v, i) => v + (dest[i] - v) * ease);
+			pointer[0] += (destX - pointer[0]) * ease;
+			pointer[1] += (destY - pointer[1]) * ease;
 
 			// Cursor speed (0..1) rises instantly with movement and decays over ~0.15s
 			cursorSpeed = Math.max(
 				Math.min(1, (Math.hypot(cursor[0] - previousCursor[0], cursor[1] - previousCursor[1]) / dt) * 0.5),
 				cursorSpeed * Math.exp(-dt * 7)
 			);
-			previousCursor = [...cursor];
+			previousCursor[0] = cursor[0];
+			previousCursor[1] = cursor[1];
 			scroll.step(dt);
 
 			// Cache the full-colour portrait during the fade; the final pass desaturates it.
@@ -491,11 +521,12 @@ export function mountDepthEffect({
 				!s.auto &&
 				scroll.settled &&
 				cursorSpeed < CURSOR_SPEED_EPSILON &&
-				Math.abs(pointer[0] - dest[0]) < SETTLE_EPSILON &&
-				Math.abs(pointer[1] - dest[1]) < SETTLE_EPSILON;
+				Math.abs(pointer[0] - destX) < SETTLE_EPSILON &&
+				Math.abs(pointer[1] - destY) < SETTLE_EPSILON;
 			// Idle frames are identical, so skip them; one last draw lands the snapped rest pose
 			if (settled && !dirty) {
-				if (liquid) {
+				// A phone's liquid layer can be static too: then its last frame stays on screen
+				if (liquid && !liquid.isStatic()) {
 					try {
 						liquid.draw(dt, scroll.velocity, scroll.gesture);
 					} catch {
@@ -507,13 +538,14 @@ export function mountDepthEffect({
 			}
 			dirty = !settled;
 			if (settled) {
-				pointer = [...dest];
+				pointer[0] = destX;
+				pointer[1] = destY;
 				cursorSpeed = 0;
 			}
 
 			// Per-effect scroll strengths; all zero in depth-debug view or when an effect is off
 			scrollKeys.forEach((key, i) => {
-				scrollValues[i] = !s.depth && s[`${key}On`] ? s[key] : 0;
+				scrollValues[i] = !s.depth && s[scrollToggles[i]] ? s[key] : 0;
 			});
 
 			// Draw the portrait into the liquid layer's scene texture, or straight to the canvas
@@ -563,7 +595,7 @@ export function mountDepthEffect({
 			gl.uniform1f(u.debug, s.depth ? 1 : 0);
 			gl.uniform1fv(u['scrollFX[0]'], scrollValues);
 			gl.uniform1f(u.scrollVelocity, scroll.pulse);
-			gl.uniform1f(u.colourMix, colourImage ? scroll.colour + (1 - scroll.colour) * introTint : 0);
+			gl.uniform1f(u.colourMix, hasColour ? scroll.colour + (1 - scroll.colour) * introTint : 0);
 			lastIntroTint = introTint;
 
 			gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -799,15 +831,26 @@ export function mountDepthEffect({
 			]);
 			if (disposed || lost || current !== generation) return;
 
+			// The portraits arrive decoded off the main thread; they're released once uploaded
+			// and decoded afresh if a lost context is ever restored
+			// Taken before the await, so a restore that starts meanwhile decodes its own bitmaps
+			// instead of sharing (and having this stale run close) these
+			const pending = portraits ?? decodePortraits();
+			portraits = null;
+			const images = await pending;
+			const [photoImage, colourImage] = images;
+			const release = () => closeBitmaps(images);
+			if (disposed || lost || current !== generation) return release();
+			hasColour = Boolean(colourImage);
+
 			// Full-screen quad as two triangles; textures: 0 photo, 1 depth, 2 colour
 			main = compiled;
 			quad = makeBuffer(new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]));
-			photoTexture = texture(0, () => gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, photo));
+			photoTexture = texture(0, () => uploadTextureImage(gl, photoImage));
 			await yieldToMain();
-			if (disposed || lost || current !== generation) return;
-			colourTexture = texture(2, () =>
-				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, colourImage || photo)
-			);
+			if (disposed || lost || current !== generation) return release();
+			colourTexture = texture(2, () => uploadTextureImage(gl, colourImage || photoImage));
+			release();
 			await yieldToMain();
 			if (disposed || lost || current !== generation) return;
 			depthTexture = texture(1, () => {
@@ -828,7 +871,7 @@ export function mountDepthEffect({
 			loaded = true;
 			syncTicker();
 			dirty = true;
-			draw(0, 16);
+			draw(FIRST_FRAME_MS);
 			if (loaded) onReady(true);
 			if (loaded) void startLiquid();
 		} catch (error) {
@@ -839,10 +882,11 @@ export function mountDepthEffect({
 		}
 	}
 
+	// Decoded before the depth bake draws it, so drawImage doesn't decode on the main thread
 	const load = (url: string) =>
 		new Promise<HTMLImageElement>((resolve, reject) => {
 			const img = new Image();
-			img.onload = () => resolve(img);
+			img.onload = () => img.decode().then(() => resolve(img), reject);
 			img.onerror = reject;
 			img.src = url;
 		});
@@ -855,25 +899,60 @@ export function mountDepthEffect({
 					photo.addEventListener('error', reject, { once: true, signal: events.signal });
 				});
 
+	// The photo and (optional) colour portrait as WebGL texture sources. texImage2D(<img>)
+	// would decode them again on the main thread — a 70ms+ hitch on every visit to Home.
+	const decodePortraits = () =>
+		Promise.all([
+			decodeTextureImage(photo),
+			decodeTextureImage('/images/hero-depth/portrait-colour.webp').catch(() => null),
+		]);
+	let portraits: ReturnType<typeof decodePortraits> | null = null;
+	// Bitmaps hold decoded pixels until closed, so ones nothing will upload are closed right away
+	const closeBitmaps = (images: (TextureImage | null)[]) => {
+		for (const image of images) if (image instanceof ImageBitmap) image.close();
+	};
+	const discardPortraits = () => {
+		const pending = portraits;
+		portraits = null;
+		void pending?.then(closeBitmaps, () => {});
+	};
+
 	// Kick everything off: photo, depth map and (optional) colour portrait load in parallel
+	// A start-up that has already failed (the depth map, say) never uses the portraits, so they
+	// aren't decoded once it has
+	let startupFailed = false;
 	Promise.all([
-		photoReady.then(() => photo.decode()),
-		load(depthUrl),
-		load('/images/hero-depth/portrait-colour.webp').catch(() => null),
+		photoReady.then(() => {
+			if (!disposed && !startupFailed) {
+				portraits = decodePortraits();
+				// initialize() reports a failure; this only stops an unawaited rejection after teardown
+				portraits.catch(() => {});
+			}
+			return photo.decode();
+		}),
+		// A bake from an earlier visit needs no depth map
+		bakedDepths.has(depthUrl) ? null : load(depthUrl),
 	])
-		.then(async ([, depth, colour]) => {
+		.then(async ([, depth]) => {
 			if (disposed) return;
-			colourImage = colour;
-			// The bake decodes the whole depth map, so it waits for the wave like the GPU work
-			await waitForNavigationScene(events.signal);
-			if (disposed) return;
-			bakedDepth = bakeDepth(depth);
+			const cached = bakedDepths.get(depthUrl);
+			if (cached) bakedDepth = cached;
+			else {
+				if (!depth) throw new Error('Depth map missing');
+				// The bake decodes the whole depth map, so it waits for the wave like the GPU work
+				await waitForNavigationScene(events.signal);
+				if (disposed) return;
+				bakedDepth = bakeDepth(depth);
+				bakedDepths.set(depthUrl, bakedDepth);
+			}
 			// The bake and the shader compile each get their own task
 			return yieldToMain().then(() => {
 				if (!disposed) void initialize();
 			});
 		})
 		.catch(() => {
+			startupFailed = true;
+			discardPortraits();
 			if (!disposed) onReady(false);
 		});
 
@@ -929,12 +1008,13 @@ export function mountDepthEffect({
 		destroy() {
 			disposed = true;
 			generation++;
+			discardPortraits();
 			stopLiquid();
 			logoObserver.disconnect();
 			pauseObserver.disconnect();
 			decorationResizer.disconnect();
 			themeObserver.disconnect();
-			gsap.ticker.remove(draw);
+			gsap.ticker.remove(tick);
 			events.abort();
 			observer.disconnect();
 			resizer.disconnect();

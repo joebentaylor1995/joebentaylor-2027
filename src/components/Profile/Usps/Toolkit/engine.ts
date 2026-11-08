@@ -1,6 +1,8 @@
 // Imports
 // ------------
+
 import { getSettings, subscribe } from '@parts/ProfileReveal/Settings/store';
+import { frameStep } from '@utils/frameClock';
 import { yieldSceneWork } from '@utils/prepareScene';
 import { gsap } from 'gsap';
 import { Body, Sleeping } from 'matter-js';
@@ -17,6 +19,12 @@ const RESOLUTION = 3;
 
 // Longest frame time (ms) fed to the physics, so a stalled tab doesn't fast-forward the simulation
 const MAX_DELTA = 50;
+
+// NOTE • Why: frame times on the vsync clock land a hair either side of the physics step
+// (8.333 vs 8.3333ms at 120Hz), so a strict comparison ran 0 steps one frame and 2 the next.
+// A step is taken once the accumulator is within this much of a whole step; the remainder
+// (now possibly slightly negative) carries over, so the simulation keeps exact time overall.
+const STEP_TOLERANCE = 1;
 
 // Physics steps run up front when motion is reduced, so tiles appear already at rest
 const SETTLE_STEPS = 600;
@@ -153,7 +161,17 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		texture.flipY = false;
 		const mesh = new THREE.Mesh(
 			new THREE.PlaneGeometry(SIZE, SIZE),
-			new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, depthTest: false })
+			new THREE.MeshBasicMaterial({
+				map: texture,
+				transparent: true,
+				side: THREE.DoubleSide,
+				depthTest: false,
+				// NOTE • Why: a transparent double-sided material is otherwise drawn twice (back
+				// faces, then front) and its program re-checked for both passes, every tile every
+				// frame. A tile is a flat plane turned only about z, so one pass always drew
+				// nothing, and MeshBasicMaterial without lights or an env map shades both faces alike.
+				forceSinglePass: true,
+			})
 		);
 		scene.add(mesh);
 		return mesh;
@@ -198,6 +216,16 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 	const events = new AbortController();
 	const options = { signal: events.signal };
 
+	// NOTE • Why: each button's variables were rewritten every frame, including for tiles that
+	// are asleep. The last value written per button and property is kept, so an unchanged
+	// value skips setProperty (and its CSS parse) altogether.
+	const written = buttons.map(() => new Map<string, string>());
+	function setToolProperty(index: number, property: string, value: string) {
+		if (written[index].get(property) === value) return;
+		written[index].set(property, value);
+		buttons[index].style.setProperty(property, value);
+	}
+
 	// Copy each body's position/angle to its mesh (or 2D draw) and to its button's CSS variables, then render
 	function draw() {
 		fallback?.clearRect(0, 0, width, height);
@@ -205,11 +233,10 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 			const mesh = meshes[index];
 			mesh.position.set(body.position.x, body.position.y, 0);
 			mesh.rotation.z = body.angle;
-			const button = buttons[index];
-			button.style.setProperty('--tool-size', `${SIZE * scale}px`);
-			button.style.setProperty('--tool-x', `${(body.position.x - SIZE / 2) * scale}px`);
-			button.style.setProperty('--tool-y', `${(body.position.y - SIZE / 2) * scale}px`);
-			button.style.setProperty('--tool-angle', `${body.angle}rad`);
+			setToolProperty(index, '--tool-size', `${SIZE * scale}px`);
+			setToolProperty(index, '--tool-x', `${(body.position.x - SIZE / 2) * scale}px`);
+			setToolProperty(index, '--tool-y', `${(body.position.y - SIZE / 2) * scale}px`);
+			setToolProperty(index, '--tool-angle', `${body.angle}rad`);
 			if (fallback) {
 				fallback.save();
 				fallback.translate(body.position.x, body.position.y);
@@ -233,10 +260,10 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 		gsap.ticker.add(tick);
 	}
 
-	// Fixed-timestep physics from accumulated frame time
-	function tick(_time: number, delta: number) {
-		accumulator += Math.min(delta, MAX_DELTA);
-		while (accumulator >= STEP) {
+	// Fixed-timestep physics from accumulated frame time (this frame's vsync interval)
+	function tick() {
+		accumulator += Math.min(frameStep(), MAX_DELTA);
+		while (accumulator >= STEP - STEP_TOLERANCE) {
 			physics.step();
 			accumulator -= STEP;
 		}

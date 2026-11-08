@@ -6,7 +6,8 @@
 // project flies one sheet (a mesh textured with the clicked slide, then the hero image) from the slide's place on
 // the ribbon until it fills the viewport, spreading outwards from the click point with a small ripple.
 // Loaded before app.js, which creates the instance; at call time it uses app.js globals (canvas, gridView, ready,
-// featured, position, atlas sizes, requestRender, imageLoad) and navigation.js (routeHistory, routeLocation, fromHost).
+// featured, position, atlas sizes, requestRender, imageLoad), navigation.js (routeHistory, routeLocation, fromHost) and
+// gl-async.js (linkProgramAsync, whenLinked, checkProgram, decodeTextureBitmap).
 //
 // Phases:
 // 1. open() fetches the hero details, (when embedded) asks the host to prepare its page, loads the hero image and
@@ -392,7 +393,14 @@ class ProjectTransition {
 			}
 			const image = await imageLoad(this.hero(project), !this.embedded);
 			if (serial !== this.serial) return;
-			this.pending = { project, hit, point, image, destination: this.upload(image) };
+			// The same pixels, decoded off the main thread when the bytes are cached (null otherwise: the <img> is uploaded)
+			const bitmap = await decodeTextureBitmap(image);
+			if (serial !== this.serial) {
+				bitmap?.close();
+				return;
+			}
+			this.pending = { project, hit, point, image, destination: this.upload(bitmap || image) };
+			bitmap?.close();
 			requestRender();
 		} catch (error) {
 			if (serial === this.serial) {
@@ -405,7 +413,8 @@ class ProjectTransition {
 			}
 		}
 	}
-	// Upload the hero while the ribbon is at rest after the tap: on phones the upload alone outlasts a frame, and inside begin() it would stutter the expansion's first frame
+	// Upload the hero while the ribbon is at rest after the tap: on phones the upload alone outlasts a frame, and inside begin() it would stutter the expansion's first frame.
+	// `image` is the decoded ImageBitmap, or the <img> itself.
 	upload(image) {
 		const gl = this.gl,
 			unit = gl.getParameter(gl.ACTIVE_TEXTURE);
@@ -577,20 +586,36 @@ class ProjectTransition {
 		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 		this.vertexCount = indices.length;
 	}
-	// Link the expansion program in idle time: the first compile in a fresh WebKit process can stall the main thread for most of a second, which would swallow the whole animation on the first tap
+	// Link the expansion program in idle time: the first compile in a fresh WebKit process can stall the main thread for most of a second, which would swallow the whole animation on the first tap.
+	// NOTE • Linked without reading it back (gl-async.js), so even that compile no longer holds the main thread; its
+	// result is read once the GPU process reports it done. The program then lives as long as the context, so later taps
+	// never relink it.
 	warm() {
-		if (this.warmProgram) return;
-		try {
-			this.warmProgram = this.link();
-		} catch {}
+		if (this.sheet || this.sheetLinking) return;
+		const linking = (this.sheetLinking = linkProgramAsync(this.gl, this.sheetShaders()));
+		whenLinked(this.gl, linking.program).then(() => {
+			// A tap may already have read it (compile() below).
+			if (this.sheetLinking !== linking) return;
+			try {
+				this.sheet = this.finishSheet(linking);
+			} catch {
+				// The program is gone: a tap links it again and reports the error, as before.
+			}
+		});
 	}
-	// Uses the warmed program if there is one, and caches the uniform locations.
+	// Uses the linked program (reading a pending link now, or linking one, as before), with its cached locations.
 	compile() {
+		if (!this.sheet)
+			this.sheet = this.finishSheet(this.sheetLinking || linkProgramAsync(this.gl, this.sheetShaders()));
+		this.program = this.sheet.program;
+		this.uniforms = this.sheet.uniforms;
+	}
+	// Reads a sheet link's result (throwing any compile or link error) and looks up its uniform and attribute locations.
+	finishSheet(linking) {
 		const gl = this.gl;
-		this.program = this.warmProgram || this.link();
-		this.warmProgram = null;
-		this.resources.push(['program', this.program]);
-		this.uniforms = {};
+		this.sheetLinking = null;
+		const program = checkProgram(gl, linking, true),
+			uniforms = {};
 		for (const key of [
 			'Progress',
 			'Background',
@@ -614,13 +639,18 @@ class ProjectTransition {
 			'Lift',
 			'Shading',
 		])
-			this.uniforms[key] = gl.getUniformLocation(this.program, 'u' + key);
+			uniforms[key] = gl.getUniformLocation(program, 'u' + key);
+		return {
+			program,
+			uniforms,
+			start: gl.getAttribLocation(program, 'aStart'),
+			uv: gl.getAttribLocation(program, 'aUV'),
+		};
 	}
-	// Compiles and links the sheet program.
-	link() {
-		const gl = this.gl,
-			program = gl.createProgram();
-		const shaders = [
+	// The sheet program's shaders, as [type, source] pairs.
+	sheetShaders() {
+		const gl = this.gl;
+		return [
 			// Each vertex runs the same flight, delayed by its distance from the clicked point. The billow (env) is zero at both ends of a vertex's flight, so the sheet still leaves the ribbon and lands on the viewport exactly. The lead overtakes the edges still waiting on the ribbon, so depth keeps it on top: they tuck underneath instead of showing through.
 			[
 				gl.VERTEX_SHADER,
@@ -691,21 +721,6 @@ class ProjectTransition {
 				`,
 			],
 		];
-		for (const [type, src] of shaders) {
-			const s = gl.createShader(type);
-			gl.shaderSource(s, src);
-			gl.compileShader(s);
-			if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(s));
-			gl.attachShader(program, s);
-			gl.deleteShader(s);
-		}
-		gl.linkProgram(program);
-		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-			const log = gl.getProgramInfoLog(program);
-			gl.deleteProgram(program);
-			throw Error(log);
-		}
-		return program;
 	}
 	// One frame of the flight, called by renderScene while `active`. `progress` is elapsed / duration (or the scrubbed value).
 	// A return plays `returnFrom` back down through the same flight on a smoothstep. `flight` is the shader's progress and
@@ -758,8 +773,8 @@ class ProjectTransition {
 		gl.useProgram(this.program);
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vertices);
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indices);
-		const a = gl.getAttribLocation(this.program, 'aStart'),
-			b = gl.getAttribLocation(this.program, 'aUV');
+		const a = this.sheet.start,
+			b = this.sheet.uv;
 		gl.enableVertexAttribArray(a);
 		// Interleaved vertices: 5 floats (20 bytes), position xyw then UV.
 		gl.vertexAttribPointer(a, 3, gl.FLOAT, false, 20, 0);
@@ -867,19 +882,15 @@ class ProjectTransition {
 		document.body.classList.add('project-arrived');
 		this.page.querySelector('button').focus({ preventScroll: true });
 	}
-	// Releases this flight's GL textures, buffers and program.
+	// Releases this flight's GL textures and buffers. The program stays linked for the next flight.
 	dispose() {
 		const gl = this.gl;
 		if (this.program) {
-			for (const name of ['aStart', 'aUV']) {
-				const slot = gl.getAttribLocation(this.program, name);
-				if (slot >= 0) gl.disableVertexAttribArray(slot);
-			}
+			for (const slot of [this.sheet.start, this.sheet.uv]) if (slot >= 0) gl.disableVertexAttribArray(slot);
 		}
 		for (const [type, item] of this.resources) {
 			if (type === 'texture') gl.deleteTexture(item);
 			else if (type === 'buffer') gl.deleteBuffer(item);
-			else gl.deleteProgram(item);
 		}
 		this.resources = [];
 		this.program = null;

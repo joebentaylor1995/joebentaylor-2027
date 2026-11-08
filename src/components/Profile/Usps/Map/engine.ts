@@ -1,8 +1,11 @@
 // Imports
 // ------------
+
 import { getSettings, subscribe } from '@parts/ProfileReveal/Settings/store';
 import { canHover } from '@utils/desktopHover';
+import { frameStep } from '@utils/frameClock';
 import { yieldSceneWork } from '@utils/prepareScene';
+import { enableParallelCompile } from '@utils/webgl';
 import { gsap } from 'gsap';
 import { loadGeometry } from './loadGeometry';
 import { framing, projectLocation, rotation } from './projection';
@@ -68,6 +71,7 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 	const context = canvas.getContext('webgl', { antialias: true, alpha: true });
 	if (!context) throw new Error('WebGL unavailable');
 	const gl = context;
+	const parallel = enableParallelCompile(gl);
 
 	const shaders: WebGLShader[] = [];
 	const buffers: WebGLBuffer[] = [];
@@ -97,7 +101,6 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		gl.linkProgram(program);
 
 		// Wait for compilation without blocking the main thread
-		const parallel = gl.getExtension('KHR_parallel_shader_compile');
 		do {
 			await yieldSceneWork();
 			signal.throwIfAborted();
@@ -154,7 +157,8 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 	let visible = false,
 		ticking = false,
 		disposed = false,
-		contextLost = false;
+		contextLost = false,
+		drawPending = false;
 	let width = 1,
 		height = 1;
 	let frame = framing(width, height);
@@ -163,6 +167,8 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 	function stop() {
 		gsap.ticker.remove(tick);
 		ticking = false;
+		// A drag move waiting for this frame's tick is drawn now, as it was before it was deferred
+		if (drawPending) draw();
 	}
 	function wake() {
 		if (disposed || contextLost || !visible || document.hidden || ticking) return;
@@ -170,10 +176,21 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		gsap.ticker.add(tick);
 	}
 
+	// NOTE • Why: the reveal and marker variables were rewritten every drawn frame, though the
+	// reveal sits at 1 after the intro and the marker often holds still. Unchanged values are
+	// skipped (Map keyed by target and property: the last value written).
+	const written = new Map<string, string>();
+	function setStyle(target: HTMLElement | null, key: string, property: string, value: string) {
+		if (written.get(key) === value) return;
+		written.set(key, value);
+		target?.style.setProperty(property, value);
+	}
+
 	// Render one frame and position the Doncaster marker (hidden when it turns to the back)
 	function draw() {
+		drawPending = false;
 		if (disposed || contextLost) return;
-		element.style.setProperty('--map-reveal', String(reveal * reveal * (3 - 2 * reveal)));
+		setStyle(element, 'reveal', '--map-reveal', String(reveal * reveal * (3 - 2 * reveal)));
 		const matrix = rotation({
 			longitude: view.longitude + hover.x,
 			latitude: clampLatitude(view.latitude + hover.y),
@@ -189,14 +206,23 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		}
 
 		const location = projectLocation(matrix);
-		marker?.style.setProperty('--map-x', `${frame.x + location.x * frame.radius}px`);
-		marker?.style.setProperty('--map-y', `${frame.y - location.y * frame.radius}px`);
-		marker?.style.setProperty('--map-opacity', String(Math.max(0, Math.min(1, (location.z - 0.05) / 0.3))));
+		setStyle(marker, 'x', '--map-x', `${frame.x + location.x * frame.radius}px`);
+		setStyle(marker, 'y', '--map-y', `${frame.y - location.y * frame.radius}px`);
+		setStyle(marker, 'opacity', '--map-opacity', String(Math.max(0, Math.min(1, (location.z - 0.05) / 0.3))));
+	}
+
+	// NOTE • Why: pointer moves can arrive more than once a frame, and each drew the whole globe.
+	// While the ticker runs, a drag move only marks the frame dirty and the tick (in the same
+	// rendering update, before anything is presented) draws the latest view once.
+	function requestDraw() {
+		drawPending = true;
+		wake();
+		if (!ticking) draw();
 	}
 
 	// Advance reveal, the intro/return journey (ease-out quintic) and hover easing; stop once everything has settled
-	function tick(_time: number, deltaMs: number) {
-		const dt = deltaMs / 1000;
+	function tick() {
+		const dt = frameStep() / 1000;
 		reveal = Math.min(1, reveal + dt / settings.globeFade);
 		if (journey) {
 			journey.elapsed += dt;
@@ -296,7 +322,7 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 				if (event.pointerId !== drag.id) return;
 				view.longitude = drag.longitude - (event.clientX - drag.x) * 0.18;
 				view.latitude = clampLatitude(drag.latitude + (event.clientY - drag.y) * 0.18);
-				draw();
+				requestDraw();
 				return;
 			}
 			if (

@@ -11,6 +11,26 @@
 // SECTION • Layer order — lowest priority first
 @layer reset, base, grid, utilities;
 
+// SECTION • Per-frame custom properties
+// NOTE • Written every frame of an animation, and read only by the element that
+// sets them. Unregistered, a custom property inherits, so each write restyled the
+// setter's whole subtree — for --loader-page-y on #page, the entire page through
+// the loader reveal. Registered as non-inheriting, only that element restyles.
+// syntax '*' keeps the value a plain token stream, exactly as before: no type
+// check, and nothing for a transition to interpolate.
+// --loader-page-y • #page, from SiteLoader/window-reveal.ts
+@property --loader-page-y {
+	syntax: '*';
+	inherits: false;
+}
+
+// --tfw-fill • the text fill wave, tweened on the element that draws it: PageTitleReveal
+// .jacket, Introduction/Title .line, CallToAction .titleLine and ProjectOutro .wave
+@property --tfw-fill {
+	syntax: '*';
+	inherits: false;
+}
+
 // SECTION • Reset
 @layer reset {
 	* {

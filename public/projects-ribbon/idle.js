@@ -17,6 +17,8 @@ class IdleMotion {
 	// Once idle ends, the drift decays exponentially at this rate per second and snaps to zero below the floor.
 	static DECAY_RATE = 6;
 	static STOP_SPEED = 0.002;
+	// NOTE • Read on every input event and every frame: one live MediaQueryList rather than parsing a new query each time
+	static REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
 
 	constructor(wake) {
 		this.wake = wake;
@@ -33,7 +35,7 @@ class IdleMotion {
 	activity(wake = true) {
 		this.lastActivity = performance.now();
 		clearTimeout(this.timer);
-		if (!document.hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches)
+		if (!document.hidden && !IdleMotion.REDUCED_MOTION.matches)
 			this.timer = setTimeout(() => this.wake(), IdleMotion.GRACE_MS + IdleMotion.WAKE_MARGIN_MS);
 		if (wake) this.wake();
 	}
@@ -55,7 +57,7 @@ class IdleMotion {
 	// Per-frame step. Returns the scroll `delta` to apply, whether drift is `moving`, and
 	// whether it has just `stopped`. `blocked` pauses it.
 	update(time, dt, mode, blocked) {
-		if (blocked || document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+		if (blocked || document.hidden || IdleMotion.REDUCED_MOTION.matches) {
 			this.reset(false);
 			return { delta: 0, moving: false, stopped: false };
 		}

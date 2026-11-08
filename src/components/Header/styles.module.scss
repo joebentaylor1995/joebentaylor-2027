@@ -186,6 +186,10 @@
 	inset: 0 0 calc(-4 * var(--gap-xl));
 	pointer-events: none;
 
+	// Fully transparent at the top of the page; removed so its backdrop filters aren't composited
+	// (Blink can keep a render surface for a merely invisible backdrop filter)
+	&[data-idle] { display: none; }
+
 	span {
 		position: absolute;
 		// Overscan keeps backdrop sampling edges outside the visible fade.

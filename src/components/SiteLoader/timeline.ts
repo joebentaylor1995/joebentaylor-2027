@@ -8,7 +8,7 @@ import type { RefObject } from 'react';
 import { landLoader, revealScene, settleLoader } from './events';
 import { renderFade } from './fade-reveal';
 import { createIntro, INTRO_FPS, INTRO_FRAMES, INTRO_LAST_FRAME, type IntroIds } from './intro';
-import { LOGO_BOX } from './logoPaths';
+import { LOGO_BOX, WASH_BLUR } from './logoPaths';
 import { MOBILE_SCALE_DURATION, MOBILE_SCALE_EASE } from './mobile-intro';
 import { type LoaderSettings, loaderControl, loaderSettings } from './settings';
 import { renderRevealWindow } from './window-reveal';
@@ -44,6 +44,12 @@ const FRAMES_BEFORE_RELEASE = 2;
 const HOMEPAGE_SCENE_DEADLINE_MS = 15000;
 const PAGE_SCENE_DEADLINE_MS = 2000;
 const ASSET_DEADLINE_MS = 1500;
+// NOTE • The wash circle (centred on the logo, edge blurred by WASH_BLUR) has erased every
+// logo pixel once it reaches this far, in artboard units: the logo's corners plus six blur
+// deviations, where the blurred edge leaves well under one 8-bit level of the logo. Growing
+// it further changes nothing on screen, so its radius stops here.
+const WASH_ERASE_DEVIATIONS = 6;
+const WASH_ERASED_RADIUS = Math.hypot(LOGO_BOX.width / 2, LOGO_BOX.height / 2) + WASH_ERASE_DEVIATIONS * WASH_BLUR;
 
 // Scene
 // ------------
@@ -119,9 +125,12 @@ const setProjectWave = ({ projectsListing, waveSettings, projectHero, fadeReveal
 	if (entrance) entrance.waterReveal = fadeReveal ? 1 : progress;
 };
 
+// NOTE • Each new wash radius re-rasterises the blurred, masked logo, so an unchanged one
+// (past WASH_ERASED_RADIUS) isn't written again
 const setApertureRadius = ({ circle, wash, logoWidth }: LoaderScene, radius: number) => {
 	circle?.setAttribute('r', String(radius));
-	wash?.setAttribute('r', String(radius / (logoWidth / LOGO_BOX.width)));
+	const washRadius = String(Math.min(radius / (logoWidth / LOGO_BOX.width), WASH_ERASED_RADIUS));
+	if (wash && wash.getAttribute('r') !== washRadius) wash.setAttribute('r', washRadius);
 };
 
 const markLoaderComplete = ({ root, finished }: LoaderScene) => {

@@ -21,6 +21,16 @@ const Calendar = lazy(() => import('./Calendar'));
 const CLOSE_MAGNET_STRENGTH = 0.22;
 const CLOSE_MAGNET_LIMIT = 5;
 
+// Helpers
+// ------------
+// Created on first use, then reused: its `matches` stays live, so there's no need for a
+// new MediaQueryList on every pointermove
+let reducedMotionQuery: MediaQueryList | undefined;
+const prefersReducedMotion = () => {
+	reducedMotionQuery ??= window.matchMedia('(prefers-reduced-motion: reduce)');
+	return reducedMotionQuery.matches;
+};
+
 // Component
 // ------------
 const ContactModal = ({ onClose }: I.ContactModalProps) => {
@@ -31,6 +41,8 @@ const ContactModal = ({ onClose }: I.ContactModalProps) => {
 	// Refs
 	const dialogRef = useRef<HTMLDialogElement>(null);
 	const closeButtonRef = useRef<HTMLButtonElement>(null);
+	// The close button's box while the pointer is over it (null until measured)
+	const closeBoundsRef = useRef<DOMRect | null>(null);
 
 	// State
 	const [isClosing, setIsClosing] = useState(false);
@@ -43,6 +55,16 @@ const ContactModal = ({ onClose }: I.ContactModalProps) => {
 		const overflow = page?.style.overflow;
 		const lenis = lenisRef.current?.lenis;
 		const wasStopped = lenis?.isStopped;
+		const scrollRoot = lenis?.rootElement;
+		const scrollOverflow = scrollRoot?.style.overflow ?? '';
+		// NOTE • Lenis' stopped class sets overflow: clip, which stops the wrapper being a scroll
+		// container: the page behind jumped to the top as the backdrop faded in (and back once it
+		// faded out), and the scroller was torn down and rebuilt. Inline 'auto' (the wrapper's own
+		// value) keeps the container, its position and its composited scrolling, as ProfileReveal
+		// does; the page still can't scroll behind the modal dialog, which makes it inert, and
+		// Lenis is stopped. When the page Lenis is already stopped (opened over the profile), its
+		// owner has done this already.
+		if (scrollRoot && !wasStopped) scrollRoot.style.overflow = 'auto';
 		dialog?.showModal();
 		lenis?.stop();
 		if (page) page.style.overflow = 'hidden';
@@ -50,9 +72,19 @@ const ContactModal = ({ onClose }: I.ContactModalProps) => {
 			dialog?.close();
 			if (page) page.style.overflow = overflow ?? '';
 			if (lenis && !wasStopped) lenis.start();
+			if (scrollRoot && !wasStopped) scrollRoot.style.overflow = scrollOverflow;
 			if (previousFocus instanceof HTMLElement) previousFocus.focus({ preventScroll: true });
 		};
 	}, [lenisRef]);
+
+	// NOTE • The close button is fixed, so its box only moves when the viewport changes
+	useEffect(() => {
+		const forgetCloseBounds = () => {
+			closeBoundsRef.current = null;
+		};
+		window.addEventListener('resize', forgetCloseBounds);
+		return () => window.removeEventListener('resize', forgetCloseBounds);
+	}, []);
 
 	useEffect(() => {
 		if (!isClosing) return;
@@ -72,18 +104,18 @@ const ContactModal = ({ onClose }: I.ContactModalProps) => {
 	const allowCalendar = () => saveConsent({ ...(getConsent() ?? noConsent()), marketing: true });
 	const close = () => setIsClosing(true);
 	const resetCloseMagnet = () => {
+		closeBoundsRef.current = null;
 		closeButtonRef.current?.style.removeProperty('--magnetic-x');
 		closeButtonRef.current?.style.removeProperty('--magnetic-y');
 	};
 	const moveCloseMagnet = (event: PointerEvent<HTMLButtonElement>) => {
-		if (
-			!canHover() ||
-			event.pointerType !== 'mouse' ||
-			window.matchMedia('(prefers-reduced-motion: reduce)').matches
-		)
-			return;
+		if (!canHover() || event.pointerType !== 'mouse' || prefersReducedMotion()) return;
 		const button = event.currentTarget;
-		const bounds = button.getBoundingClientRect();
+		// NOTE • Measured once per hover: the previous move's --magnetic-* writes left style
+		// dirty, so reading the box on every move forced a style recalc. The magnet moves the
+		// icon inside, never the button itself, so the box is the same every time.
+		closeBoundsRef.current ??= button.getBoundingClientRect();
+		const bounds = closeBoundsRef.current;
 		const pull = (distance: number) =>
 			Math.max(-CLOSE_MAGNET_LIMIT, Math.min(CLOSE_MAGNET_LIMIT, distance * CLOSE_MAGNET_STRENGTH));
 		button.style.setProperty('--magnetic-x', `${pull(event.clientX - bounds.left - bounds.width / 2)}px`);

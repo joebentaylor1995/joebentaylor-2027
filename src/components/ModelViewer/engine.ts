@@ -11,6 +11,7 @@
 
 // Imports
 // ------------
+import { frameStep } from '@utils/frameClock';
 import gsap from 'gsap';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -55,6 +56,10 @@ const MAX_PIXEL_RATIO = 2;
 // Public path the Draco decoder files are served from
 const DRACO_DECODER = '/draco/';
 
+// The camera pose as last drawn: position (x, y, z), then quaternion (x, y, z, w)
+const POSE_LENGTH = 7;
+const QUATERNION_OFFSET = 3;
+
 // Helpers
 // ------------
 // Frees GPU memory (geometry, materials and their textures) for every mesh under root
@@ -79,7 +84,8 @@ const distanceFor = (radius: number, aspect: number) => {
 // Exports
 // ------------
 // Loads the model, sets up the renderer, camera and orbit controls, and returns handles to
-// toggle auto-rotation and dispose everything. Rejects with the signal's reason if aborted mid-load.
+// toggle auto-rotation and dispose everything. Rejects with the signal's reason (having freed what
+// it made) if aborted while the model loads or its shaders compile.
 export const createModelViewer = async (
 	canvas: HTMLCanvasElement,
 	url: string,
@@ -145,6 +151,70 @@ export const createModelViewer = async (
 	controls.addEventListener('start', onDragStart);
 	controls.addEventListener('end', onDragEnd);
 
+	// Frees the controls and everything on the GPU
+	const release = () => {
+		resumeCall?.kill();
+		controls.removeEventListener('start', onDragStart);
+		controls.removeEventListener('end', onDragEnd);
+		controls.dispose();
+		disposeObject(model);
+		environment.dispose();
+		pmrem.dispose();
+		renderer.dispose();
+	};
+
+	// NOTE • Why: the first render would otherwise compile the model's PBR programs right
+	// after the click, blocking the page for hundreds of ms on a cold shader cache. This
+	// compiles the same programs in parallel (KHR_parallel_shader_compile), so the first
+	// render below finds them ready. Until then the poster shows, as it did while blocked.
+	// A context lost mid-compile (and not restored) never settles it, so teardown or a loss
+	// ends the wait too.
+	const waiting = new AbortController();
+	await Promise.race([
+		renderer.compileAsync(scene, camera),
+		new Promise<void>(resolve => {
+			if (signal.aborted) return resolve();
+			signal.addEventListener('abort', () => resolve(), { once: true, signal: waiting.signal });
+			canvas.addEventListener('webglcontextlost', () => resolve(), { once: true, signal: waiting.signal });
+		}),
+	]);
+	waiting.abort();
+	if (signal.aborted) {
+		release();
+		throw signal.reason;
+	}
+
+	// Drawing
+	// NOTE • Why: the model and its lighting never change, so a frame only differs when the
+	// camera moved (auto-rotation, a drag or its damping) or the canvas was resized. Re-drawing
+	// an unchanged pose gave the identical image every frame. The damping comes to rest on an
+	// exact pose, so a paused model stops drawing a few seconds after its last drag.
+	const drawnPose = Array.from({ length: POSE_LENGTH }, () => Number.NaN);
+	let needsRender = true;
+	const render = () => {
+		needsRender = false;
+		renderer.render(scene, camera);
+		camera.position.toArray(drawnPose);
+		camera.quaternion.toArray(drawnPose, QUATERNION_OFFSET);
+	};
+	const cameraMoved = () => {
+		const { position, quaternion } = camera;
+		return (
+			position.x !== drawnPose[0] ||
+			position.y !== drawnPose[1] ||
+			position.z !== drawnPose[2] ||
+			quaternion.x !== drawnPose[3] ||
+			quaternion.y !== drawnPose[4] ||
+			quaternion.z !== drawnPose[5] ||
+			quaternion.w !== drawnPose[6]
+		);
+	};
+	// A restored context comes back blank
+	const onContextRestored = () => {
+		needsRender = true;
+	};
+	canvas.addEventListener('webglcontextrestored', onContextRestored);
+
 	// Sizing
 	// NOTE • Keeps the camera's direction, re-fitting its distance to the new shape
 	const resize = () => {
@@ -159,20 +229,26 @@ export const createModelViewer = async (
 			: new THREE.Vector3(0, Math.sin(VIEW_ELEVATION), Math.cos(VIEW_ELEVATION));
 		camera.position.copy(direction.multiplyScalar(distance));
 		controls.update();
+		// A resized canvas is cleared, and the projection changed
+		needsRender = true;
 	};
 
 	// Frame loop
+	// NOTE • Steps by the vsync interval (see src/utils/frameClock.ts) so auto-rotation turns
+	// evenly; GSAP's own delta is whole milliseconds. Its delta covers a run's first frame.
 	const tick = (_time: number, deltaTime: number) => {
-		controls.update(deltaTime / 1000);
-		renderer.render(scene, camera);
+		controls.update((frameStep() || deltaTime) / 1000);
+		if (needsRender || cameraMoved()) render();
 	};
 
-	// Only ticks while the canvas is on screen
+	// Only ticks while the canvas is on screen; coming back on screen draws afresh
 	let isTicking = false;
 	const setTicking = (shouldTick: boolean) => {
 		if (shouldTick === isTicking) return;
-		if (shouldTick) gsap.ticker.add(tick);
-		else gsap.ticker.remove(tick);
+		if (shouldTick) {
+			needsRender = true;
+			gsap.ticker.add(tick);
+		} else gsap.ticker.remove(tick);
 		isTicking = shouldTick;
 	};
 
@@ -182,7 +258,7 @@ export const createModelViewer = async (
 	resizeObserver.observe(canvas);
 	visibility.observe(canvas);
 	resize();
-	renderer.render(scene, camera);
+	render();
 
 	// Handle
 	return {
@@ -193,16 +269,10 @@ export const createModelViewer = async (
 		},
 		dispose: () => {
 			setTicking(false);
-			resumeCall?.kill();
 			resizeObserver.disconnect();
 			visibility.disconnect();
-			controls.removeEventListener('start', onDragStart);
-			controls.removeEventListener('end', onDragEnd);
-			controls.dispose();
-			disposeObject(model);
-			environment.dispose();
-			pmrem.dispose();
-			renderer.dispose();
+			canvas.removeEventListener('webglcontextrestored', onContextRestored);
+			release();
 		},
 	};
 };

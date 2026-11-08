@@ -1,7 +1,15 @@
 // Imports
 // ------------
 import { DESKTOP_HOVER_QUERY } from '@utils/desktopHover';
-import { setClampedLinear } from '@utils/webgl';
+import { frameStep } from '@utils/frameClock';
+import {
+	decodeTextureImage,
+	enableParallelCompile,
+	setClampedLinear,
+	type TextureImage,
+	uploadTextureImage,
+	waitForProgram,
+} from '@utils/webgl';
 import { gsap } from 'gsap';
 import { drawHeroContent } from '../../Hero/Background/hero-content-texture';
 import { createLiquidLayer, type LiquidLayer } from '../../Hero/Background/liquid';
@@ -53,8 +61,8 @@ const MAX_PIXELS = 4000000;
 // Media movement (px) too small to be worth a portrait redraw
 const MEDIA_TOP_TOLERANCE = 0.01;
 
-// Delay between checks while the program links in parallel
-const LINK_POLL_MS = 16;
+// Backing store a torn-down canvas keeps (it's hidden then; the next mount resizes it)
+const RELEASED_CANVAS_SIZE = 1;
 
 // Engine
 // ------------
@@ -67,6 +75,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 	// GL + shared handles
 	const gl = canvas.getContext('webgl', { alpha: false, antialias: false, powerPreference: 'low-power' });
 	if (!gl) return () => {};
+	enableParallelCompile(gl);
 	const bindProgram = gl.useProgram.bind(gl);
 	const events = new AbortController();
 	const media = photo.parentElement;
@@ -195,16 +204,21 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 
 		if (!dirty && stirSecondsRemaining <= 0 && entrance.waterReveal === 1 && previousReveal === 1) return;
 
-		const dt = Math.min(delta / 1000, MAX_FRAME_SECONDS);
+		// NOTE • The vsync step (see src/utils/frameClock.ts), so the ripples advance evenly;
+		// GSAP's own delta is whole milliseconds. Falls back to it on a run's first frame.
+		const dt = Math.min((frameStep() || delta) / 1000, MAX_FRAME_SECONDS);
 
 		if (dirty) drawPortrait(layer, mediaBounds, bounds);
 
 		layer.draw(dt, 0, 0);
 		previousReveal = entrance.waterReveal;
 		stirSecondsRemaining -= dt;
-		canvas.dataset.ready = 'true';
-		if (bakeText) host.dataset.waterText = 'true';
-		canvas.dataset.intro = entrance.waterReveal === 1 ? 'complete' : 'playing';
+		// NOTE • Written only when they change: each write is an attribute mutation that
+		// observers and style invalidation would otherwise see on every drawn frame
+		const intro = entrance.waterReveal === 1 ? 'complete' : 'playing';
+		if (canvas.dataset.ready !== 'true') canvas.dataset.ready = 'true';
+		if (bakeText && host.dataset.waterText !== 'true') host.dataset.waterText = 'true';
+		if (canvas.dataset.intro !== intro) canvas.dataset.intro = intro;
 	};
 
 	// Idempotent teardown of observers, listeners and GL resources, restoring the plain hero
@@ -226,6 +240,11 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		delete host.dataset.waterText;
 		delete canvas.dataset.ready;
 		delete canvas.dataset.intro;
+		// NOTE • Case studies stay mounted (hidden) under React Activity, and a canvas keeps its
+		// full drawing buffer (up to 4M px) while it does. Without data-ready the canvas is at
+		// opacity 0, so dropping the buffer changes nothing on screen; the next mount resizes it.
+		canvas.width = RELEASED_CANVAS_SIZE;
+		canvas.height = RELEASED_CANVAS_SIZE;
 	};
 
 	// Re-bakes the title raster into its texture
@@ -265,8 +284,13 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 			Math.sqrt(MAX_PIXELS / (width * height))
 		);
 
-		canvas.width = Math.round(width * ratio);
-		canvas.height = Math.round(height * ratio);
+		// NOTE • Fonts, the title reveal and both observed boxes all land here, mostly at an
+		// unchanged size. Assigning a canvas dimension, even to its current value, is how a
+		// drawing buffer gets reallocated, so it is only done when the size really changes.
+		const pixelWidth = Math.round(width * ratio),
+			pixelHeight = Math.round(height * ratio);
+		if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+		if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
 		try {
 			layer?.resize();
 		} catch {
@@ -304,11 +328,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 	// away would block the page through the visitor's first scroll.
 	// Resolves false if the mount went away while waiting.
 	const waitForLink = async (program: WebGLProgram) => {
-		const parallel = gl.getExtension('KHR_parallel_shader_compile');
-		do {
-			await new Promise(resolve => setTimeout(resolve, LINK_POLL_MS));
-			if (disposed || gl.isContextLost()) return false;
-		} while (parallel && !gl.getProgramParameter(program, parallel.COMPLETION_STATUS_KHR));
+		if (!(await waitForProgram(gl, program, () => disposed))) return false;
 		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('Project water shader failed');
 		return true;
 	};
@@ -326,8 +346,9 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		uniforms.shade = gl.getUniformLocation(program, 'shade');
 	};
 
-	// Quad buffer, the photo texture, and the title texture (its pixels are uploaded by resize())
-	const createGeometryAndTextures = () => {
+	// Quad buffer, the photo texture, and the title texture (its pixels are uploaded by resize()).
+	// The photo arrives already decoded and flipped (see initialize()).
+	const createGeometryAndTextures = (photoImage: TextureImage) => {
 		gpu.buffer = gl.createBuffer();
 		gpu.texture = gl.createTexture();
 		if (!gpu.buffer || !gpu.texture) throw new Error('Project water resources unavailable');
@@ -335,9 +356,7 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(QUAD_VERTICES), gl.STATIC_DRAW);
 		gl.bindTexture(gl.TEXTURE_2D, gpu.texture);
 		setClampedLinear(gl);
-		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, photo);
-		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+		uploadTextureImage(gl, photoImage, true);
 
 		gpu.textTexture = gl.createTexture();
 		if (!gpu.textTexture) throw new Error('Project text texture unavailable');
@@ -348,12 +367,15 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 	// Pointer stirs the water only on fine pointers, inside the canvas, over the hero or header
 	const stirWater = (event: PointerEvent) => {
 		if (!finePointer.matches || event.pointerType === 'touch' || isScenePaused()) return;
-		const rect = canvas.getBoundingClientRect();
 		const target = event.target instanceof Element ? event.target : null;
+		// NOTE • The cheap checks come first: this runs for every move anywhere on the page, and
+		// measuring the canvas forces a layout. They end the same way as the bounds check below.
+		if (!visible || !target || (!host.contains(target) && !target.closest('header'))) {
+			layer?.resetPointer();
+			return;
+		}
+		const rect = canvas.getBoundingClientRect();
 		if (
-			!visible ||
-			!target ||
-			(!host.contains(target) && !target.closest('header')) ||
 			event.clientX < rect.left ||
 			event.clientX > rect.right ||
 			event.clientY < rect.top ||
@@ -394,13 +416,30 @@ export function mountProjectWater(canvas: HTMLCanvasElement, photo: HTMLImageEle
 	// Async setup: decode the photo, build the compositing program, create textures, then the liquid layer
 	const initialize = async () => {
 		await photo.decode();
-		await document.fonts.ready;
 		if (disposed) return;
+		// NOTE • Why: texImage2D(<img>) re-decodes and flips the full-width hero photo on the main
+		// thread (~70ms at 4K) as the case study opens. This decodes the same file, already
+		// flipped, off the main thread, starting now so it overlaps the fonts and the link.
+		const photoImage = decodeTextureImage(photo, true);
+		try {
+			await document.fonts.ready;
+			if (disposed) return;
 
-		const program = compileCompositeProgram();
-		if (!(await waitForLink(program))) return;
-		lookupProgramInputs(program);
-		createGeometryAndTextures();
+			const program = compileCompositeProgram();
+			if (!(await waitForLink(program))) return;
+			lookupProgramInputs(program);
+			const image = await photoImage;
+			if (disposed) return;
+			createGeometryAndTextures(image);
+		} finally {
+			// Uploaded (or no longer wanted): the decoded copy can go
+			void photoImage.then(
+				image => {
+					if (image instanceof ImageBitmap) image.close();
+				},
+				() => {}
+			);
+		}
 
 		resize();
 		layer = await createLiquidLayer(

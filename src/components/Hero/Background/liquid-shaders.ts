@@ -120,17 +120,23 @@ export const composite = `
 		vec2 p = uv * screen;
 		float y = (p.y - bottom) / strip.y;
 		vec2 logoUV = vec2(p.x / strip.x + phase, clamp(y, 0., 1.));
-		vec4 logo = texture2D(logos, vec2(fract(logoUV.x), logoUV.y));
-		// Average premultiplied samples so transparent logos blur without dark halos.
-		if (logoBlur > .00001) {
-			logo = vec4(0.);
-			for (int i = 0;i < 9;i++) {
-				vec4 tap = texture2D(logos, vec2(fract(logoUV.x + (float(i) - 4.) * .25 * logoBlur), logoUV.y));
-				logo += vec4(tap.rgb * tap.a, tap.a) / 9.;
+		// NOTE • Outside the strip (0 <= y <= 1) the logo was always multiplied by
+		// step(0., y) * step(y, 1.) = 0, so it's left at 0 there without sampling; inside, that
+		// factor was exactly 1. Most of the screen skips its 1 to 9 logo taps. Checked
+		// bit-identical against the old shader.
+		vec4 logo = vec4(0.);
+		if (y >= 0. && y <= 1.) {
+			logo = texture2D(logos, vec2(fract(logoUV.x), logoUV.y));
+			// Average premultiplied samples so transparent logos blur without dark halos.
+			if (logoBlur > .00001) {
+				logo = vec4(0.);
+				for (int i = 0;i < 9;i++) {
+					vec4 tap = texture2D(logos, vec2(fract(logoUV.x + (float(i) - 4.) * .25 * logoBlur), logoUV.y));
+					logo += vec4(tap.rgb * tap.a, tap.a) / 9.;
+				}
+				logo.rgb /= max(logo.a, .0001);
 			}
-			logo.rgb /= max(logo.a, .0001);
 		}
-		logo *= step(0., y) * step(y, 1.);
 		vec3 col = mix(background, logo.rgb, logo.a);
 		vec4 detail = texture2D(decoration, uv);
 		col = mix(col, detail.rgb, detail.a);

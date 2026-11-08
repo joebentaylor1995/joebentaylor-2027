@@ -40,8 +40,10 @@ const Orbit = ({ images, background, sizes }: I.GalleryAnimationProps) => {
 	// Animations
 	// NOTE • The whole ring turns on one property; each card keeps itself upright in CSS
 	const render = useCallback<GalleryRender>(elapsed => {
-		const loop = (elapsed % TIMING.loop) / TIMING.loop;
-		ringRef.current?.style.setProperty('--spin', `${easeSpin(loop) * 360}deg`);
+		const ring = ringRef.current;
+		const spin = `${easeSpin((elapsed % TIMING.loop) / TIMING.loop) * 360}deg`;
+		// NOTE • Only a new angle is written: redraws on resize (or paused) repeat the last one
+		if (ring && ring.style.getPropertyValue('--spin') !== spin) ring.style.setProperty('--spin', spin);
 	}, []);
 	useGalleryLoop(stageRef, render, isPaused);
 

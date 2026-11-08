@@ -15,6 +15,8 @@ class RibbonIntroduction {
 	static CASCADE_EFFECT = 9;
 	static CASCADE_STAGGER_STEPS = 4;
 	static REDUCED_FADE_MS = 250;
+	// NOTE • Read every frame while the intro runs: one live MediaQueryList rather than parsing a new query each time
+	static REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
 
 	// `requestFrame` asks app.js for a render; `prepare` runs at the start of each `play()`.
 	constructor(requestFrame, prepare) {
@@ -125,18 +127,21 @@ class RibbonIntroduction {
 		this.start = null;
 		this.progress = 0;
 		this.active = true;
-		document.querySelector('#intro-status').textContent = matchMedia('(prefers-reduced-motion: reduce)').matches
+		document.querySelector('#intro-status').textContent = RibbonIntroduction.REDUCED_MOTION.matches
 			? 'Reduced motion: using a short fade.'
 			: 'Playing — scroll to take control.';
 		this.requestFrame();
 	}
 
 	// Jumps to the fully revealed state and ends the intro.
+	// NOTE • Called on every wheel event, press and arrow key, so the status line is only rewritten when it changes.
 	finish() {
 		this.active = false;
 		this.progress = 1;
 		this.start = null;
-		document.querySelector('#intro-status').textContent = 'Ready. Replay slide cascade.';
+		const status = document.querySelector('#intro-status'),
+			text = 'Ready. Replay slide cascade.';
+		if (status.textContent !== text) status.textContent = text;
 		this.requestFrame();
 	}
 
@@ -144,7 +149,7 @@ class RibbonIntroduction {
 	// needs frames (including while it waits for the host transition).
 	update(time) {
 		if (!this.active) return false;
-		const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+		const reduced = RibbonIntroduction.REDUCED_MOTION.matches;
 
 		if (this.start === null) {
 			// Let the host cross-dissolve finish before revealing live WebGL behind its snapshot.

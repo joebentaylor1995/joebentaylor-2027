@@ -5,6 +5,7 @@
 import ContactModal from '@parts/ContactModal';
 import { ContactContext } from '@parts/Contexts';
 import { introDefaults } from '@parts/Hero/Background/scene-intro';
+import { HERO_DESKTOP_QUERY } from '@parts/Hero/layout';
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
 import SpecialHeading from '@parts/SpecialHeading';
 import { canHover } from '@utils/desktopHover';
@@ -213,25 +214,42 @@ const CallToAction = () => {
 	);
 
 	// Effects
-	// Exposes how close the panel is to its bottom (0..1 over the last 160px) as --connect-bottom-progress
+	// Exposes how close the panel is to its bottom (0..1 over the last 160px) as --connect-bottom-progress.
+	// NOTE • Why: only the heroDesktop layout reads the variable (styles.module.scss), yet every
+	// panel scroll event measured the panel and rewrote it, on every device. It is now measured
+	// only while that layout applies, and written only when it changes.
 	useEffect(() => {
 		const section = sectionRef.current;
 		const panel = section?.closest<HTMLElement>('#profile-panel');
 		if (!present || !section || !panel) return;
 
+		const layout = window.matchMedia(HERO_DESKTOP_QUERY);
+		let written = '';
+
 		const update = () => {
 			const remaining = panel.scrollHeight - panel.clientHeight - panel.scrollTop;
-			const progress = Math.max(0, Math.min(1, 1 - remaining / BOTTOM_PROGRESS_DISTANCE));
-			section.style.setProperty('--connect-bottom-progress', String(progress));
+			const progress = String(Math.max(0, Math.min(1, 1 - remaining / BOTTOM_PROGRESS_DISTANCE)));
+			if (progress === written) return;
+			written = progress;
+			section.style.setProperty('--connect-bottom-progress', progress);
 		};
 
-		update();
-		panel.addEventListener('scroll', update, { passive: true });
 		const observer = new ResizeObserver(update);
-		observer.observe(panel);
-		observer.observe(section);
+		const sync = () => {
+			panel.removeEventListener('scroll', update);
+			observer.disconnect();
+			if (!layout.matches) return;
+			update();
+			panel.addEventListener('scroll', update, { passive: true });
+			observer.observe(panel);
+			observer.observe(section);
+		};
+
+		sync();
+		layout.addEventListener('change', sync);
 
 		return () => {
+			layout.removeEventListener('change', sync);
 			panel.removeEventListener('scroll', update);
 			observer.disconnect();
 			section.style.removeProperty('--connect-bottom-progress');
@@ -270,11 +288,12 @@ const CallToAction = () => {
 			visible = false;
 		let scene: MatrixScene | undefined;
 
-		// NOTE • Freeze on the last frame while the profile closes: rendering under the panel's
-		// clip-path wipe drops frames on phones
+		// NOTE • Freeze on the last frame unless the profile is fully open: rendering under the
+		// panel's clip-path wipe drops frames on phones, and a closed panel stays mounted for a
+		// moment (see ProfileReveal's kept presence) with nothing of it on screen
 		const reveal = section.closest('#profile-panel')?.parentElement;
-		const closing = () => reveal?.dataset.state === 'closing';
-		const sync = () => scene?.setVisible(visible && !closing());
+		const shut = () => Boolean(reveal) && reveal?.dataset.state !== 'open';
+		const sync = () => scene?.setVisible(visible && !shut());
 
 		// Import the engine once; a failed import switches the section to its static fallback
 		const load = () => {
@@ -285,6 +304,8 @@ const CallToAction = () => {
 					if (disposed) return;
 					scene = createMatrix(canvas, section);
 					sync();
+					// The queue waits for the GL setup, so the next scene isn't built alongside it
+					return scene.prepared;
 				})
 				.catch(() => {
 					if (!disposed) section.dataset.state = 'fallback';

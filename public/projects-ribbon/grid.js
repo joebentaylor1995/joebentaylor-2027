@@ -33,10 +33,11 @@ function projectKind(project) {
 }
 
 // Hides the tooltip and clears the stage's aria-describedby / aria-disabled.
+// NOTE • Runs every frame the ribbon draws with nothing hovered: re-setting `hidden` would restyle the label each time.
 function clearProjectTooltip() {
 	const label = document.querySelector('#hover-title'),
 		stage = document.querySelector('#stage');
-	label.hidden = true;
+	if (!label.hidden) label.hidden = true;
 	tooltipKey = null;
 	stage.removeAttribute('aria-describedby');
 	stage.removeAttribute('aria-disabled');
@@ -67,6 +68,16 @@ function projectLockIcon() {
 	return svg;
 }
 
+// Sets an attribute only when its value changes, so per-frame callers leave the DOM untouched at rest.
+function setChangedAttribute(element, name, value) {
+	if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+}
+
+// Sets an inline style property only when its value changes.
+function setChangedStyle(element, property, value) {
+	if (element.style[property] !== value) element.style[property] = value;
+}
+
 // Shows the tooltip for `project` at `point` (viewport px). The label and the stage's aria-label are
 // only rebuilt when the project or its kind changes.
 function showProjectTooltip(project, point) {
@@ -87,12 +98,12 @@ function showProjectTooltip(project, point) {
 			`${project.name} — ${kind === 'View' ? 'case study. Press Enter to open.' : kind === 'View Offsite' ? 'external project. Opens in a new tab.' : 'coming soon'}`
 		);
 	}
-	label.hidden = false;
-	stage.setAttribute('aria-describedby', 'hover-title');
-	stage.setAttribute('aria-disabled', String(!isProjectClickable(project)));
+	if (label.hidden) label.hidden = false;
+	setChangedAttribute(stage, 'aria-describedby', 'hover-title');
+	setChangedAttribute(stage, 'aria-disabled', String(!isProjectClickable(project)));
 	// Sits just below-right of the pointer, kept inside the viewport.
-	label.style.left = Math.max(12, Math.min(point.x + 18, innerWidth - label.offsetWidth - 20)) + 'px';
-	label.style.top = Math.max(12, Math.min(point.y + 20, innerHeight - 70)) + 'px';
+	setChangedStyle(label, 'left', Math.max(12, Math.min(point.x + 18, innerWidth - label.offsetWidth - 20)) + 'px');
+	setChangedStyle(label, 'top', Math.max(12, Math.min(point.y + 20, innerHeight - 70)) + 'px');
 }
 
 // Layout
@@ -194,11 +205,23 @@ function buildGridLayout(featuredCount, projectCount, anchor = 0, along, across)
 	}
 	// Repair: move clashing tiles to their least-clashing project until none clash (or the budget runs out)
 	const all = Array.from({ length: n }, (_, i) => i);
+	// NOTE • Once no movable tile clashes, every remaining step skips its cell, so stopping there returns the very same
+	// cells; the fill usually settles within a few thousand of the 40,000 steps. After a run of steps that changed
+	// nothing, one full scan checks for that, and each failed scan waits twice as long before the next.
+	const settled = () => cells.every((row, t) => row.every((v, c) => (t === 0 && fixed.has(c)) || !clashes(t, c, v)));
+	let quiet = 0,
+		scanAfter = rows * cols;
 	for (let step = 0; step < GRID_LAYOUT_REPAIR_STEPS; step++) {
 		const t = Math.floor(Math.random() * rows),
 			c = Math.floor(Math.random() * cols);
-		if (t === 0 && fixed.has(c)) continue;
-		if (!clashes(t, c, cells[t][c])) continue;
+		if ((t === 0 && fixed.has(c)) || !clashes(t, c, cells[t][c])) {
+			if (++quiet < scanAfter) continue;
+			if (settled()) break;
+			quiet = 0;
+			scanAfter *= 2;
+			continue;
+		}
+		quiet = 0;
 		cells[t][c] = pick(t, c, all);
 	}
 	return { cols, rows, cells, w, h };
@@ -292,20 +315,13 @@ class ProjectGrid {
 		}
 	}
 
-	// Builds the shader program, the tile mesh and the placeholder texture.
+	// Starts linking the shader program and builds the tile mesh and the placeholder texture.
+	// NOTE • The link isn't read back here, so the GPU process compiles it while the ribbon boots; app.js waits for
+	// whenLinked() and then calls finishCompile(), which throws any compile or link error as this once did.
 	compile() {
 		const gl = this.gl;
-		const shader = (type, src) => {
-			const s = gl.createShader(type);
-			gl.shaderSource(s, src);
-			gl.compileShader(s);
-			if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(s));
-			return s;
-		};
-		this.program = gl.createProgram();
-		gl.attachShader(
-			this.program,
-			shader(
+		this.linking = linkProgramAsync(gl, [
+			[
 				gl.VERTEX_SHADER,
 				`
 					precision highp float;
@@ -352,12 +368,9 @@ class ProjectGrid {
 						float depth = mix(w, 1.0, uMix);
 						gl_Position = vec4(result * depth, 0.0, depth);
 					}
-				`
-			)
-		);
-		gl.attachShader(
-			this.program,
-			shader(
+				`,
+			],
+			[
 				gl.FRAGMENT_SHADER,
 				`
 					precision highp float;
@@ -382,11 +395,43 @@ class ProjectGrid {
 						else colour = (texture2D(uTexture, uv).rgb * outgoing + texture2D(uRibbonTexture, ribbonUV).rgb * incoming) / max(alpha, .0001);
 						gl_FragColor = vec4(colour, alpha * uOpacity);
 					}
-				`
-			)
-		);
-		gl.linkProgram(this.program);
-		if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(this.program));
+				`,
+			],
+		]);
+		this.program = this.linking.program;
+
+		// Tile mesh: a 24 x 24 quad grid over UV 0..1, so the ribbon curve bends smoothly.
+		const vertices = [],
+			indices = [];
+		const nx = 24,
+			ny = 24;
+		for (let y = 0; y <= ny; y++) for (let x = 0; x <= nx; x++) vertices.push(x / nx, y / ny);
+		for (let y = 0; y < ny; y++)
+			for (let x = 0; x < nx; x++) {
+				const a = y * (nx + 1) + x,
+					b = a + nx + 1;
+				indices.push(a, a + 1, b, b, a + 1, b + 1);
+			}
+		this.vertexCount = indices.length;
+		this.buffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+		this.indices = gl.createBuffer();
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indices);
+		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+		// 1 x 1 dark grey shown until a tile's own texture has loaded.
+		this.fallback = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, this.fallback);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([24, 24, 24, 255]));
+		this.textureParams();
+	}
+
+	// Reads the link result (throwing a compile or link error) and caches the program's input locations.
+	finishCompile() {
+		const gl = this.gl;
+		checkProgram(gl, this.linking);
+		this.linking = null;
 		this.uniforms = {};
 		for (const name of [
 			'Viewport',
@@ -413,33 +458,7 @@ class ProjectGrid {
 			'Vertical',
 		])
 			this.uniforms[name] = gl.getUniformLocation(this.program, 'u' + name);
-
-		// Tile mesh: a 24 x 24 quad grid over UV 0..1, so the ribbon curve bends smoothly.
-		const vertices = [],
-			indices = [];
-		const nx = 24,
-			ny = 24;
-		for (let y = 0; y <= ny; y++) for (let x = 0; x <= nx; x++) vertices.push(x / nx, y / ny);
-		for (let y = 0; y < ny; y++)
-			for (let x = 0; x < nx; x++) {
-				const a = y * (nx + 1) + x,
-					b = a + nx + 1;
-				indices.push(a, a + 1, b, b, a + 1, b + 1);
-			}
-		this.vertexCount = indices.length;
-		this.buffer = gl.createBuffer();
-		gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 		this.attrib = gl.getAttribLocation(this.program, 'aUV');
-		this.indices = gl.createBuffer();
-		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indices);
-		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
-
-		// 1 x 1 dark grey shown until a tile's own texture has loaded.
-		this.fallback = gl.createTexture();
-		gl.bindTexture(gl.TEXTURE_2D, this.fallback);
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([24, 24, 24, 255]));
-		this.textureParams();
 	}
 
 	// Host integration: Video loop projects play in the All projects grid too. The poster shows until the loop
@@ -560,10 +579,12 @@ class ProjectGrid {
 	}
 
 	// Supplies the catalogue and rebuilds the layout. Without extra projects, the featured list is used.
+	// NOTE • With the grid closed and at rest, nothing reads the layout before setView(true) builds a fresh one (it
+	// always does from rest), so it is only built here while the grid is showing; this runs at every boot, phones too.
 	setProjects(featured, projects) {
 		this.featured = featured;
 		this.projects = projects.length ? projects : featured;
-		this.layout = this.buildLayout();
+		this.layout = this.target || this.mix > 0 ? this.buildLayout() : null;
 		this.requestFrame();
 	}
 
@@ -793,10 +814,15 @@ class ProjectGrid {
 		const hit = point && !this.drag ? this.hitTest(point.x, point.y) : null;
 		this.hover = hit;
 		const canvas = document.querySelector('#stage');
-		canvas.style.cursor = this.drag ? 'grabbing' : isProjectClickable(hit?.project) ? 'pointer' : 'grab';
+		setChangedStyle(
+			canvas,
+			'cursor',
+			this.drag ? 'grabbing' : isProjectClickable(hit?.project) ? 'pointer' : 'grab'
+		);
 		showProjectTooltip(hit?.project, point);
 		if (!hit)
-			canvas.setAttribute(
+			setChangedAttribute(
+				canvas,
 				'aria-label',
 				'All projects. Drag in any direction or scroll vertically to explore the infinite grid.'
 			);
@@ -819,10 +845,17 @@ class ProjectGrid {
 				const i = index++,
 					project = this.projects[i];
 				if (project.type === 'video' && project.video) continue;
-				this.requestTexture(i);
+				this.requestTexture(i, true);
 				const entry = this.cache.get(project.poster),
+					// A poster loaded and waiting for its upload slot counts as done, so the queue keeps its pace
 					settled = () => {
-						if (!entry || entry.texture || entry.failed || this.cache.get(project.poster) !== entry)
+						if (
+							!entry ||
+							entry.texture ||
+							entry.pendingPoster ||
+							entry.failed ||
+							this.cache.get(project.poster) !== entry
+						)
 							idle(next);
 						else setTimeout(settled, PREWARM_POLL_MS);
 					};
@@ -834,14 +867,18 @@ class ProjectGrid {
 	}
 
 	// Returns the GL texture for project `index`, starting its load on first use. Until it arrives (or if
-	// it fails) the fallback texture is used. Images are cover-cropped to 512 x 320.
-	requestTexture(index) {
+	// it fails) the fallback texture is used. Images are cover-cropped to 512 x 320. `prewarming` marks the
+	// idle prewarm's requests, whose posters are drawn in an idle slot (see uploadWhenIdle).
+	requestTexture(index, prewarming = false) {
 		// Host integration: Video loop tiles key by their video so the poster and the loop share one entry.
 		const project = this.projects[index],
 			key = project.type === 'video' && project.video ? project.video : project.poster;
 		let entry = this.cache.get(key);
 		if (entry) {
 			entry.last = this.frame;
+			// A prewarmed poster still waiting for its idle slot is needed now: draw it straight away, so the tile
+			// shows it this frame exactly as if it had been drawn when it loaded.
+			if (entry.pendingPoster && !prewarming) this.uploadPoster(entry, entry.pendingPoster);
 			if (entry.video) this.updateVideoTexture(entry);
 			return entry.texture || this.fallback;
 		}
@@ -852,20 +889,11 @@ class ProjectGrid {
 		image.crossOrigin = 'anonymous';
 		image.onload = () => {
 			if (this.cache.get(key) !== entry || entry.hasVideoFrame) return;
-			const gl = this.gl,
-				c = document.createElement('canvas');
-			c.width = 512;
-			c.height = 320;
-			const ctx = c.getContext('2d'),
-				scale = Math.max(512 / image.width, 320 / image.height),
-				sw = 512 / scale,
-				sh = 320 / scale;
-			ctx.drawImage(image, (image.width - sw) / 2, (image.height - sh) / 2, sw, sh, 0, 0, 512, 320);
-			entry.texture = gl.createTexture();
-			gl.activeTexture(gl.TEXTURE0);
-			gl.bindTexture(gl.TEXTURE_2D, entry.texture);
-			this.textureParams();
-			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+			if (prewarming && this.mix === 0 && window.requestIdleCallback) {
+				this.uploadWhenIdle(entry, image, key);
+				return;
+			}
+			this.uploadPoster(entry, image);
 			this.requestFrame();
 		};
 		image.onerror = () => {
@@ -875,6 +903,49 @@ class ProjectGrid {
 		};
 		image.src = project.poster;
 		return this.fallback;
+	}
+
+	// Cover-crops a loaded poster into a 512 x 320 canvas and uploads it as the entry's texture.
+	uploadPoster(entry, image) {
+		entry.pendingPoster = null;
+		const gl = this.gl,
+			c = document.createElement('canvas');
+		c.width = 512;
+		c.height = 320;
+		const ctx = c.getContext('2d'),
+			scale = Math.max(512 / image.width, 320 / image.height),
+			sw = 512 / scale,
+			sh = 320 / scale;
+		ctx.drawImage(image, (image.width - sw) / 2, (image.height - sh) / 2, sw, sh, 0, 0, 512, 320);
+		entry.texture = gl.createTexture();
+		gl.activeTexture(gl.TEXTURE0);
+		gl.bindTexture(gl.TEXTURE_2D, entry.texture);
+		this.textureParams();
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+	}
+
+	// NOTE • Drawing a just-loaded poster decodes it on the main thread (5-15 ms for a 1600 px JPEG), and the prewarm
+	// runs in the background while the visitor scrolls other pages. While the grid is hidden its posters wait for an
+	// idle slot with room for that, rather than landing mid-frame whenever they load. The wait is short, so the prewarm
+	// keeps its pace on a page that animates every frame, and any frame that needs a poster draws it at once
+	// (requestTexture), so the grid never shows a tile later than before.
+	uploadWhenIdle(entry, image, key) {
+		const UPLOAD_IDLE_MS = 8,
+			UPLOAD_WAIT_MS = 250,
+			queued = performance.now();
+		entry.pendingPoster = image;
+		const attempt = deadline => {
+			if (this.cache.get(key) !== entry || entry.pendingPoster !== image) return;
+			const waited = performance.now() - queued;
+			if (deadline.timeRemaining() < UPLOAD_IDLE_MS && waited < UPLOAD_WAIT_MS) {
+				// Only what is left of the budget, so the wait really is capped at UPLOAD_WAIT_MS
+				window.requestIdleCallback(attempt, { timeout: Math.max(1, UPLOAD_WAIT_MS - waited) });
+				return;
+			}
+			this.uploadPoster(entry, image);
+			this.requestFrame();
+		};
+		window.requestIdleCallback(attempt, { timeout: UPLOAD_WAIT_MS });
 	}
 
 	// Per-frame step; `dt` is in seconds. Returns true while anything is still moving, so the caller keeps rendering.
@@ -1060,6 +1131,8 @@ class ProjectGrid {
 
 // Helpers
 // ------------
+// NOTE • Read several times a frame: one live MediaQueryList rather than parsing a new query on every call
+const gridReducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 function reducedMotion() {
-	return matchMedia('(prefers-reduced-motion: reduce)').matches;
+	return gridReducedMotion.matches;
 }

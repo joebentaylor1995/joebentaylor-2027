@@ -42,6 +42,10 @@ for (const width of [390, 768, 1024, 1440]) {
 		);
 		const settings = page.getByRole('complementary', { name: 'Modal settings' });
 		const panel = page.locator('#profile-panel');
+		// The settings panel opens the profile, which the site loader closes and reopens once it
+		// settles, scrolled back to the top: a section shown before then would be scrolled away again
+		await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 15000 });
+		await expect(panel.locator('..')).toHaveAttribute('data-state', 'open');
 		// Total draws across all canvases inside a section
 		const count = (selector: string) =>
 			page.locator(selector).evaluate(el => {

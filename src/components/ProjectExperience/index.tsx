@@ -25,6 +25,31 @@ gsap.registerPlugin(ScrollTrigger);
 const PANEL_DRIFT = 12;
 // NOTE • Lets a burst of media resizes settle into one re-measure of the scroll
 const CONTENT_RESIZE_SETTLE = 0.2;
+// NOTE • gsap.set() rounds tweened CSS values to 4 decimals (CSSPlugin's _renderCSSProp); the
+// quick setters below write raw numbers, so they round the same way to keep every string equal
+const GSAP_ROUNDING = 10000;
+
+// Helpers
+// ------------
+const gsapRound = (value: number) => Math.round(value * GSAP_ROUNDING) / GSAP_ROUNDING;
+
+// Sets an inline custom property only when its value changes
+const setVariable = (element: HTMLElement | null | undefined, name: string, value: string) => {
+	if (element && element.style.getPropertyValue(name) !== value) element.style.setProperty(name, value);
+};
+
+// NOTE • Why: a quickSetter that skips the write (and the style invalidation) when the value
+// it would write is the one already there. These elements are only ever moved from here.
+const changedSetter = (target: Element, property: string, unit?: string) => {
+	const setter = gsap.quickSetter(target, property, unit) as (value: number) => void;
+	let last = Number.NaN;
+	return (value: number) => {
+		const rounded = gsapRound(value);
+		if (rounded === last) return;
+		last = rounded;
+		setter(rounded);
+	};
+};
 
 // Component
 // ------------
@@ -133,8 +158,23 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 				};
 				measure();
 
+				// NOTE • Why: update() runs every scroll frame. A gsap.set() builds a throwaway tween
+				// (about 840 a second at 120Hz); these setters write the same strings directly, and
+				// only when a value changes — most of them hold still for most of the scroll.
+				const setHeroY = changedSetter(heroLayer, 'y', 'px');
+				const setHeroX = changedSetter(heroLayer, 'xPercent');
+				const setMediaY = changedSetter(heroMedia, 'y', 'px');
+				const setPanelX = changedSetter(panel, 'xPercent');
+				const setContentY = changedSetter(content, 'y', 'px');
+				const setLabelY = label ? changedSetter(label, 'y', 'px') : undefined;
+				const setShadeOpacity = changedSetter(shade, 'opacity');
+				let heroClipPath = '';
+
 				// Maps the pinned scroll position (px) onto every moving part
 				const update = (raw: number) => {
+					// NOTE • Read before this frame's writes: a layout read after them forces a style
+					// recalc of the hero mid-update. Nothing written below changes the stage's height.
+					const stageHeight = stage.clientHeight;
 					// The hero has no scroll of its own, so the reveal starts at 0px. Sub-pixel
 					// ScrollTrigger rounding at the top must not open it: the return-to-top
 					// layer would then cover the hero and catch its clicks.
@@ -145,56 +185,52 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 					const textFade = gsap.utils.clamp(0, 1, reveal / 0.7);
 					const imageFade = gsap.utils.clamp(0, 1, reveal / 0.4);
 					// Smoothstep easing for the fades
-					hero?.style.setProperty(
+					setVariable(
+						hero,
 						'--project-image-saturation',
 						String(1 - imageFade * imageFade * (3 - 2 * imageFade))
 					);
-					hero?.style.setProperty(
-						'--project-text-opacity',
-						String(1 - textFade * textFade * (3 - 2 * textFade))
-					);
+					setVariable(hero, '--project-text-opacity', String(1 - textFade * textFade * (3 - 2 * textFade)));
 
 					// Hero slides up and left, the panel in from the right, then the panel content scrolls
-					gsap.set(heroLayer, {
-						y: -Math.min(scroll, heroTravel),
-						xPercent: -12 * reveal,
-					});
-					gsap.set(heroMedia, { y: Math.min(scroll, heroTravel) * parallaxCompensation });
+					setHeroY(-Math.min(scroll, heroTravel));
+					setHeroX(-12 * reveal);
+					setMediaY(Math.min(scroll, heroTravel) * parallaxCompensation);
 					// NOTE • The hero's edge wipes across to the panel's left edge, uncovering it
 					// from beneath. Closed, the panel waits off-stage: under the hero it would still
 					// count as in view, and its media would load and its reveals play unseen.
-					heroClip.style.clipPath = reveal > 0 ? `inset(0 ${panelWidth * reveal}px 0 0)` : '';
-					gsap.set(panel, { xPercent: reveal > 0 ? PANEL_DRIFT * (1 - reveal) : 100 });
-					gsap.set(content, { y: -contentScroll });
-					if (label)
-						gsap.set(label, {
-							y: gsap.utils.clamp(
-								-labelTravel,
-								0,
-								contentScroll + stage.clientHeight - labelGap - labelBottom
-							),
-						});
+					const clipPath = reveal > 0 ? `inset(0 ${panelWidth * reveal}px 0 0)` : '';
+					if (clipPath !== heroClipPath) {
+						heroClipPath = clipPath;
+						heroClip.style.clipPath = clipPath;
+					}
+					setPanelX(reveal > 0 ? PANEL_DRIFT * (1 - reveal) : 100);
+					setContentY(-contentScroll);
+					setLabelY?.(
+						gsap.utils.clamp(-labelTravel, 0, contentScroll + stageHeight - labelGap - labelBottom)
+					);
 
 					// The outro eases in over the last 35% of the content scroll
 					if (outro) {
 						const progress = gsap.utils.clamp(
 							0,
 							1,
-							1 - (contentTravel - contentScroll) / (stage.clientHeight * 0.35)
+							1 - (contentTravel - contentScroll) / (stageHeight * 0.35)
 						);
-						outro.style.setProperty('--project-outro-progress', String(progress));
+						setVariable(outro, '--project-outro-progress', String(progress));
 					}
 
 					// The return-to-top layer dims the hero and only takes clicks once the panel is moving
-					gsap.set(shade, { opacity: reveal * 0.85 });
-					panel.inert = reveal === 0;
+					setShadeOpacity(reveal * 0.85);
+					const closed = reveal === 0;
+					if (panel.inert !== closed) panel.inert = closed;
 
 					const open = String(reveal >= 1);
 					if (panel.dataset.open !== open) {
 						panel.dataset.open = open;
 						window.dispatchEvent(new Event('project-panel:change'));
 					}
-					shade.disabled = reveal === 0;
+					if (shade.disabled !== closed) shade.disabled = closed;
 				};
 
 				update(0);
