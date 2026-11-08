@@ -26,6 +26,9 @@ const PARALLAX = 50;
 // sideways scroll or thumbnail click stops it for good
 const AUTOPLAY_SECONDS = 4;
 const WHEEL_THRESHOLD = 50;
+// NOTE • Thumbnails are 7.2rem: 86px on tablets (a 12px rem), 72px on desktop, then
+// growing with the root font size (0.625vw) above 1600px
+const THUMBNAIL_SIZES = '(max-width: 1023px) 86px, (max-width: 1600px) 72px, 4.5vw';
 
 const focusStyle = (image: I.ParallaxGalleryProps['images'][number]) =>
 	image.hotspot ? ({ '--focus': `${image.hotspot.x * 100}% ${image.hotspot.y * 100}%` } as CSSProperties) : undefined;
@@ -208,7 +211,7 @@ const ParallaxGallery = ({ images, sizes }: I.ParallaxGalleryProps) => {
 						aria-label={`Show image ${index + 1} of ${images.length}`}
 						className={s.thumb}
 					>
-						<Image src={image.src} alt='' fill sizes='72px' quality={90} draggable={false} />
+						<Image src={image.src} alt='' fill sizes={THUMBNAIL_SIZES} quality={90} draggable={false} />
 					</button>
 				))}
 			</div>

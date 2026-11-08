@@ -26,6 +26,7 @@ import type {
 } from './interface';
 import { mountMediaReveal } from './reveal';
 import { MEDIA_REPLAY, MEDIA_SETTINGS_CHANGED } from './settings';
+import { DUAL_GALLERY_SIZES, DUAL_SIZES, GALLERY_SIZES, SINGLE_SIZES } from './sizes';
 import s from './styles.module.scss';
 import Video from './Video';
 import YouTube from './YouTube';
@@ -64,9 +65,6 @@ const Media = ({ media, sizes }: MediaProps) => {
 	);
 };
 
-// NOTE • Image widths for a full-width tile
-const SINGLE_SIZES = '(max-width: 1023px) calc(100vw - 32px), (max-width: 1440px) calc(67.65vw - 80px), 894px';
-
 // Layouts: one full-width tile
 export const SingleMedia = ({ media }: SingleMediaProps) => (
 	<div className={s.jacket} data-media-layout='single'>
@@ -98,8 +96,6 @@ export const BeforeAfterMedia = ({ aspect, before, after, start }: BeforeAfterMe
 	</div>
 );
 
-// NOTE • Gallery cards are two-thirds of a two-up tile's width
-const DUAL_GALLERY_SIZES = '(max-width: 1023px) 66vw, (max-width: 1440px) 23vw, 300px';
 // NOTE • A gallery has no single src, so it's keyed by its first image
 const dualKey = (media: DualMediaProps['media'][number]) =>
 	media.type === 'gallery' ? `gallery-${media.images[0]?.src}` : media.src;
@@ -108,11 +104,7 @@ const dualKey = (media: DualMediaProps['media'][number]) =>
 export const DualMedia = ({ media }: DualMediaProps) => (
 	<div className={s.jacket} data-media-layout='dual'>
 		{media.map(item => (
-			<Media
-				key={dualKey(item)}
-				media={item}
-				sizes='(max-width: 1023px) calc(100vw - 32px), (max-width: 1440px) calc(33.825vw - 44px), 443px'
-			/>
+			<Media key={dualKey(item)} media={item} sizes={DUAL_SIZES} />
 		))}
 	</div>
 );
@@ -122,12 +114,7 @@ export const GalleryMedia = ({ animation, images, background }: GalleryMediaProp
 	<div className={s.jacket} data-media-layout='gallery'>
 		<div className={s.mediaSlot} data-media-tile>
 			<figure className={s.media}>
-				<AnimatedGallery
-					animation={animation}
-					images={images}
-					background={background}
-					sizes='(max-width: 1023px) 60vw, (max-width: 1440px) 40vw, 560px'
-				/>
+				<AnimatedGallery animation={animation} images={images} background={background} sizes={GALLERY_SIZES} />
 			</figure>
 		</div>
 	</div>
@@ -138,13 +125,7 @@ export const ModelMedia = ({ src, poster, alt, aspect, background }: ModelMediaP
 	<div className={s.jacket} data-media-layout='single'>
 		<div className={s.mediaSlot} data-media-tile>
 			<figure className={s.media} style={aspect ? ({ '--media-aspect': aspect } as CSSProperties) : undefined}>
-				<ModelViewer
-					src={src}
-					poster={poster}
-					alt={alt}
-					background={background}
-					sizes='(max-width: 1023px) calc(100vw - 32px), (max-width: 1440px) calc(67.65vw - 80px), 894px'
-				/>
+				<ModelViewer src={src} poster={poster} alt={alt} background={background} sizes={SINGLE_SIZES} />
 			</figure>
 		</div>
 	</div>
