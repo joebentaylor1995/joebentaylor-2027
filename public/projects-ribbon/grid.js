@@ -637,6 +637,14 @@ class ProjectGrid {
 		return selected;
 	}
 
+	// Jumps a grid-to-ribbon hand-back to its end state, for when it would play off screen.
+	finishReturn() {
+		if (!this.returnMotion) return;
+		this.returnMotion.elapsed = this.returnMotion.duration;
+		this.update(0);
+		this.requestFrame();
+	}
+
 	// Finds the featured tile closest to the screen centre. Returns { col, row, index } or null.
 	nearestFeatured() {
 		if (!this.featured.length || !this.projects.length) return null;

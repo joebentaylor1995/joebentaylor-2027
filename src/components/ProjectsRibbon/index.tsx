@@ -14,6 +14,7 @@ import { markProjectModalEntry } from '@utils/projectModal';
 import { getImageProps } from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useRef, useState } from 'react';
+import { SHOW_FEATURED } from './events';
 import { FILL_PREVIEW, FILL_SCRUB } from './fillSettings';
 import { holdProjectHero } from './handoff';
 
@@ -39,7 +40,7 @@ const warmHero = (src: string) => {
 // The iframe stays mounted ("cached") while you are elsewhere on the site so /projects opens
 // instantly; this component talks to it with same-origin postMessage:
 //   ribbon -> site: projects:wave-ready, :error, :prefetch, :prepare, :modal, :open
-//   site -> ribbon: projects:active, :route, :prepared, :fill-preview, :fill-scrub
+//   site -> ribbon: projects:active, :route, :prepared, :fill-preview, :fill-scrub, :featured
 const ProjectsRibbon = () => {
 	// Context
 	const { lenisRef, pagePath } = use(GlobalContext);
@@ -238,6 +239,17 @@ const ProjectsRibbon = () => {
 			window.removeEventListener(FILL_PREVIEW, preview);
 			window.removeEventListener(FILL_SCRUB, scrub);
 		};
+	}, []);
+
+	// Relay the header's Projects link: back to the featured ribbon
+	useEffect(() => {
+		const showFeatured = (event: Event) =>
+			frame.current?.contentWindow?.postMessage(
+				{ type: 'projects:featured', instant: event instanceof CustomEvent && event.detail?.instant === true },
+				window.location.origin
+			);
+		window.addEventListener(SHOW_FEATURED, showFeatured);
+		return () => window.removeEventListener(SHOW_FEATURED, showFeatured);
 	}, []);
 
 	// Boot the ribbon: immediately on /projects, otherwise in the background once the loader

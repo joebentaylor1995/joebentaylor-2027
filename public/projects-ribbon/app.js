@@ -897,6 +897,14 @@ function setProjectView(all) {
 }
 document.querySelector('#view-featured').onclick = () => setProjectView(false);
 document.querySelector('#view-all').onclick = () => setProjectView(true);
+// Host message: the site's Projects link always lands on the featured ribbon. `instant` skips the
+// grid's hand-back when the page isn't showing yet, so it arrives already settled.
+window.addEventListener('message', event => {
+	if (!fromHost(event) || event.data?.type !== 'projects:featured' || !gridView) return;
+	if (gridView.target) setProjectView(false);
+	if (event.data.instant === true) gridView.finishReturn();
+	requestRender();
+});
 // Tuning panel
 // ------------
 // Opens or closes the panel; it is inert while closed so it cannot take focus.

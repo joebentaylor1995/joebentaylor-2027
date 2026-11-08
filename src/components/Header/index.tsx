@@ -5,6 +5,7 @@
 import ContactModal from '@parts/ContactModal';
 import { GlobalContext } from '@parts/Contexts';
 import Logo from '@parts/Logo';
+import { showFeaturedProjects } from '@parts/ProjectsRibbon/events';
 import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { prepareNavigationScene } from '@utils/navigationScene';
 import { useAnimation } from '@utils/useAnimation';
@@ -170,7 +171,12 @@ const Header = () => {
 						</button>
 						<Link
 							href='/projects'
-							onNavigate={() => prepareNavigationScene('/projects')}
+							onNavigate={() => {
+								// NOTE • The ribbon lives on between pages, so it would reopen on whichever view was left;
+								// the Projects link always lands on Featured
+								showFeaturedProjects(!/^\/projects\/?$/.test(pathname));
+								prepareNavigationScene('/projects');
+							}}
 							aria-current={/^\/projects\/?$/.test(pathname) ? 'page' : undefined}
 							data-type='bodyS'
 						>
