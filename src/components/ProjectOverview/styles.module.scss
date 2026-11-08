@@ -111,15 +111,21 @@
 	color: inherit;
 	text-decoration: none;
 
-	.creditName {
-		text-decoration: underline;
-		text-decoration-color: transparent;
-		text-underline-offset: 0.2em;
-		transition: text-decoration-color var(--time-m) var(--easing-bezzy);
-	}
+	// NOTE • No underline: on hover (or keyboard focus) the name and role swap
+	// brightness — the role turns fully white and the name dims to the role's 40%
+	.creditName,
+	span[data-type] { transition: color var(--time-m) var(--easing-bezzy); }
 
 	@media (hover: hover) and (pointer: fine) {
-		&:hover .creditName { text-decoration-color: currentcolor; }
+		&:hover {
+			.creditName { color: alpha(--global-white, 40); }
+			span[data-type] { color: var(--global-white); }
+		}
+	}
+
+	&:focus-visible {
+		.creditName { color: alpha(--global-white, 40); }
+		span[data-type] { color: var(--global-white); }
 	}
 
 	&:focus-visible {
