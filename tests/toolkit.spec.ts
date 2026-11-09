@@ -1,7 +1,32 @@
 // Imports
 // ------------
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { createPhysics } from '../src/components/Profile/Usps/Toolkit/physics';
+
+// Constants
+// ------------
+// Tile size in design pixels, and the approved phone preset (below 1024px) that draws both toolkits'
+// tiles at 90% (mobileDefaults in ProfileReveal/Settings/store.ts, 187ccb3)
+const TILE_SIZE = 98;
+const TILE_RADIUS = 16;
+const DESKTOP_BREAKPOINT = 1024;
+const MOBILE_TILE_SCALE = 0.9;
+// Above 1600px everything scales with the width
+const SCALE_UP_FROM = 1600;
+
+// Helpers
+// ------------
+// NOTE • An Open Profile click that lands as the intro loader settles can be dropped (no /profile/ push),
+// so wait for the loader to finish, as a visitor would, and confirm the panel opened before going on.
+const LOADER_TIMEOUT = 15_000;
+const waitForLoader = (page: Page) =>
+	expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: LOADER_TIMEOUT });
+const openProfile = async (page: Page) => {
+	await page.goto('/');
+	await waitForLoader(page);
+	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await expect(page.locator('#profile-panel')).toHaveAttribute('aria-hidden', 'false');
+};
 
 // Tests
 // ------------
@@ -45,24 +70,24 @@ for (const width of [1440, 440, 2560]) {
 		await page.emulateMedia({ reducedMotion: 'reduce' });
 		const errors: string[] = [];
 		page.on('pageerror', error => errors.push(error.message));
-		await page.goto('/');
-		await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+		await openProfile(page);
 		// [toolkit label, expected tile count]
 		for (const [label, count] of [
 			['Design toolkit', 6],
 			['Development toolkit', 5],
 		] as const) {
-			const toolkit = page.locator(`[data-toolkit="${label}"]`);
+			// The label comes from the CMS ("Design Toolkit"), so match it case-insensitively like the settings panel
+			const toolkit = page.locator(`[data-toolkit="${label}" i]`);
 			await toolkit.scrollIntoViewIfNeeded();
 			await expect(toolkit).toHaveAttribute('data-state', 'ready');
 			await expect(toolkit).toHaveAttribute('data-renderer', 'webgl');
 			await expect(toolkit.locator('button')).toHaveCount(count);
 			const tile = toolkit.locator('button').last();
-			// Above 1600px everything scales with the width
-			const scale = width > 1600 ? width / 1600 : 1;
-			await expect(tile).toHaveCSS('border-radius', `${16 * scale}px`);
+			const scale = width > SCALE_UP_FROM ? width / SCALE_UP_FROM : 1;
+			const tileScale = width < DESKTOP_BREAKPOINT ? MOBILE_TILE_SCALE : 1;
+			await expect(tile).toHaveCSS('border-radius', `${TILE_RADIUS * scale}px`);
 			expect(await tile.evaluate(element => parseFloat(getComputedStyle(element).width))).toBeCloseTo(
-				98 * scale,
+				TILE_SIZE * scale * tileScale,
 				1
 			);
 			await expect(toolkit).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -93,7 +118,7 @@ for (const width of [1440, 440, 2560]) {
 			await expect(toolkit.locator('button').first()).toBeDisabled();
 		}
 		await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
-		const reopened = page.locator('[data-toolkit="Design toolkit"]');
+		const reopened = page.locator('[data-toolkit="Design toolkit" i]');
 		await reopened.scrollIntoViewIfNeeded();
 		await expect(reopened).toHaveAttribute('data-state', 'ready');
 		await expect(reopened.locator('canvas')).toHaveCount(1);

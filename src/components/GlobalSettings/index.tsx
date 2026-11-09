@@ -33,6 +33,11 @@ import { useEffect, useState } from 'react';
 // ------------
 import s from './styles.module.scss';
 
+// Constants
+// ------------
+// NOTE • The site's own tablet font scale: keep in step with --tablet-font-scale in src/css/global.scss
+const TABLET_FONT_SCALE = 75;
+
 // Component
 // ------------
 // A tuning panel for site-wide settings (opened with ?globalSettings): the page-transition wave,
@@ -40,7 +45,7 @@ import s from './styles.module.scss';
 // to localStorage and read back by the live site; the font scale is a live preview only.
 export default function GlobalSettings() {
 	// State
-	const [scale, setScale] = useState(100);
+	const [scale, setScale] = useState(TABLET_FONT_SCALE);
 
 	// Navigation wave. `preview` is the point (0-100%) to hold the wave at on this page, or null for off
 	const [wave, setWave] = useState<WaveSettings>(waveDefaults);
@@ -302,9 +307,12 @@ export default function GlobalSettings() {
 						onChange={event => setScale(Number(event.target.value))}
 					/>
 				</label>
-				<p>Live preview only. Mobile and desktop keep their normal sizing. Reload to restore 100%.</p>
-				<button type='button' onClick={() => setScale(100)}>
-					Reset to 100%
+				<p>
+					Live preview only. Mobile and desktop keep their normal sizing. Reload to restore{' '}
+					{TABLET_FONT_SCALE}%.
+				</p>
+				<button type='button' onClick={() => setScale(TABLET_FONT_SCALE)}>
+					Reset to {TABLET_FONT_SCALE}%
 				</button>
 			</details>
 		</aside>

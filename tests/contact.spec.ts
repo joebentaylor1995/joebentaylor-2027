@@ -2,6 +2,14 @@
 // ------------
 import { expect, test } from '@playwright/test';
 
+// Config
+// ------------
+// The site loader plays for several seconds by design and runs longer on a busy or GPU-less runner
+const LOADER_TIMEOUT = 20_000;
+// The calendar is a lazily loaded chunk that injects Cal.com's script when it mounts; on a contended
+// runner the chunk alone can take several seconds to arrive
+const CALENDAR_MOUNT_TIMEOUT = 15_000;
+
 // Tests
 // ------------
 // Protects the booking modal as a proper modal dialog: full-viewport, focus moves in and stays
@@ -9,7 +17,9 @@ import { expect, test } from '@playwright/test';
 test('booking modal covers the viewport, traps focus and restores it on close', async ({ page }) => {
 	await page.goto('/');
 	// Wait for the site loader to complete before opening the modal
-	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true');
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', {
+		timeout: LOADER_TIMEOUT,
+	});
 	const trigger = page.getByRole('button', { name: 'Open Booking Form' });
 	await trigger.click();
 	const dialog = page.getByRole('dialog', { name: 'Book a call with Joe Ben Taylor' });
@@ -34,26 +44,48 @@ test('booking modal covers the viewport, traps focus and restores it on close', 
 	await expect(dialog.getByRole('link', { name: 'Book on Cal.com' })).toBeFocused();
 	await expect(dialog).toHaveCSS('opacity', '1');
 
-	// Closing is staged: the shell waits (transition-delay) while the calendar fades first
+	// Closing is staged: the shell waits (transition-delay) while the calendar fades first.
+	// The closing transitions are paused as they start, so the staging is checked at a fixed point in
+	// the timeline rather than by sampling a few hundred milliseconds of a busy page.
+	await dialog.evaluate(element => {
+		element.addEventListener(
+			'transitionrun',
+			() => {
+				for (const animation of element.getAnimations({ subtree: true })) animation.pause();
+				element.dataset.closingPaused = 'true';
+			},
+			{ once: true }
+		);
+	});
 	await page.keyboard.press('Escape');
+	await expect(dialog).toHaveAttribute('data-closing-paused', 'true');
 	await expect(dialog).toHaveAttribute('data-state', 'closing');
 	await expect(dialog).toBeVisible();
 	await expect(dialog).toHaveCSS('transition-delay', '0.6s');
 	// The calendar finishes its exit before the modal and backdrop start fading.
-	await expect
-		.poll(
-			() =>
-				dialog.evaluate(element => {
-					const content = element.querySelector('[inert]');
-					return (
-						content !== null &&
-						Number(getComputedStyle(content).opacity) < 0.5 &&
-						getComputedStyle(element, '::backdrop').opacity === '1'
-					);
-				}),
-			{ intervals: [20] }
-		)
-		.toBe(true);
+	const opacitiesWhenCalendarHasFaded = await dialog.evaluate(element => {
+		const content = element.querySelector('[inert]');
+		if (!content) throw new Error('Closing content is not inert');
+		const animations = element.getAnimations({ subtree: true });
+		const calendarFade = animations.find(
+			animation =>
+				animation instanceof CSSTransition &&
+				animation.transitionProperty === 'opacity' &&
+				animation.effect instanceof KeyframeEffect &&
+				animation.effect.target === content
+		);
+		const calendarFadeEnd = calendarFade?.effect?.getComputedTiming().endTime;
+		if (typeof calendarFadeEnd !== 'number') throw new Error('Calendar fade-out transition not found');
+		for (const animation of animations) animation.currentTime = calendarFadeEnd;
+		const opacities = {
+			calendar: getComputedStyle(content).opacity,
+			modal: getComputedStyle(element).opacity,
+			backdrop: getComputedStyle(element, '::backdrop').opacity,
+		};
+		for (const animation of animations) animation.play();
+		return opacities;
+	});
+	expect(opacitiesWhenCalendarHasFaded).toEqual({ calendar: '0', modal: '1', backdrop: '1' });
 	await expect(dialog).toBeVisible();
 	await expect(dialog).toHaveCount(0);
 	await expect(trigger).toBeFocused();
@@ -66,7 +98,9 @@ test('booking modal covers the viewport, traps focus and restores it on close', 
 test('reduced motion closes the modal without a fade', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');
-	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true');
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', {
+		timeout: LOADER_TIMEOUT,
+	});
 	const trigger = page.getByRole('button', { name: 'Open Booking Form' });
 	await trigger.click();
 	const dialog = page.getByRole('dialog');
@@ -92,10 +126,13 @@ test('Cal.com loads only after consent and preserves the booking URL', async ({ 
 		'https://cal.com/joebentaylor/30min?overlayCalendar=true'
 	);
 	await page.getByRole('button', { name: 'Allow cookies and load calendar' }).click();
+	// The calendar mounts busy, and requests Cal.com as it mounts
+	await expect(page.getByRole('dialog').locator('[aria-busy]')).toHaveAttribute('aria-busy', 'true', {
+		timeout: CALENDAR_MOUNT_TIMEOUT,
+	});
 	await expect.poll(() => requests.length).toBeGreaterThan(0);
 	await expect(page.getByRole('link', { name: 'Calendar not loading?' })).toBeVisible();
-	await expect(page.getByRole('status')).toHaveText('Loading calendar…');
-	await expect(page.getByRole('dialog').locator('[aria-busy]')).toHaveAttribute('aria-busy', 'true');
+	await expect(page.getByRole('dialog').getByRole('status')).toHaveText('Loading calendar…');
 	await expect(page.getByRole('dialog').locator('[inert]')).toHaveCSS('opacity', '0');
 
 	// The embed stays hidden until it has loaded
@@ -119,7 +156,9 @@ test('Cal.com loads only after consent and preserves the booking URL', async ({ 
 test('booking modal fits a narrow viewport', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/', { waitUntil: 'domcontentloaded' });
-	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true');
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', {
+		timeout: LOADER_TIMEOUT,
+	});
 	// The development-only Next badge overlaps the right side at this width.
 	await page.getByRole('button', { name: 'Open Booking Form' }).click({ position: { x: 3, y: 8 } });
 	const dialog = page.getByRole('dialog');

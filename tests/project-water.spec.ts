@@ -5,8 +5,8 @@ import { expect, test } from '@playwright/test';
 // Tests
 // ------------
 // Protects the case study water effect: the DOM title hands over to the WebGL water (with the title layered
-// above the canvas), pointer movement visibly disturbs it, scrolling carries it with the hero, and reduced motion
-// falls back to plain text and the native image.
+// above the canvas), pointer movement visibly disturbs it, it travels with the hero as the panel slides in, and
+// reduced motion falls back to plain text and the native image.
 test('project title hands over to water, responds to the pointer and respects reduced motion', async ({ page }) => {
 	await page.goto('/projects/pocketchange/');
 	await page.getByRole('button', { name: 'Accept Necessary' }).click();
@@ -16,8 +16,7 @@ test('project title hands over to water, responds to the pointer and respects re
 	await expect(canvas).toHaveAttribute('data-intro', 'complete');
 	// Title layer must sit above the water canvas in z-order
 	const layers = await page.locator('#project-title').evaluate(title => {
-		const titleLayer = title.closest('[data-project-hero]')?.querySelector('[data-page-title-reveal]')
-			?.parentElement?.parentElement?.parentElement;
+		const titleLayer = title.closest('[data-project-hero-copy]');
 		const water = document.querySelector('[data-project-water]');
 		return {
 			title: titleLayer ? Number(getComputedStyle(titleLayer).zIndex) : 0,
@@ -30,7 +29,7 @@ test('project title hands over to water, responds to the pointer and respects re
 	await expect(page.locator('[data-project-hero]')).toHaveAttribute('data-water-text', 'true');
 	await expect(page.locator('#project-title [data-page-title-reveal]')).toHaveAttribute(
 		'data-reveal-variant',
-		'block'
+		'wave'
 	);
 	await expect(page.locator('#project-title [data-page-title-reveal]')).toHaveAttribute(
 		'data-wave-state',
@@ -40,7 +39,10 @@ test('project title hands over to water, responds to the pointer and respects re
 		'-webkit-text-fill-color',
 		'rgba(0, 0, 0, 0)'
 	);
-	await expect(page.locator('[data-project-hero] p')).toHaveCSS('-webkit-text-fill-color', 'rgba(0, 0, 0, 0)');
+	// The "Case Study" label (which replaced the description) is drawn by the canvas too, star icon included
+	const label = page.locator('[data-project-hero-copy] p');
+	await expect(label.locator('span')).toHaveCSS('-webkit-text-fill-color', 'rgba(0, 0, 0, 0)');
+	await expect(label.locator('svg')).toHaveCSS('fill-opacity', '0');
 
 	// Pointer movement must change the pixels in the title area
 	const resting = await page.screenshot({ clip: { x: 100, y: 200, width: 1000, height: 400 } });
@@ -53,11 +55,19 @@ test('project title hands over to water, responds to the pointer and respects re
 		.locator('#page .lenis')
 		.first()
 		.evaluate(el => el.scrollTo({ top: 280, behavior: 'instant' }));
-	await expect
-		.poll(() =>
-			page.locator('[data-project-hero-layer]').evaluate(el => new DOMMatrix(getComputedStyle(el).transform).f)
-		)
-		.toBeCloseTo(-280, 0);
+	// The hero is a single viewport, so the first scroll goes straight into the panel reveal: the hero holds
+	// vertically while it eases left, and the water canvas travels with it
+	const heroLayer = page.locator('[data-project-hero-layer]');
+	await expect.poll(() => heroLayer.evaluate(el => new DOMMatrix(getComputedStyle(el).transform).e)).toBeLessThan(0);
+	const offsets = await heroLayer.evaluate(layer => {
+		const hero = layer.getBoundingClientRect();
+		const water = layer.querySelector('[data-project-water]')?.getBoundingClientRect();
+		return { heroY: hero.y, x: (water?.x ?? Number.NaN) - hero.x, y: (water?.y ?? Number.NaN) - hero.y };
+	});
+	expect(offsets.heroY).toBeCloseTo(0, 0);
+	expect(offsets.x).toBeCloseTo(0, 0);
+	expect(offsets.y).toBeCloseTo(0, 0);
+	await expect(canvas).toHaveAttribute('data-ready', 'true');
 	await page.screenshot({ path: 'test-results/project-water-text.png' });
 
 	// Mobile still has water; reduced motion switches it off and shows the native image

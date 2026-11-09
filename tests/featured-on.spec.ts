@@ -2,6 +2,10 @@
 // ------------
 import { expect, test } from '@playwright/test';
 
+// Constants
+// ------------
+const LOADER_TIMEOUT = 15_000;
+
 // Tests
 // ------------
 // Protects the Codrops card video: nothing is fetched until Profile opens, it plays only while
@@ -10,21 +14,39 @@ for (const width of [1440, 440]) {
 	test(`Codrops background plays only while visible at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
 		await page.emulateMedia({ reducedMotion: 'reduce' });
-		// Track video fetches to prove the file is not requested before it is needed
-		const videoRequests: string[] = [];
+		// Track every fetch made while Profile is closed, to prove the video is not requested before it is
+		// needed. The file is picked per screen from the CMS renditions (4467e15), with /videos/codrops.mp4 as
+		// the fallback, so its URL is only known once Profile opens.
+		const requestsWhileClosed: string[] = [];
+		const requestsAfterOpen: string[] = [];
+		let profileOpened = false;
 		page.on('request', request => {
-			if (request.url().includes('/videos/codrops.mp4')) videoRequests.push(request.url());
+			(profileOpened ? requestsAfterOpen : requestsWhileClosed).push(request.url());
 		});
 		await page.goto('/');
+		// NOTE • An Open Profile click that lands as the intro loader settles can be dropped (no /profile/
+		// push), so wait for the loader to finish, as a visitor would
+		await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', {
+			timeout: LOADER_TIMEOUT,
+		});
 
-		// Closed: no source attached, no request, not playing
+		// Closed: no source attached, not playing
 		const video = page.locator('[data-featured-video]').first();
 		await expect(video).not.toHaveAttribute('src');
-		expect(videoRequests).toEqual([]);
 		await expect(video).toHaveJSProperty('paused', true);
 
-		// Open: it plays muted without looping and fills its card with a slight 1% overscan
+		// Open: a source is attached that was never fetched while closed
+		profileOpened = true;
 		await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+		await expect(page.locator('#profile-panel')).toHaveAttribute('aria-hidden', 'false');
+		await expect(video).toHaveAttribute('src', /\.mp4$/);
+		const source = (await video.getAttribute('src')) ?? '';
+		const sourceUrl = new URL(source, page.url()).href;
+		expect(requestsWhileClosed).not.toContain(sourceUrl);
+		// ...and is fetched now, which also proves the closed check above can see the request
+		await expect.poll(() => requestsAfterOpen).toContain(sourceUrl);
+
+		// It plays muted without looping and fills its card with a slight 1% overscan
 		await video.scrollIntoViewIfNeeded();
 		await expect(video).toHaveCSS('object-fit', 'cover');
 		await expect(video).toHaveJSProperty('muted', true);
@@ -78,7 +100,7 @@ for (const width of [1440, 440]) {
 		await expect(video).not.toHaveAttribute('src');
 		await expect(video).toHaveJSProperty('currentTime', 0);
 		await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
-		await expect(video).toHaveAttribute('src', '/videos/codrops.mp4');
+		await expect(video).toHaveAttribute('src', source);
 		await expect(video).toHaveJSProperty('currentTime', 0);
 		await video.scrollIntoViewIfNeeded();
 		await expect(video).toHaveJSProperty('paused', false);

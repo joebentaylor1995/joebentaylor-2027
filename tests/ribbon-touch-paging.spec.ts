@@ -25,8 +25,12 @@ const openRibbon = async (page: Page): Promise<Frame> => {
 	return renderer;
 };
 
-// One vertical touch gesture on the stage: `steps` moves of `stepY` px each, `holdMs` still before
-// lifting (a held finger has no flick), ending in `end` (pointerup or pointercancel)
+// One vertical touch gesture on the stage: `steps` moves of `stepY` px each, 16ms apart, `holdMs` still
+// before lifting (a held finger has no flick), ending in `end` (pointerup or pointercancel). With no hold the
+// finger lifts on its last move, as in a real flick.
+// NOTE • The ribbon reads finger speed from each event's timeStamp, which for a dispatched event is the moment
+// it is dispatched. Awaiting a timer between events let the busy ribbon frame stretch a 16ms gap past the 100ms
+// speed window, so a flick read as a held finger. Pacing the events within one task keeps their timestamps exact.
 type Gesture = {
 	steps: number;
 	stepY: number;
@@ -35,7 +39,8 @@ type Gesture = {
 	pointerId?: number;
 };
 const swipe = (renderer: Frame, gesture: Gesture) =>
-	renderer.evaluate(async ({ steps, stepY, holdMs, end = 'pointerup', pointerId = 1 }) => {
+	renderer.evaluate(({ steps, stepY, holdMs, end = 'pointerup', pointerId = 1 }) => {
+		const STEP_MS = 16;
 		const stage = document.querySelector('#stage') as HTMLCanvasElement;
 		const fire = (type: string, y: number) =>
 			stage.dispatchEvent(
@@ -48,14 +53,20 @@ const swipe = (renderer: Frame, gesture: Gesture) =>
 					clientY: y,
 				})
 			);
+		const pause = (ms: number) => {
+			const until = performance.now() + ms;
+			while (performance.now() < until) {
+				// Holds the finger still for exactly `ms`
+			}
+		};
 		let y = 600;
 		fire('pointerdown', y);
 		for (let i = 0; i < steps; i++) {
+			pause(STEP_MS);
 			y -= stepY;
 			fire('pointermove', y);
-			await new Promise(resolve => setTimeout(resolve, 16));
 		}
-		await new Promise(resolve => setTimeout(resolve, holdMs));
+		pause(holdMs);
 		fire(end, y);
 	}, gesture);
 

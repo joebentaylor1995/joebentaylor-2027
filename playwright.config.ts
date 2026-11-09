@@ -11,6 +11,10 @@ const baseURL = `http://localhost:${port}`;
 export default defineConfig({
 	testDir: './tests',
 	timeout: 60_000,
+	// NOTE • One retry on CI: the runner draws WebGL in software on shared cores, so a frame can
+	// occasionally stall long enough to fail a timing check. A retried pass is still reported as
+	// flaky in the run summary, so a test that needs it stays visible.
+	retries: process.env.CI ? 1 : 0,
 	use: {
 		baseURL,
 		// NOTE • Sandboxed environments (agent containers, locked-down CI) often

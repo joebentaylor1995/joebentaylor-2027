@@ -38,6 +38,25 @@ const setVariable = (element: HTMLElement | null | undefined, name: string, valu
 	if (element && element.style.getPropertyValue(name) !== value) element.style.setProperty(name, value);
 };
 
+// NOTE • Media can change height after a trigger measures (a video with no poster takes its
+// shape once its metadata loads), which leaves the trigger's end short of the outro. Calls
+// `remeasure` once a burst of height changes has settled; returns the cleanup.
+const onHeightChange = (element: HTMLElement, remeasure: () => void) => {
+	let height = element.scrollHeight;
+	let settle: gsap.core.Tween | undefined;
+	const observer = new ResizeObserver(() => {
+		if (element.scrollHeight === height) return;
+		height = element.scrollHeight;
+		settle?.kill();
+		settle = gsap.delayedCall(CONTENT_RESIZE_SETTLE, remeasure);
+	});
+	observer.observe(element);
+	return () => {
+		observer.disconnect();
+		settle?.kill();
+	};
+};
+
 // NOTE • Why: a quickSetter that skips the write (and the style invalidation) when the value
 // it would write is the one already there. These elements are only ever moved from here.
 const changedSetter = (target: Element, property: string, unit?: string) => {
@@ -87,7 +106,7 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 					.join(', '),
 				() => {
 					if (!outro) return;
-					gsap.fromTo(
+					const fill = gsap.fromTo(
 						outro,
 						{ '--project-outro-progress': 0 },
 						{
@@ -102,6 +121,8 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 							},
 						}
 					);
+					// Only this trigger re-measures: nothing on phones is pinned
+					return onHeightChange(root, () => fill.scrollTrigger?.refresh());
 				}
 			);
 			// Desktop: the pinned scroll sequence
@@ -246,20 +267,10 @@ const ProjectExperience = ({ hero, children }: ProjectExperienceProps) => {
 					onUpdate: self => update(self.progress * (self.end - self.start)),
 					onRefresh: self => update(self.progress * (self.end - self.start)),
 				});
-				// NOTE • Media can change height after this measures — a video with no poster takes
-				// its shape once its metadata loads — which would stop the scroll short of the outro
-				let contentHeight = content.scrollHeight;
-				let settle: gsap.core.Tween | undefined;
-				const contentResize = new ResizeObserver(() => {
-					if (content.scrollHeight === contentHeight) return;
-					contentHeight = content.scrollHeight;
-					settle?.kill();
-					settle = gsap.delayedCall(CONTENT_RESIZE_SETTLE, () => ScrollTrigger.refresh());
-				});
-				contentResize.observe(content);
+				// The pin's length depends on the content, so everything re-measures
+				const stopWatchingContent = onHeightChange(content, () => ScrollTrigger.refresh());
 				return () => {
-					contentResize.disconnect();
-					settle?.kill();
+					stopWatchingContent();
 					heroClip.style.removeProperty('clip-path');
 					// Undo every inline style and attribute this block set
 					gsap.set([heroLayer, panel, content, shade], { clearProps: 'transform,opacity' });

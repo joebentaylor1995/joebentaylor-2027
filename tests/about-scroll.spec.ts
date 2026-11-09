@@ -1,14 +1,27 @@
 // Imports
 // ------------
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+
+// Helpers
+// ------------
+// NOTE • An Open Profile click that lands as the intro loader settles can be dropped (no /profile/ push),
+// so wait for the loader to finish, as a visitor would, and confirm the panel opened before going on.
+const LOADER_TIMEOUT = 15_000;
+const waitForLoader = (page: Page) =>
+	expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: LOADER_TIMEOUT });
+const openProfile = async (page: Page) => {
+	await page.goto('/');
+	await waitForLoader(page);
+	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await expect(page.locator('#profile-panel')).toHaveAttribute('aria-hidden', 'false');
+};
 
 // Tests
 // ------------
 // Protects the scroll-linked parallax on the About images: they should be offset a quarter
 // of their height at the half-screen entry point and mirror that on exit.
 test('About uses 50% entry and exit parallax', async ({ page }) => {
-	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	const about = page.locator('[data-about]');
 	// Following sections are still placeholders; provide scroll room to exercise the exit.
 	await about.evaluate(section => {
@@ -52,6 +65,8 @@ test('About uses 50% entry and exit parallax', async ({ page }) => {
 // and return to the defaults on reset.
 test('About settings update the scrub, persist and reset', async ({ page }) => {
 	await page.goto('/?modalSettings');
+	// The loader closes and reopens Profile scrolled to the top as it settles; show About after that
+	await waitForLoader(page);
 	const settings = page.getByRole('complementary', { name: 'Modal settings' });
 	await settings.getByRole('button', { name: 'Show About', exact: true }).click();
 	// Non-default values for every About control
@@ -138,8 +153,10 @@ test('About settings update the scrub, persist and reset', async ({ page }) => {
 		)
 		.toBeCloseTo(0.35, 2);
 
-	// Settings persist across a reload, then reset restores the defaults
-	await page.reload();
+	// Settings persist across a reload, then reset restores the defaults. Opening Profile moves the URL to
+	// /profile/ (ea57c53), which drops the ?modalSettings flag, so the reload goes back through the opt-in URL.
+	await page.goto('/?modalSettings');
+	await waitForLoader(page);
 	await expect(settings.locator('#modal-aboutScrollDistance')).toHaveValue('800');
 	await expect(settings.locator('#modal-aboutStartZoom')).toHaveValue('200');
 	await expect(settings.locator('#modal-aboutFinalOpacity')).toHaveValue('25');
@@ -158,8 +175,7 @@ test('About settings update the scrub, persist and reset', async ({ page }) => {
 // Protects the About image sequence: five frames scrub in and out, play in reverse when
 // scrolling back, dim behind the text and survive closing and reopening Profile.
 test('About scrubs five images, reverses, and dims behind its text', async ({ page }) => {
-	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	const panel = page.locator('#profile-panel');
 	const about = page.locator('[data-about]');
 	const frames = about.locator('[data-about-frame]');
@@ -233,8 +249,7 @@ test('About scrubs five images, reverses, and dims behind its text', async ({ pa
 test('About remains readable on mobile with reduced motion', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.emulateMedia({ reducedMotion: 'reduce' });
-	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	const about = page.locator('[data-about]');
 	await about.scrollIntoViewIfNeeded();
 	await expect(about.locator('[data-about-frame]').first()).toHaveCSS('opacity', '0.4');

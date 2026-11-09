@@ -4,31 +4,33 @@ import { expect, test } from '@playwright/test';
 
 // Tests
 // ------------
-// Protects the portrait crop below the desktop breakpoint (1283px): phones and tablets show the static
-// <img> with their own crop settings, WebGL is never requested, and desktop switches to the canvas.
-test('mobile uses a static portrait and preserves controls across the breakpoint', async ({ page }) => {
-	// Record any WebGL context request so we can assert none was made while below the desktop breakpoint
+// Protects the portrait crop below the desktop breakpoint (1283px): phones and tablets each keep their own
+// crop settings, in both the native <img> (shown until the GPU portrait is ready) and the WebGL portrait,
+// and desktop keeps its own. Since 187ccb3 the WebGL portrait runs at every width, not only on desktop.
+test('mobile portrait crops follow their own settings across the breakpoint', async ({ page }) => {
 	await page.setViewportSize({ width: 768, height: 900 });
-	await page.addInitScript(() => {
-		const original = HTMLCanvasElement.prototype.getContext;
-		HTMLCanvasElement.prototype.getContext = function (
-			this: HTMLCanvasElement,
-			...args: Parameters<typeof original>
-		) {
-			if (String(args[0]).includes('webgl')) document.documentElement.dataset.webglRequested = 'true';
-			return original.apply(this, args);
-		} as typeof original;
-	});
 	await page.goto('/?heroSettings');
-	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete', { timeout: 15000 });
+	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete', { timeout: 30_000 });
 
-	// At 768px the page must be showing the plain <img>, not the canvas
-	await expect(page.locator('html')).not.toHaveAttribute('data-webgl-requested');
 	const scene = page.getByTestId('hero-depth');
 	const photo = scene.locator('img');
-	await expect(scene).toHaveAttribute('data-ready', 'false');
-	await expect(photo).toBeVisible();
+	await expect(scene).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
 	await expect(photo).toHaveAttribute('src', /portrait\.png/);
+	// The crop the WebGL portrait is drawing with: its scale and horizontal shift, to two decimals
+	const drawnCrop = () =>
+		scene.locator('canvas').evaluate(element => {
+			const gl = (element as HTMLCanvasElement).getContext('webgl');
+			if (!gl) throw new Error('Missing WebGL');
+			const program = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram;
+			const zoom = gl.getUniformLocation(program, 'zoom');
+			const shift = gl.getUniformLocation(program, 'positionShift');
+			if (!zoom || !shift) throw new Error('Missing portrait uniforms');
+			const round = (value: number) => Math.round(value * 100) / 100;
+			return {
+				scale: round(gl.getUniform(program, zoom) as number),
+				x: round((gl.getUniform(program, shift) as Float32Array)[0]),
+			};
+		});
 
 	// Set distinct mobile and tablet crops through the settings panel
 	await page.getByLabel('Mobile X position (%) value', { exact: true }).fill('12');
@@ -55,9 +57,10 @@ test('mobile uses a static portrait and preserves controls across the breakpoint
 		await page.setViewportSize({ width, height });
 
 		if (width < 1283) {
-			// Phones (<700px) use the mobile crop, tablets the tablet crop; the transform is x/y as a fraction of the viewport
-			await expect(scene).toHaveAttribute('data-ready', 'false');
-			await expect(photo).toBeVisible();
+			// Phones (<700px) use the mobile crop, tablets the tablet crop, in the GPU portrait...
+			await expect(scene).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
+			await expect.poll(drawnCrop).toEqual(width < 700 ? { scale: 0.8, x: 0.12 } : { scale: 0.9, x: 0.2 });
+			// ...and in the native image underneath, where the transform is x/y as a fraction of the viewport
 			await expect
 				.poll(() =>
 					photo.evaluate(element => {
@@ -71,8 +74,8 @@ test('mobile uses a static portrait and preserves controls across the breakpoint
 						: { scale: 0.9, x: Math.round(width * 0.2), y: Math.round(height * -0.05) }
 				);
 		} else {
-			// Desktop: the canvas takes over and the copy column keeps its width
-			await expect(scene).toHaveAttribute('data-ready', 'true');
+			// Desktop: the canvas (remounted for the desktop layout) shows and the copy column keeps its width
+			await expect(scene).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
 			await expect(photo).toBeHidden();
 			const copy = await page.locator('[data-hero-content] hgroup').boundingBox();
 			expect(copy?.width).toBeLessThanOrEqual(400);
@@ -94,6 +97,7 @@ test('mobile content and copyright stay anchored to the bottom', async ({ page }
 	for (const height of [796, 900]) {
 		await page.setViewportSize({ width: 440, height });
 		await expect(page.locator('[data-hero-content] hgroup')).toBeVisible();
+		await expect(page.locator('[data-copyright]')).toBeVisible();
 
 		const copyright = await page.locator('[data-copyright]').boundingBox();
 		const content = await page.locator('[data-hero-content] hgroup').boundingBox();

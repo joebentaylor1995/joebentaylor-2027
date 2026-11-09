@@ -167,6 +167,22 @@ export function mountDepthEffect({
 		cssHeight = canvas.clientHeight,
 		lastSettings: DepthSettings | null = null;
 	let lastIntroTint = -1;
+	// NOTE • The portrait's width / height, kept from the last candidate that had loaded: a resize
+	// that makes the <img> pick a larger srcset candidate empties naturalWidth until it arrives,
+	// and 0 / 0 zoomed the portrait off screen (the settled frame loop never redrew it)
+	let portraitAspect = 1;
+	const photoAspect = () => {
+		if (photo.naturalWidth && photo.naturalHeight) portraitAspect = photo.naturalWidth / photo.naturalHeight;
+		return portraitAspect;
+	};
+	// ...and redraws once the new candidate arrives
+	photo.addEventListener(
+		'load',
+		() => {
+			dirty = true;
+		},
+		{ signal: events.signal }
+	);
 
 	// Pointer state. `target`/`pointer` are the -1..1 parallax offset (goal and eased value);
 	// `cursor` is the raw 0..1 position over the canvas that drives the cursor glow
@@ -360,7 +376,7 @@ export function mountDepthEffect({
 	// Percent settings (positionX/Y) become fractions here.
 	function commonUniforms(u: Uniforms, s: DepthSettings) {
 		gl.uniform2f(u.resolution, canvas.width, canvas.height);
-		gl.uniform1f(u.portraitAspect, photo.naturalWidth / photo.naturalHeight);
+		gl.uniform1f(u.portraitAspect, photoAspect());
 		gl.uniform2f(u.motion, pointer[0] * s.horizontal, pointer[1] * s.vertical);
 
 		const mobile = !desktopLayout.matches;
@@ -569,10 +585,10 @@ export function mountDepthEffect({
 			// Keep tall windows from enlarging the portrait into the text column.
 			// Zoom and position are overridden from commonUniforms to blend in the intro scale.
 			if (desktopLayout.matches) {
-				const portraitAspect = photo.naturalWidth / photo.naturalHeight;
-				const coverWidth = Math.max(cssWidth, cssHeight * portraitAspect);
+				const aspect = photoAspect();
+				const coverWidth = Math.max(cssWidth, cssHeight * aspect);
 				const widthScale = cssWidth / coverWidth;
-				const bottomSpan = cssWidth * portraitBottomSpan(s, portraitAspect);
+				const bottomSpan = cssWidth * portraitBottomSpan(s, aspect);
 				const bottomOffset = Math.max(0, (cssHeight - bottomSpan) / 2);
 				gl.uniform2f(u.positionShift, s.positionX / 100, s.positionY / 100 + bottomOffset / cssHeight);
 				gl.uniform1f(

@@ -108,18 +108,31 @@ test('gentle scrolling preserves colour and velocity decays at rest', () => {
 test('fast gestures alternate the rendered colour portrait and release sustained scroll', async ({
 	page,
 }, testInfo) => {
+	// Both gestures are paced by rendered frames, and every frame of the scroll effects redraws the full liquid
+	// stack: on a loaded machine or software WebGL a single gesture measured 10-30s, past the 60s default
+	test.slow();
 	await page.goto('/');
 	const effect = page.getByTestId('hero-depth');
 	await expect(effect).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
+	// Scroll once the loader has revealed the page, as a visitor would (it covers the hero until then)
+	await expect(page.locator('[data-loader-overlay]')).toBeHidden({ timeout: 30_000 });
 	const canvas = effect.locator('canvas');
-	// Fires 90 wheel events ~16ms apart (about a second of continuous scrolling)
+	// One wheel event per animation frame for 60 frames (about a second of continuous scrolling at 60fps).
+	// Paced by frames rather than 16ms timers: on a loaded runner the timers stretched to 100-250ms each,
+	// which made one gesture take over 20s and split it into many gestures at the renderer's 0.35s gap.
 	const gesture = async (delta: number) =>
 		canvas.evaluate(async (element, amount) => {
-			for (let i = 0; i < 90; i++) {
+			for (let i = 0; i < 60; i++) {
 				element.dispatchEvent(new WheelEvent('wheel', { deltaY: amount, bubbles: true }));
-				await new Promise(resolve => setTimeout(resolve, 16));
+				await new Promise(requestAnimationFrame);
 			}
 		}, delta);
+	// Waits 30 frames: the renderer advances its clock by at most 50ms a frame, so this always passes the
+	// 0.35s gesture gap in the renderer's own time, however slow the frames are
+	const pauseBetweenGestures = () =>
+		page.evaluate(async () => {
+			for (let i = 0; i < 30; i++) await new Promise(requestAnimationFrame);
+		});
 	// Reads colourMix and scrollVelocity from the live program
 	const state = () =>
 		canvas.evaluate(element => {
@@ -142,8 +155,8 @@ test('fast gestures alternate the rendered colour portrait and release sustained
 	expect((await state()).pulse).toBeLessThan(0.02);
 	await page.screenshot({ path: testInfo.outputPath('colour-portrait.png') });
 
-	// A fast upward gesture takes it back out
-	await page.waitForTimeout(500);
+	// After a pause, a fast upward gesture takes it back out
+	await pauseBetweenGestures();
 	await gesture(-500);
 	await expect.poll(async () => (await state()).colour).toBeLessThan(0.05);
 	expect((await state()).error).toBe(0);

@@ -10,7 +10,7 @@ import { observeScenePause } from '@utils/observeScenePause';
 import { gsap } from 'gsap';
 import ScrollTrigger from 'gsap/ScrollTrigger';
 import { ReactLenis, useLenis } from 'lenis/react';
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useLayoutEffect, useState } from 'react';
 
 // Styles + Interfaces
 // ------------
@@ -38,15 +38,20 @@ const ignoresTouch = (node: EventTarget) =>
 	(node.hasAttribute('data-lenis-prevent') || node.hasAttribute('data-lenis-prevent-touch'));
 
 /**
- * Wires Lenis + GSAP after the Lenis instance exists (created in ReactLenis useEffect).
- * Rendered after page children so its useEffect runs after deeper useGSAP hooks schedule work.
+ * Wires Lenis + GSAP once the Lenis instance exists (created in ReactLenis useEffect).
+ * NOTE • Rendered before the page and wired in a layout effect, so the scroller proxy is in place
+ * before any useGSAP (also a layout effect) creates a ScrollTrigger on the wrapper. Registering a
+ * proxy drops the wrapper from ScrollTrigger's scroller registry; triggers made before it kept a
+ * plain scroll function no refresh records or restores, so every refresh (a resize, media
+ * changing height) unpinned the case study, the browser clamped the page to the top, and it
+ * stayed there.
  */
 const LenisGsapBridge = () => {
 	// Context
 	const lenis = useLenis();
 
 	// Effects
-	useEffect(() => {
+	useLayoutEffect(() => {
 		if (!lenis) return;
 
 		const wrapper = lenis.rootElement;
@@ -66,11 +71,24 @@ const LenisGsapBridge = () => {
 			readRendered();
 			ScrollTrigger.update();
 		};
+		// Whether ScrollTrigger is mid-refresh (its own flag isn't in GSAP's types)
+		let refreshing = false;
+		const onRefreshInit = () => {
+			refreshing = true;
+			readRendered();
+		};
+		const onRefresh = () => {
+			refreshing = false;
+		};
 
+		// NOTE • A refresh measures at 0 and then puts the offset back; those writes go straight to the
+		// wrapper, leaving Lenis animating toward the visitor's target. Through Lenis they would
+		// end any smooth scroll in flight, so media loading mid-wheel cut the scroll short.
 		ScrollTrigger.scrollerProxy(wrapper, {
 			scrollTop(value?: number) {
 				if (value !== undefined) {
-					lenis.scrollTo(value, { immediate: true });
+					if (refreshing) wrapper.scrollTop = value;
+					else lenis.scrollTo(value, { immediate: true });
 					readRendered();
 				}
 				return rendered;
@@ -91,7 +109,8 @@ const LenisGsapBridge = () => {
 		// Scrolls Lenis doesn't emit (the browser clamping or anchoring), and refreshes that run
 		// before the next scroll event
 		wrapper.addEventListener('scroll', readRendered, { passive: true });
-		ScrollTrigger.addEventListener('refreshInit', readRendered);
+		ScrollTrigger.addEventListener('refreshInit', onRefreshInit);
+		ScrollTrigger.addEventListener('refresh', onRefresh);
 
 		// Lenis rides GSAP's shared ticker (autoRaf is off); it is detached while the scene is paused.
 		// It steps on the vsync clock: GSAP's own time is whole milliseconds, which makes the
@@ -117,18 +136,22 @@ const LenisGsapBridge = () => {
 		const listensForTouch = lenis.options.eventsTarget === wrapper;
 		if (!listensForTouch) wrapper.addEventListener('touchmove', yieldToFinger, { passive: true });
 
-		ScrollTrigger.refresh();
-
 		return () => {
 			lenis.off('scroll', onScroll);
 			wrapper.removeEventListener('scroll', readRendered);
-			ScrollTrigger.removeEventListener('refreshInit', readRendered);
+			ScrollTrigger.removeEventListener('refreshInit', onRefreshInit);
+			ScrollTrigger.removeEventListener('refresh', onRefresh);
 			if (!listensForTouch) wrapper.removeEventListener('touchmove', yieldToFinger);
 			gsap.ticker.remove(update);
 			stopObservingPause();
 			ScrollTrigger.defaults({ scroller: window });
 			ScrollTrigger.scrollerProxy(wrapper, {});
 		};
+	}, [lenis]);
+
+	// Re-measures once the page's own layout effects have created their triggers on the wrapper
+	useEffect(() => {
+		if (lenis) ScrollTrigger.refresh();
 	}, [lenis]);
 
 	// Render
@@ -157,8 +180,8 @@ const SmoothScroll = ({ children }: I.SmoothScrollProps) => {
 
 	return (
 		<ReactLenis ref={lenisRef} options={options}>
-			{children}
 			<LenisGsapBridge />
+			{children}
 		</ReactLenis>
 	);
 };

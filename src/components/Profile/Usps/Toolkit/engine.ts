@@ -107,7 +107,8 @@ export async function createToolkit(element: HTMLElement, items: readonly Toolki
 	// Keep physics in design units; the camera and hit targets scale with rem sizing.
 	const getScale = () =>
 		((parseFloat(getComputedStyle(document.documentElement).fontSize) / 10) *
-			(element.dataset.toolkit === 'Design toolkit'
+			// The label is the section's CMS title ('Design Toolkit'), so it matches without case
+			(element.dataset.toolkit?.toLowerCase() === 'design toolkit'
 				? getSettings().designToolkitSize
 				: getSettings().developmentToolkitSize)) /
 		100;

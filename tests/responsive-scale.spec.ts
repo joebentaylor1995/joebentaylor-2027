@@ -2,6 +2,11 @@
 // ------------
 import { expect, test } from '@playwright/test';
 
+// Constants
+// ------------
+// The loader's own scene deadline (SiteLoader/timeline.ts) plus headroom
+const LOADER_TIMEOUT = 30_000;
+
 // Tests
 // ------------
 // Protects fluid sizing on big screens: the root size stays 10px up to 1600px, then scales as width / 160.
@@ -24,6 +29,9 @@ test('WebGL portrait retains its source aspect at wide and tall desktop sizes', 
 	await page.goto('/');
 	const hero = page.getByTestId('hero-depth');
 	await expect(hero).toHaveAttribute('data-ready', 'true', { timeout: 15000 });
+	// The hero turns ready behind the site loader, which holds its frames (and so any canvas resize)
+	// until the loader settles; on a busy machine that gate can take up to its 15s deadline
+	await expect(page.locator('html')).not.toHaveAttribute('data-loader-pending', /.*/, { timeout: LOADER_TIMEOUT });
 	for (const [width, height] of [
 		[1600, 900],
 		[1920, 1200],

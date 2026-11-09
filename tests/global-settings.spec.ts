@@ -11,9 +11,12 @@ test('global sizing preview affects tablet only and resets on reload', async ({ 
 	await page.goto('/?globalSettings');
 	const panel = page.getByRole('complementary', { name: 'Global settings' });
 	await expect(panel).toBeVisible();
-	await expect(page.locator('html')).toHaveCSS('font-size', '16px');
-	// 125% of the 16px tablet root
+	// The panel starts at the site's own 75% tablet root
+	await expect(panel.getByText('Tablet font scale').locator('output')).toHaveText('75%');
+	await expect(page.locator('html')).toHaveCSS('font-size', '12px');
+	// 125% of the 16px base (the panel's readout confirms the slider change landed)
 	await panel.getByRole('slider', { name: 'Tablet font scale' }).fill('125');
+	await expect(panel.getByText('Tablet font scale').locator('output')).toHaveText('125%');
 	await expect(page.locator('html')).toHaveCSS('font-size', '20px');
 
 	// Other breakpoints keep their own root size, then tablet picks the preview back up
@@ -24,18 +27,19 @@ test('global sizing preview affects tablet only and resets on reload', async ({ 
 	await page.setViewportSize({ width: 768, height: 1000 });
 	await expect(page.locator('html')).toHaveCSS('font-size', '20px');
 
-	// Reset returns to 16px
-	await panel.getByRole('button', { name: 'Reset to 100%' }).click();
-	await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+	// Reset returns to the site's 12px
+	await panel.getByRole('button', { name: 'Reset to 75%' }).click();
+	await expect(page.locator('html')).toHaveCSS('font-size', '12px');
 	await panel.getByRole('slider', { name: 'Tablet font scale' }).fill('125');
 
 	// The preview is not persisted
 	await page.reload();
 	await expect(panel).toBeVisible();
-	await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+	await expect(page.locator('html')).toHaveCSS('font-size', '12px');
 	await expect(page.locator('[data-loader-overlay]')).not.toBeVisible({ timeout: 15000 });
 	await page.screenshot({ path: 'test-results/global-settings-tablet.png' });
+	// Without the panel, tablets fall back to the site's own 75% root (12px, since 5439522)
 	await page.goto('/');
 	await expect(panel).toHaveCount(0);
-	await expect(page.locator('html')).toHaveCSS('font-size', '16px');
+	await expect(page.locator('html')).toHaveCSS('font-size', '12px');
 });

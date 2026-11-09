@@ -2,6 +2,13 @@
 // ------------
 import { expect, test } from '@playwright/test';
 
+// Constants
+// ------------
+// The hero's GPU scene starts behind the site loader (once its logo lands) and the text entrance only
+// plays once the loader reveals the page, so first-load waits cover the loader too. These are waits on
+// state, not sleeps: they return as soon as the scene is ready.
+const SCENE_READY_TIMEOUT = 30_000;
+
 // Tests
 // ------------
 // Protects the hero render loop: once the intro has settled, the shader attribute lookup is not
@@ -24,12 +31,14 @@ test('settled animation does not query shader attributes on every frame', async 
 		if (request.url().includes('portrait-colour')) colourRequests.push(request.url());
 	});
 	await page.goto('/');
-	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
+	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1, { timeout: SCENE_READY_TIMEOUT });
 
 	// The colour portrait is fetched exactly once
 	expect(colourRequests).toHaveLength(1);
 	expect(colourRequests[0]).toContain('/portrait-colour.webp');
-	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete');
+	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete', {
+		timeout: SCENE_READY_TIMEOUT,
+	});
 
 	// Compare the counter 500ms apart: some calls happened during setup, but none while idle
 	await page.waitForTimeout(300);
@@ -44,7 +53,9 @@ test('settled animation does not query shader attributes on every frame', async 
 test('portrait continues scaling with the viewport width', async ({ page }) => {
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await page.goto('/?heroSettings');
-	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
+	await expect(page.locator('[data-hero-content]')).toHaveAttribute('data-entrance', 'complete', {
+		timeout: SCENE_READY_TIMEOUT,
+	});
 	const canvas = page.getByTestId('hero-depth').locator('canvas');
 	// Reads the zoom uniform from the live WebGL program and combines it with the canvas size.
 	// 1.4455 mirrors the portrait image width/height ratio for the cover fit.
@@ -69,38 +80,105 @@ test('portrait continues scaling with the viewport width', async ({ page }) => {
 // Protects the intro against early input: hovering before the entrance ends neither sets the cursor
 // state nor stalls the zoom, and the cursor takes over once the intro is done.
 test('early hover does not interrupt intro and a slow ripple keeps updating without input', async ({ page }) => {
+	// Records, for every drawn portrait frame, the zoom and cursor uniforms it used and whether the ripple was
+	// still opening, plus when the pointer first and last moved. Everything is timed on the page's own clock,
+	// so a busy runner's slow round trips can't push a sample past the end of the intro.
+	await page.addInitScript(() => {
+		const audit = {
+			armed: false,
+			hoverAt: 0,
+			lastMoveAt: 0,
+			frames: [] as { time: number; zoom: number; cursor: number; opening: boolean }[],
+		};
+		Object.assign(window, { introAudit: audit });
+		window.addEventListener(
+			'pointermove',
+			() => {
+				if (!audit.armed) return;
+				audit.lastMoveAt = performance.now();
+				audit.hoverAt ||= audit.lastMoveAt;
+			},
+			true
+		);
+		const names = new WeakMap<WebGLUniformLocation, string>();
+		const locate = WebGLRenderingContext.prototype.getUniformLocation;
+		const setFloat = WebGLRenderingContext.prototype.uniform1f;
+		const drawArrays = WebGLRenderingContext.prototype.drawArrays;
+		let portrait: WebGLProgram | null = null;
+		let zoom = Number.NaN;
+		let cursor = 0;
+		WebGLRenderingContext.prototype.getUniformLocation = function (program, name) {
+			const location = locate.call(this, program, name);
+			if (location) names.set(location, name);
+			return location;
+		};
+		// The portrait writes zoom twice a frame (its base, then the intro value); the last write is drawn
+		WebGLRenderingContext.prototype.uniform1f = function (location, value) {
+			const name = location ? names.get(location) : undefined;
+			if (name === 'zoom') {
+				zoom = value;
+				portrait = this.getParameter(this.CURRENT_PROGRAM);
+			}
+			if (name === 'cursorOn') cursor = value;
+			return setFloat.call(this, location, value);
+		};
+		WebGLRenderingContext.prototype.drawArrays = function (mode, first, count) {
+			if (audit.armed && portrait && this.getParameter(this.CURRENT_PROGRAM) === portrait)
+				audit.frames.push({
+					time: performance.now(),
+					zoom,
+					cursor,
+					opening: !document.querySelector('[data-scene-cover]')?.hasAttribute('data-complete'),
+				});
+			return drawArrays.call(this, mode, first, count);
+		};
+	});
+	type IntroAudit = {
+		armed: boolean;
+		hoverAt: number;
+		lastMoveAt: number;
+		frames: { time: number; zoom: number; cursor: number; opening: boolean }[];
+	};
+
 	await page.goto('/?heroSettings');
 	const content = page.locator('[data-hero-content]');
-	await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
+	await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: SCENE_READY_TIMEOUT });
+	// A 0.25x ripple takes 4s to open, so the portrait zoom is still settling well after the pointer arrives
 	await page.getByLabel('Ripple speed value', { exact: true }).fill('0.25');
 	const canvas = page.getByTestId('hero-depth').locator('canvas');
-	// Reads the portrait zoom and cursor uniforms, plus any GL error
+	// Reads the portrait cursor uniform and any GL error from the live program
 	const read = () =>
 		canvas.evaluate(element => {
 			const gl = (element as HTMLCanvasElement).getContext('webgl');
 			if (!gl) throw new Error('Missing WebGL');
 			const program = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram;
-			const zoom = gl.getUniformLocation(program, 'zoom');
 			const cursor = gl.getUniformLocation(program, 'cursorOn');
-			if (!zoom || !cursor) throw new Error('Missing portrait uniforms');
-			return {
-				zoom: gl.getUniform(program, zoom) as number,
-				cursor: gl.getUniform(program, cursor) as number,
-				error: gl.getError(),
-			};
+			if (!cursor) throw new Error('Missing portrait uniforms');
+			return { cursor: gl.getUniform(program, cursor) as number, error: gl.getError() };
 		});
 
-	// Move the pointer in during the intro
+	// Move the pointer in during the intro (the audit starts after the click, so the button hover isn't counted)
 	await page.getByRole('button', { name: 'Replay introduction', exact: true }).click();
+	await page.evaluate(() => {
+		(window as unknown as { introAudit: IntroAudit }).introAudit.armed = true;
+	});
 	await page.mouse.move(100, 330);
-	await page.mouse.move(450, 420, { steps: 10 });
-	await page.waitForTimeout(1800);
-	const early = await read();
-	expect(early.cursor).toBe(0);
-	expect(early.error).toBe(0);
-	await page.waitForTimeout(500);
-	expect((await read()).zoom).toBeLessThan(early.zoom - 0.01);
+	await page.mouse.move(450, 420, { steps: 5 });
 	await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
+	const audit = await page.evaluate(() => (window as unknown as { introAudit: IntroAudit }).introAudit);
+
+	// The hover landed while the slow ripple was still opening, and never switched the cursor on during it
+	expect(audit.hoverAt).toBeGreaterThan(0);
+	const opening = audit.frames.filter(frame => frame.opening && frame.time >= audit.hoverAt);
+	expect(opening.length).toBeGreaterThan(0);
+	expect(opening.filter(frame => frame.cursor !== 0)).toEqual([]);
+	// After the last pointer move, with no further input, the zoom kept settling
+	const withoutInput = opening.filter(frame => frame.time > audit.lastMoveAt);
+	expect(withoutInput.length).toBeGreaterThan(1);
+	expect(withoutInput[withoutInput.length - 1].zoom).toBeLessThan(withoutInput[0].zoom - 0.01);
+	expect((await read()).error).toBe(0);
+
+	// Once the intro is done, the cursor takes over
 	await page.mouse.move(150, 350);
 	await expect.poll(async () => (await read()).cursor).toBe(1);
 	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
@@ -109,51 +187,94 @@ test('early hover does not interrupt intro and a slow ripple keeps updating with
 // Protects the intro handoff: pointer movement while the text is still entering already drives both
 // the depth motion and the water ripple.
 test('depth and water cursor respond together after the ripple while text is still entering', async ({ page }) => {
-	// Flags <html> the first time the water shader's "amount" uniform is written
+	// Times, on the page clock, the first pointer move after arming, the first water splat (the water
+	// shader's "amount" uniform) and the first non-zero depth motion, and whether the text was still entering
 	await page.addInitScript(() => {
-		const amounts = new WeakSet<WebGLUniformLocation>();
-		const getLocation = WebGLRenderingContext.prototype.getUniformLocation;
+		const audit = {
+			armed: false,
+			movedAt: 0,
+			strokeAt: 0,
+			motionAt: 0,
+			enteringAtStroke: false,
+			enteringAtMotion: false,
+		};
+		Object.assign(window, { handoffAudit: audit });
+		const entering = () =>
+			document.querySelector('[data-hero-content]')?.getAttribute('data-entrance') === 'running';
+		window.addEventListener(
+			'pointermove',
+			() => {
+				if (audit.armed) audit.movedAt ||= performance.now();
+			},
+			true
+		);
+		const names = new WeakMap<WebGLUniformLocation, string>();
+		const locate = WebGLRenderingContext.prototype.getUniformLocation;
 		const setVector = WebGLRenderingContext.prototype.uniform3fv;
+		const setPair = WebGLRenderingContext.prototype.uniform2f;
 		WebGLRenderingContext.prototype.getUniformLocation = function (program, name) {
-			const location = getLocation.call(this, program, name);
-			if (location && name === 'amount') amounts.add(location);
+			const location = locate.call(this, program, name);
+			if (location) names.set(location, name);
 			return location;
 		};
 		WebGLRenderingContext.prototype.uniform3fv = function (location, value) {
-			if (location && amounts.has(location)) document.documentElement.dataset.waterStroke = 'true';
+			if (audit.movedAt && !audit.strokeAt && location && names.get(location) === 'amount') {
+				audit.strokeAt = performance.now();
+				audit.enteringAtStroke = entering();
+			}
 			return setVector.call(this, location, value);
 		};
+		WebGLRenderingContext.prototype.uniform2f = function (location, x, y) {
+			if (
+				audit.movedAt &&
+				!audit.motionAt &&
+				location &&
+				names.get(location) === 'motion' &&
+				Math.abs(x) > 0.01
+			) {
+				audit.motionAt = performance.now();
+				audit.enteringAtMotion = entering();
+			}
+			return setPair.call(this, location, x, y);
+		};
 	});
+	type HandoffAudit = {
+		armed: boolean;
+		movedAt: number;
+		strokeAt: number;
+		motionAt: number;
+		enteringAtStroke: boolean;
+		enteringAtMotion: boolean;
+	};
+	const readAudit = () => page.evaluate(() => (window as unknown as { handoffAudit: HandoffAudit }).handoffAudit);
+
 	await page.goto('/?heroSettings');
 	const content = page.locator('[data-hero-content]');
-	await expect(content).toHaveAttribute('data-entrance', 'complete');
+	await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: SCENE_READY_TIMEOUT });
+	// Hold the paragraph back to 6s so the text is still entering for several seconds after the ripple lands
+	// (~1.5s); with the default timings that window is about a second
+	await page.getByText('Heading & paragraph timing', { exact: true }).click();
+	await page.getByLabel('Paragraph start value', { exact: true }).fill('6');
 	await page.getByRole('button', { name: 'Replay introduction', exact: true }).click();
 	await expect(page.locator('[data-scene-cover]')).toHaveAttribute('data-complete', 'true');
 	await expect(content).toHaveAttribute('data-entrance', 'running');
 
 	// Move the pointer while the text is still animating in
+	await page.evaluate(() => {
+		(window as unknown as { handoffAudit: HandoffAudit }).handoffAudit.armed = true;
+	});
 	await page.mouse.move(100, 300);
 	await page.mouse.move(350, 350, { steps: 5 });
-	await expect(page.locator('html')).toHaveAttribute('data-water-stroke', 'true', { timeout: 750 });
 	await expect
-		.poll(
-			() =>
-				page
-					.getByTestId('hero-depth')
-					.locator('canvas')
-					.evaluate(element => {
-						const gl = (element as HTMLCanvasElement).getContext('webgl');
-						if (!gl) throw new Error('Missing WebGL');
-						const program = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram;
-						const location = gl.getUniformLocation(program, 'motion');
-						if (!location) throw new Error('Missing motion uniform');
-						const motion = gl.getUniform(program, location) as Float32Array;
-						return Math.abs(motion[0]);
-					}),
-			{ timeout: 750 }
-		)
-		.toBeGreaterThan(0.01);
-	await expect(content).toHaveAttribute('data-entrance', 'running');
+		.poll(async () => Math.min((await readAudit()).strokeAt, (await readAudit()).motionAt))
+		.toBeGreaterThan(0);
+
+	// Both respond within 750ms of the pointer arriving, while the text is still entering
+	const audit = await readAudit();
+	expect(audit.strokeAt - audit.movedAt).toBeLessThan(750);
+	expect(audit.motionAt - audit.movedAt).toBeLessThan(750);
+	expect(audit.enteringAtStroke).toBe(true);
+	expect(audit.enteringAtMotion).toBe(true);
 });
 
 // Protects the intro settings panel: values appear in the exported JSON and the replay applies the
@@ -161,7 +282,7 @@ test('depth and water cursor respond together after the ripple while text is sti
 test('intro controls export and replay repeatedly with changed timing', async ({ page }) => {
 	await page.goto('/?heroSettings');
 	const content = page.locator('[data-hero-content]');
-	await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
+	await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: SCENE_READY_TIMEOUT });
 	await page.getByLabel('Ripple strength value', { exact: true }).fill('1.5');
 	await page.getByLabel('Ripple width value', { exact: true }).fill('1.4');
 	await page.getByLabel('Ripple speed value', { exact: true }).fill('0.5');
@@ -177,9 +298,9 @@ test('intro controls export and replay repeatedly with changed timing', async ({
 	await page.getByLabel('Copyright line growth duration value', { exact: true }).fill('0.8');
 	await page.getByLabel('Copyright digit stagger value', { exact: true }).fill('0.1');
 
-	// Export reflects every edited control
+	// Export reflects every edited control, in the desktop profile (intro settings are kept per device)
 	const exported = JSON.parse(await page.getByLabel('All hero settings JSON').inputValue());
-	expect(exported.intro).toMatchObject({
+	expect(exported.intro.desktop).toMatchObject({
 		headingStart: 0.7,
 		paragraphStart: 2.5,
 		wordStagger: 0.04,
@@ -213,7 +334,7 @@ test('intro controls export and replay repeatedly with changed timing', async ({
 test('hero entrance settles and reduced motion reveals content immediately', async ({ page }) => {
 	await page.goto('/');
 	const content = page.locator('[data-hero-content]');
-	await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
+	await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: SCENE_READY_TIMEOUT });
 	await expect(content.locator('[data-reveal-word]').first()).toHaveCSS('opacity', '1');
 	await expect(content.locator('svg')).toHaveCSS('opacity', '1');
 	await expect(page.locator('[data-copyright-icon]')).toHaveCSS('opacity', '1');
@@ -235,7 +356,7 @@ test('hero entrance settles and reduced motion reveals content immediately', asy
 // DOM shows up as green pixels in the canvas at both desktop widths; mobile falls back to HTML.
 test('desktop hero text follows HTML content and CSS, with a mobile fallback', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
+	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1, { timeout: SCENE_READY_TIMEOUT });
 	const content = page.locator('[data-hero-content]');
 	await expect(content).toHaveCSS('opacity', '0');
 	for (const width of [1283, 1440]) {
@@ -300,7 +421,7 @@ test('desktop hero text follows HTML content and CSS, with a mobile fallback', a
 // are reproduced in the canvas pixels.
 test('WebGL decoration follows CSS border and responsive spacing changes', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
+	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1, { timeout: SCENE_READY_TIMEOUT });
 	for (const width of [1283, 1440]) {
 		await page.setViewportSize({ width, height: 800 });
 		await page.locator('[data-logo-marquee]').evaluate(
@@ -363,9 +484,10 @@ test('WebGL decoration follows CSS border and responsive spacing changes', async
 			.toEqual([0, 128, 0, 255, 240, 237, 237, 255]);
 	}
 
-	// On mobile the WebGL layer is switched off
+	// On mobile the canvas stops drawing the marquee and the HTML marquee shows instead. (The liquid layer
+	// itself keeps running on phones since 187ccb3; only desktop hands the marquee over to WebGL.)
 	await page.setViewportSize({ width: 390, height: 844 });
-	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(0);
+	await expect(page.locator('[data-logo-marquee]')).toHaveCSS('opacity', '1');
 	await expect(page.getByRole('heading', { name: 'Clients include', exact: true })).toBeVisible();
 });
 
@@ -375,7 +497,11 @@ test('liquid controls toggle, update and reset without restarting the hero', asy
 	// Short timeout so a missing control fails quickly instead of waiting out the test timeout
 	page.setDefaultTimeout(5_000);
 	await page.goto('/?heroSettings');
-	await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'true');
+	await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'true', {
+		timeout: SCENE_READY_TIMEOUT,
+	});
+	// The site loader covers (and takes the pointer from) the page until it has revealed the hero
+	await expect(page.locator('[data-loader-overlay]')).toBeHidden({ timeout: SCENE_READY_TIMEOUT });
 	const toggle = page.getByRole('button', { name: 'Liquid controls', exact: true });
 	const panel = page.getByRole('region', { name: 'Liquid glass controls' });
 	await expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -427,8 +553,8 @@ test('liquid controls toggle, update and reset without restarting the hero', asy
 	await expect(toggle).toBeHidden();
 });
 
-// Protects the liquid effect lifecycle: pointer movement causes no GL errors, and shrinking to mobile
-// swaps it for the static portrait and HTML marquee, then desktop brings it back.
+// Protects the liquid effect lifecycle: pointer movement causes no GL errors, shrinking to mobile
+// restarts the scene for the phone layout with the HTML marquee, and desktop hands the marquee back to WebGL.
 test('desktop liquid survives cursor input and returns to the HTML marquee on mobile', async ({ page }) => {
 	await page.goto('/');
 	const hero = page
@@ -436,7 +562,7 @@ test('desktop liquid survives cursor input and returns to the HTML marquee on mo
 		.filter({ has: page.getByTestId('hero-depth') })
 		.first();
 	const marquee = page.locator('[data-logo-marquee]');
-	await expect(hero).toHaveAttribute('data-liquid-ready', 'true', { timeout: 30_000 });
+	await expect(hero).toHaveAttribute('data-liquid-ready', 'true', { timeout: SCENE_READY_TIMEOUT });
 	await expect(marquee).toHaveCSS('opacity', '0');
 	await page.mouse.move(900, 350);
 	await page.mouse.move(350, 550, { steps: 20 });
@@ -448,16 +574,41 @@ test('desktop liquid survives cursor input and returns to the HTML marquee on mo
 			.evaluate(element => (element as HTMLCanvasElement).getContext('webgl')?.getError())
 	).toBe(0);
 
-	// Mobile: liquid off, marquee and static portrait on
-	await page.setViewportSize({ width: 390, height: 844 });
-	await expect(hero).not.toHaveAttribute('data-liquid-ready', 'true');
-	await expect(marquee).toHaveCSS('opacity', '1');
-	await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'false');
-	await expect(page.getByTestId('hero-depth').locator('img')).toBeVisible();
+	// Counts liquid layer starts: a remount clears data-liquid-ready and its first frame sets it again. The
+	// attribute alone can't show a restart, because the old layer's 'true' is still there just after a resize.
+	await hero.evaluate(element => {
+		const record = { starts: 0 };
+		Object.assign(window, { liquidStarts: record });
+		new MutationObserver(mutations => {
+			for (const mutation of mutations) if (mutation.oldValue !== 'true') record.starts++;
+		}).observe(element, { attributes: true, attributeOldValue: true, attributeFilter: ['data-liquid-ready'] });
+	});
+	const liquidStarts = () =>
+		page.evaluate(() => (window as unknown as { liquidStarts: { starts: number } }).liquidStarts.starts);
 
-	// Back to desktop
+	// Mobile: the HTML marquee shows, and the WebGL portrait and liquid layer restart for the phone layout
+	// (phones render WebGL too since 187ccb3; only desktop draws the marquee in the canvas)
+	await page.setViewportSize({ width: 390, height: 844 });
+	await expect(marquee).toHaveCSS('opacity', '1');
+	await expect.poll(liquidStarts, { timeout: SCENE_READY_TIMEOUT }).toBeGreaterThan(0);
+	const mobileStarts = await liquidStarts();
+	await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'true', {
+		timeout: SCENE_READY_TIMEOUT,
+	});
+	await expect(hero).toHaveAttribute('data-liquid-ready', 'true');
+	await expect(marquee).toHaveCSS('opacity', '1');
+	expect(
+		await page
+			.getByTestId('hero-depth')
+			.locator('canvas')
+			.evaluate(element => (element as HTMLCanvasElement).getContext('webgl')?.getError())
+	).toBe(0);
+
+	// Back to desktop: the liquid layer restarts for the desktop layout and the canvas takes the marquee over again
 	await page.setViewportSize({ width: 1283, height: 720 });
-	await expect(hero).toHaveAttribute('data-liquid-ready', 'true', { timeout: 30_000 });
+	await expect.poll(liquidStarts, { timeout: SCENE_READY_TIMEOUT }).toBeGreaterThan(mobileStarts);
+	await expect(hero).toHaveAttribute('data-liquid-ready', 'true');
+	await expect(marquee).toHaveCSS('opacity', '0');
 });
 
 // Protects the fallback when the GPU lacks float textures: the original portrait and marquee stay.
