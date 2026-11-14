@@ -26,6 +26,12 @@ test('desktop project reveal follows scroll in both directions and returns to to
 		await scroller.evaluate((el, y) => el.scrollTo({ top: y, behavior: 'instant' }), top);
 	};
 	const x = () => panel.evaluate(el => el.getBoundingClientRect().left);
+	// The hero's right edge, as its clip-path closes over the panel beneath
+	const heroEdge = () =>
+		page.locator('[data-project-hero-clip]').evaluate(el => {
+			const inset = /inset\(0px (\S+)px/.exec(getComputedStyle(el).clipPath)?.[1];
+			return innerWidth - Number(inset ?? 0);
+		});
 	const mediaY = () =>
 		page.locator('[data-project-hero-media]').evaluate(el => new DOMMatrix(getComputedStyle(el).transform).f);
 
@@ -48,8 +54,9 @@ test('desktop project reveal follows scroll in both directions and returns to to
 	await move(start + reveal / 2);
 	await expect(page.locator('[data-project-hero]')).toHaveCSS('--project-image-saturation', '0');
 	await expect.poll(mediaY).toBeCloseTo(start * 0.6, 0);
-	await expect.poll(x).toBeLessThan(1100);
-	await expect.poll(x).toBeGreaterThan(800);
+	await expect.poll(heroEdge).toBeLessThan(1100);
+	await expect.poll(heroEdge).toBeGreaterThan(800);
+	await expect.poll(x).toBeLessThan(560);
 	await expect
 		.poll(() => hero.evaluate(el => new DOMMatrix(getComputedStyle(el).transform).f))
 		.toBeCloseTo(-start, 0);
@@ -65,7 +72,7 @@ test('desktop project reveal follows scroll in both directions and returns to to
 	const cursorHost = page.locator('[data-profile-scene]').locator('..');
 	await expect(cursorHost).toHaveAttribute('data-cursor', 'follow');
 	await page.mouse.move(200, 400);
-	await expect(cursorHost).not.toHaveAttribute('data-cursor');
+	await expect(cursorHost).toHaveAttribute('data-cursor', 'close');
 	await expect
 		.poll(() =>
 			page.locator('[data-project-panel-content]').evaluate(el => new DOMMatrix(getComputedStyle(el).transform).f)
@@ -73,7 +80,7 @@ test('desktop project reveal follows scroll in both directions and returns to to
 		.toBeCloseTo(-300, 0);
 	await page.screenshot({ path: 'test-results/pocketchange-desktop-panel.png' });
 	await move(start + reveal / 2);
-	await expect.poll(x).toBeGreaterThan(800);
+	await expect.poll(heroEdge).toBeGreaterThan(800);
 	await page
 		.getByRole('button', { name: 'Return to the top of the project' })
 		.click({ position: { x: 200, y: 450 } });
@@ -89,19 +96,22 @@ test('desktop project reveal follows scroll in both directions and returns to to
 	await expect(panel).toHaveCSS('transform', 'none');
 });
 
-// Protects the mobile layout: the hero is exactly one viewport, the overview follows it directly and there is
-// no Return to top button.
+// Protects the mobile layout: the hero title block and its held image are each exactly one viewport, the overview
+// rises straight after the title over the held image, and there is no Return to top button.
 test('mobile project flows vertically, with a full-size hero and accessible content', async ({ page }) => {
 	await page.setViewportSize({ width: 440, height: 780 });
 	await page.goto('/projects/pocketchange/');
 	await page.getByRole('button', { name: 'Accept Necessary' }).click();
 	await expect(page.locator('[data-loader-overlay]')).not.toBeVisible({ timeout: 15000 });
 	await expect(page.locator('[data-project-experience]')).not.toHaveAttribute('data-enhanced');
-	const hero = await page.locator('[data-project-hero]').boundingBox();
+	const copy = await page.locator('[data-project-hero-copy]').boundingBox();
+	const image = await page.locator('[data-project-hero-media]').boundingBox();
 	const panel = await page.locator('[data-project-panel]').boundingBox();
-	// The hero is exactly one viewport; the overview follows straight after it
-	expect(hero?.height).toBeCloseTo(780, 0);
-	expect(panel?.y).toBeCloseTo((hero?.y ?? 0) + (hero?.height ?? 0), 0);
+	// The title block and the held image are each one viewport; the overview follows straight after the title,
+	// rising over the hero's held second row rather than after it
+	expect(copy?.height).toBeCloseTo(780, 0);
+	expect(image?.height).toBeCloseTo(780, 0);
+	expect(panel?.y).toBeCloseTo((copy?.y ?? 0) + (copy?.height ?? 0), 0);
 	await expect(page.getByRole('button', { name: 'Return to the top of the project' })).toBeHidden();
 	await page
 		.locator('#page .lenis')
@@ -109,7 +119,9 @@ test('mobile project flows vertically, with a full-size hero and accessible cont
 		.evaluate(el => el.scrollTo({ top: 280, behavior: 'instant' }));
 	await page.screenshot({ path: 'test-results/pocketchange-mobile-hero.png' });
 	await page.getByRole('heading', { name: 'Project Overview' }).scrollIntoViewIfNeeded();
-	await expect(page.getByRole('heading', { name: 'Objectives' })).toBeVisible();
+	// The desktop-only Objectives label is dropped from the single mobile column; the content beneath it stays
+	await expect(page.getByRole('heading', { name: 'Objectives' })).toBeHidden();
+	await expect(page.getByRole('heading', { name: 'Deliverables' })).toBeVisible();
 });
 
 // Protects direct visits: reduced motion gets the plain layout, and an unknown slug shows the noindex 404.

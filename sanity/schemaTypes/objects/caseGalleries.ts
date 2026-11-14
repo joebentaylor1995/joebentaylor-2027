@@ -3,20 +3,25 @@
 // NOTE • Code-driven alternatives to a video loop: editors upload stills and
 // the site animates them, so a case study ships a few images instead of a
 // heavy video. Each animation is its own "Animated Gallery — …" block in the
-// builder's insert menu, rendered by src/components/AnimatedGallery. To add
-// one, define it with `defineGallery` below, register it in schemaTypes and
+// builder's insert menu, rendered by src/components/AnimatedGallery — except
+// Scatter Drift, which is picked as one side of a Two up (caseBlocks.ts). To
+// add one, define it with `defineGallery` below, register it in schemaTypes and
 // project.caseBuilder, and map its _type in the project query.
 
 // Imports
 // ------------
 import { ImagesIcon } from '@sanity/icons/Images';
 import { defineArrayMember, defineField, defineType } from 'sanity';
+import { GalleryImagesInput } from '../../components/GalleryImagesInput';
+import { MAX_GALLERY_IMAGES as MAX_IMAGES, MIN_GALLERY_IMAGES as MIN_IMAGES } from '../../lib/galleryLimits';
 
 // Constants
 // ------------
-const MIN_IMAGES = 6;
-const MAX_IMAGES = 9;
 export const GALLERY_PREFIX = 'Animated Gallery — ';
+// NOTE • One preview selection per possible image: { image0: 'images.0.asset', … }
+const IMAGE_SLOTS = Object.fromEntries(
+	Array.from({ length: MAX_IMAGES }, (_, index) => [`image${index}`, `images.${index}.asset`])
+);
 
 // Helpers
 // ------------
@@ -43,7 +48,7 @@ const defineGallery = ({
 				name: 'images',
 				title: 'Images',
 				type: 'array',
-				description: `Upload ${MIN_IMAGES}–${MAX_IMAGES} images; drag to set their order. Every card is shown at ${aspect} — set the hotspot to keep the subject in frame. Around 2000px wide is plenty.`,
+				description: `Add ${MIN_IMAGES}–${MAX_IMAGES} images — upload or pick several at once, or drop them all onto the grid — then drag to set their order. Every card is shown at ${aspect} — set the hotspot to keep the subject in frame. Around 2000px wide is plenty.`,
 				of: [
 					defineArrayMember({
 						type: 'image',
@@ -60,6 +65,8 @@ const defineGallery = ({
 					}),
 				],
 				options: { layout: 'grid' },
+				// NOTE • Bulk upload / multi-pick from the library, on top of Sanity's grid
+				components: { input: GalleryImagesInput },
 				validation: rule =>
 					rule
 						.required()
@@ -78,9 +85,12 @@ const defineGallery = ({
 			}),
 		],
 		preview: {
-			select: { images: 'images', first: 'images.0' },
-			prepare: ({ images, first }) => {
-				const count = Array.isArray(images) ? images.length : 0;
+			// NOTE • Selecting the whole `images` list alongside `images.0` hands
+			// prepare an object rather than an array, so it counted 0. Each slot
+			// is selected on its own instead and the filled ones are counted.
+			select: { first: 'images.0', ...IMAGE_SLOTS },
+			prepare: ({ first, ...slots }) => {
+				const count = Object.values(slots).filter(Boolean).length;
 				return {
 					title: `${GALLERY_PREFIX}${title}`,
 					subtitle: `${count} image${count === 1 ? '' : 's'} · ${description}`,
@@ -95,7 +105,8 @@ const defineGallery = ({
 export const caseGalleryScatterDrift = defineGallery({
 	name: 'caseGalleryScatterDrift',
 	title: 'Scatter Drift',
-	description: 'A tilted collage of cards that drifts upward one card at a time, in a seamless loop.',
+	description:
+		'One side of a Two up, one card at a time: each swings up and away as the next turns in from below and settles.',
 	aspect: '4:3',
 });
 

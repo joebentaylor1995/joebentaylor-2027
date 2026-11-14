@@ -1,9 +1,28 @@
 // Imports
 // ------------
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { simplifyRing } from '../src/components/Profile/Usps/Map/geometry';
 import { framing, projectLocation, rotation, SETTLED } from '../src/components/Profile/Usps/Map/projection';
-import { defaults } from '../src/components/ProfileReveal/Settings/store';
+import { defaults, mobileDefaults } from '../src/components/ProfileReveal/Settings/store';
+
+// Constants
+// ------------
+// NOTE • Matches mq.up.l: from here the globe reads the desktop settings, below it the mobile preset (which
+// zooms the globe in further)
+const DESKTOP_SETTINGS_WIDTH = 1024;
+
+// Helpers
+// ------------
+// Opens Profile from the header. React plays a chain of view transitions while the page hydrates, and a
+// click that lands while one covers the page reaches the document root instead of the button, so the
+// click is repeated until the trigger reports the panel as expanded.
+async function openProfile(page: Page) {
+	const trigger = page.getByRole('button', { name: 'Open Profile', exact: true });
+	await expect(async () => {
+		if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+		await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 1000 });
+	}).toPass();
+}
 
 // Tests
 // ------------
@@ -42,8 +61,9 @@ for (const width of [1440, 440]) {
 		const map = page.locator('[data-globe]');
 		const canvas = map.locator('canvas');
 		const marker = map.locator('[data-globe-marker]');
+		const settings = width >= DESKTOP_SETTINGS_WIDTH ? defaults : mobileDefaults;
 		await expect(map).toHaveAttribute('data-state', 'loading');
-		await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+		await openProfile(page);
 		await map.scrollIntoViewIfNeeded();
 		await expect(map).toHaveAttribute('data-state', 'ready');
 		// Recomputes where the marker should be from the saved defaults and the globe framing, and compares it
@@ -54,16 +74,16 @@ for (const width of [1440, 440]) {
 			if (!area || !pin) throw new Error('Map bounds unavailable');
 			const frame = framing(area.width, area.height);
 			const point = projectLocation(
-				rotation({ latitude: defaults.globeLatitude, longitude: defaults.globeLongitude })
+				rotation({ latitude: settings.globeLatitude, longitude: settings.globeLongitude })
 			);
 			const x =
 				area.width / 2 +
-				(frame.x - area.width / 2 + point.x * frame.radius) * defaults.globeZoom +
-				(area.width * defaults.globeX) / 100;
+				(frame.x - area.width / 2 + point.x * frame.radius) * settings.globeZoom +
+				(area.width * settings.globeX) / 100;
 			const y =
 				area.height / 2 +
-				(frame.y - area.height / 2 - point.y * frame.radius) * defaults.globeZoom +
-				(area.height * defaults.globeY) / 100;
+				(frame.y - area.height / 2 - point.y * frame.radius) * settings.globeZoom +
+				(area.height * settings.globeY) / 100;
 			expect(pin.x + pin.width / 2).toBeCloseTo(area.x + x, 1);
 			expect(pin.y + pin.height / 2).toBeCloseTo(area.y + y, 1);
 		};
@@ -82,7 +102,7 @@ for (const width of [1440, 440]) {
 		// Escape resets, and reopening shows the settled globe again
 		await canvas.press('Escape');
 		await expect(map).toHaveAttribute('data-state', 'loading');
-		await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+		await openProfile(page);
 		await map.scrollIntoViewIfNeeded();
 		await expect(map).toHaveAttribute('data-state', 'ready');
 		await centred();
@@ -94,7 +114,7 @@ for (const width of [1440, 440]) {
 // pointer to the edge shifts the marker, then easing back when the pointer leaves.
 test('globe journey settles and pointer movement eases back to Doncaster', async ({ page }) => {
 	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	const map = page.locator('[data-globe]');
 	// Records the canvas opacity on every attribute change until ready, to prove an in-between value occurred
 	const revealSamples = map.evaluate(
@@ -153,18 +173,26 @@ test('coastline simplification removes subpixel detail while preserving signific
 // Protects scrolling while the globe prepares: the geometry is processed in a worker (not on the main
 // thread), the modal layout does not shift, and scroll position changes smoothly each frame.
 test('globe preparation stays off the scroll thread and preserves modal layout', async ({ page }) => {
-	let geometryWorkerStarted = false;
-	page.on('worker', worker => {
-		if (worker.url().includes('geometry')) geometryWorkerStarted = true;
+	// NOTE • Turbopack names every worker bundle turbopack-worker-*.js, so the geometry worker can't be told
+	// apart by its URL: a worker started, and the coastline data was requested but not by the page itself
+	// (checked below against the main thread's resource timing)
+	let workerStarted = false;
+	let geographyRequested = false;
+	page.on('worker', () => {
+		workerStarted = true;
+	});
+	page.on('request', request => {
+		if (request.url().includes('countries.geojson')) geographyRequested = true;
 	});
 	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	const panel = page.locator('#profile-panel');
 	const map = page.locator('[data-globe]');
 	await map.scrollIntoViewIfNeeded();
 	const heightBefore = await panel.evaluate(element => element.scrollHeight);
 	await expect(map).toHaveAttribute('data-state', /travelling|ready/);
-	expect(geometryWorkerStarted).toBe(true);
+	expect(workerStarted).toBe(true);
+	expect(geographyRequested).toBe(true);
 	expect(await panel.evaluate(element => element.scrollHeight)).toBe(heightBefore);
 	const mainThreadGeography = await page.evaluate(() =>
 		performance.getEntriesByType('resource').filter(entry => entry.name.includes('countries.geojson'))

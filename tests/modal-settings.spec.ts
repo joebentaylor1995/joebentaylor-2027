@@ -1,6 +1,14 @@
 // Imports
 // ------------
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+
+// Helpers
+// ------------
+// NOTE • The panel opens Profile straight away, but the site loader closes and reopens it as it settles;
+// edits made before then can be lost, so wait for it as a visitor would before using the panel.
+const LOADER_TIMEOUT = 15_000;
+const waitForLoader = (page: Page) =>
+	expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: LOADER_TIMEOUT });
 
 // Tests
 // ------------
@@ -13,6 +21,7 @@ test('modal settings are opt-in, update live, persist drafts and reset', async (
 
 	// Opt-in: the panel only exists with the query flag, and sits beside the Profile modal
 	await page.goto('/?modalSettings');
+	await waitForLoader(page);
 	const settings = page.getByRole('complementary', { name: 'Modal settings' });
 	await expect(settings).toBeVisible();
 	await expect(page.getByRole('dialog', { name: 'Profile' })).toBeVisible();
@@ -57,9 +66,11 @@ test('modal settings are opt-in, update live, persist drafts and reset', async (
 	expect(before?.x).not.toBe(after?.x);
 	expect(await canvas?.evaluate(element => element.isConnected)).toBe(true);
 
-	// Edits persist across a reload
+	// Edits persist across a reload. Opening Profile moves the URL to /profile/ (ea57c53), which drops the
+	// ?modalSettings flag, so the reload goes back through the opt-in URL.
 	await settings.getByLabel('Mouse movement', { exact: true }).uncheck();
-	await page.reload();
+	await page.goto('/?modalSettings');
+	await waitForLoader(page);
 	await expect(settings.locator('#modal-globeZoom')).toHaveValue('1.5');
 	await expect(settings.locator('#modal-globeDotSize')).toHaveValue('14');
 	await expect(settings.getByLabel('Dot pulse', { exact: true })).not.toBeChecked();

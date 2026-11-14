@@ -26,7 +26,11 @@ test('slow hero textures do not miss the opening WebGL wave', async ({ page }) =
 		await expect(page.locator('html')).toHaveAttribute('data-loader-pending', 'true');
 		release();
 		await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'true', { timeout: 10000 });
-		await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-webgl-reveal', 'true');
+		// The WebGL reveal also waits for the liquid layer (logo textures and its shaders) after the portrait,
+		// which takes several seconds on software WebGL (CI); the loader itself holds for up to 15s after landing
+		await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-webgl-reveal', 'true', {
+			timeout: 15_000,
+		});
 		await expect(page.locator('html')).not.toHaveAttribute('data-loader-pending', 'true');
 	} finally {
 		release();

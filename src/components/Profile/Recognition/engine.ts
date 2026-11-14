@@ -1,8 +1,11 @@
 // Imports
 // ------------
+
 import { getSettings, getSettingsTarget } from '@parts/ProfileReveal/Settings/store';
 import { canHover } from '@utils/desktopHover';
+import { frameStep } from '@utils/frameClock';
 import { yieldSceneWork } from '@utils/prepareScene';
+import { decodeBitmap, imageAccept, whenGpuCaughtUp } from '@utils/webgl';
 import gsap from 'gsap';
 import * as THREE from 'three';
 import type { RecognitionScene } from './interface';
@@ -37,6 +40,18 @@ const CAMERA_MIN_DISTANCE = 16;
 const MOBILE_PIXEL_RATIO = 1.5;
 const DESKTOP_PIXEL_RATIO = 2;
 const MAX_ANISOTROPY = 8;
+
+// NOTE • The same texels three.js uploads from an <img> for this sRGB texture: flipped
+// (TextureLoader's flipY), straight alpha, and no colour conversion (three sets
+// UNPACK_COLORSPACE_CONVERSION_WEBGL to NONE when the texture's primaries match its working
+// space). WebGL ignores those UNPACK_* settings for an ImageBitmap, so the bitmap carries them.
+const POSTER_BITMAP_OPTIONS: ImageBitmapOptions = {
+	imageOrientation: 'flipY',
+	premultiplyAlpha: 'none',
+	colorSpaceConversion: 'none',
+};
+// Posters decoded (and held in memory) ahead of the one being uploaded
+const POSTER_DECODE_WINDOW = 4;
 
 // Pointer rests off screen, where it hits nothing
 const POINTER_REST = 10;
@@ -90,6 +105,7 @@ const FOCUS_LAYER = 1;
 // ------------
 type Award = THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
 type Settings = ReturnType<typeof getSettings>;
+type Poster = THREE.Texture<ImageBitmap | HTMLImageElement>;
 
 // Helpers
 // ------------
@@ -97,6 +113,21 @@ type Settings = ReturnType<typeof getSettings>;
 function required<T>(element: T | null): T {
 	if (!element) throw new Error('Recognition element missing');
 	return element;
+}
+
+// WebKit is told apart by engine, not the Safari token, which iOS in-app browsers leave out
+const isWebKit = (agent: string) => /AppleWebKit\//.test(agent) && !/Chrome\/|Chromium\/|Edg\/|Android/.test(agent);
+
+// NOTE • WebKit before 17 and Firefox before 98 don't honour every ImageBitmap option (a poster
+// could come out upside down), so they keep the <img> path: the same versions three.js's
+// GLTFLoader trusts. On iOS (every browser there is WebKit) the OS version stands in for Safari's.
+function bitmapOptionsHonoured() {
+	if (typeof createImageBitmap === 'undefined') return false;
+	const agent = navigator.userAgent;
+	const major = (pattern: RegExp) => Number(agent.match(pattern)?.[1] ?? 0);
+	if (isWebKit(agent)) return (major(/Version\/(\d+)/) || major(/ OS (\d+)_/)) >= 17;
+	if (agent.includes('Firefox/')) return major(/Firefox\/(\d+)/) >= 98;
+	return true;
 }
 
 // Engine
@@ -132,9 +163,11 @@ export function createRecognition(
 	const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
 	const geometry = new THREE.PlaneGeometry(CARD_WIDTH, CARD_HEIGHT, 8, 10);
 	const cards: Award[] = [];
-	const textures: THREE.Texture[] = [];
+	const textures: Poster[] = [];
 	const pointer = new THREE.Vector2(POINTER_REST, POINTER_REST);
 	const raycaster = new THREE.Raycaster();
+	// NOTE • Reused by every hover pick instead of a new array each frame
+	const intersections: THREE.Intersection<Award>[] = [];
 	const tilt = new THREE.Vector2();
 	const tiltTarget = new THREE.Vector2();
 	const rotation = new THREE.Quaternion();
@@ -146,6 +179,7 @@ export function createRecognition(
 	let visible = false;
 	let disposed = false;
 	let ready = false;
+	let contextLost = false;
 	let preparingFrame = false;
 	let playing = !reduced.matches;
 	let phase = INITIAL_PHASE;
@@ -173,6 +207,12 @@ export function createRecognition(
 	let lastMove = 0;
 	let moved = false;
 	let pressed: Award | null = null;
+
+	// NOTE • Why: these attributes mirror per-frame state for styling and tests. Writing an
+	// unchanged value still costs an attribute mutation and a style invalidation every frame.
+	function mirror(key: string, value: string) {
+		if (section.dataset[key] !== value) section.dataset[key] = value;
+	}
 
 	// Enters (card) or leaves (null) inspection; a tapped card keeps the spiral where it is while selected
 	function focus(card: Award | null) {
@@ -216,7 +256,8 @@ export function createRecognition(
 		scene.updateMatrixWorld();
 		camera.updateMatrixWorld();
 		raycaster.setFromCamera(pointer, camera);
-		const hit = raycaster.intersectObjects(cards, false)[0]?.object as Award | undefined;
+		intersections.length = 0;
+		const hit = raycaster.intersectObjects(cards, false, intersections)[0]?.object;
 		return hit && hit.position.z > PICK_MIN_Z && Math.abs(hit.position.y) < PICK_MAX_Y ? hit : null;
 	}
 
@@ -315,7 +356,11 @@ export function createRecognition(
 		event => {
 			event.preventDefault();
 			ready = false;
+			contextLost = true;
 			section.dataset.state = 'fallback';
+			// NOTE • With ready cleared the tick can't draw, so take it off the ticker instead of
+			// letting it read scrollTop and return early every frame
+			syncTicker();
 		},
 		events
 	);
@@ -341,7 +386,7 @@ export function createRecognition(
 			camera.zoom = settings.awardZoom;
 			camera.updateProjectionMatrix();
 		}
-		section.dataset.spiralZoom = String(camera.zoom);
+		mirror('spiralZoom', String(camera.zoom));
 	}
 
 	// Spiral motion: scroll sets the direction and adds a speed boost; phase eases towards targetPhase
@@ -370,9 +415,9 @@ export function createRecognition(
 		phase -= turns;
 		targetPhase -= turns;
 
-		section.dataset.spiralSpeed = speed.toFixed(4);
-		section.dataset.awardSize = String(settings.awardSize);
-		section.dataset.dragEasing = String(settings.awardDragEasing);
+		mirror('spiralSpeed', speed.toFixed(4));
+		mirror('awardSize', String(settings.awardSize));
+		mirror('dragEasing', String(settings.awardDragEasing));
 	}
 
 	// Inspect progress; clears the selection once a return has finished
@@ -382,12 +427,12 @@ export function createRecognition(
 				? 1
 				: 0
 			: clamp(focusProgress + ((focused ? 1 : -1) * dt) / settings.awardFocusDuration);
-		section.dataset.hoverIntensity = String(settings.awardHoverIntensity);
-		section.dataset.focusDuration = String(settings.awardFocusDuration);
+		mirror('hoverIntensity', String(settings.awardHoverIntensity));
+		mirror('focusDuration', String(settings.awardFocusDuration));
 		// Zero velocity and acceleration at both ends keeps the return from
 		// accelerating into its spiral position and stopping abruptly.
 		focusBlend = THREE.MathUtils.smootherstep(focusProgress, 0, 1);
-		section.dataset.focusProgress = focusProgress.toFixed(3);
+		mirror('focusProgress', focusProgress.toFixed(3));
 		if (!focused && focusProgress === 0) {
 			focusBlend = 0;
 			focusProgress = 0;
@@ -413,13 +458,13 @@ export function createRecognition(
 		else tilt.lerp(tiltTarget, 1 - Math.exp(-dt * TILT_EASE_RATE));
 
 		const hoverStrength = Math.min(settings.awardHoverIntensity * HOVER_INTENSITY_GAIN, MAX_HOVER_STRENGTH);
-		section.dataset.cardTilt = tilt.length().toFixed(3);
+		mirror('cardTilt', tilt.length().toFixed(3));
 		glare = THREE.MathUtils.lerp(
 			glare,
 			overSelected && !reduced.matches ? Math.min(hoverStrength, 1) : 0,
 			1 - Math.exp(-dt * GLARE_EASE_RATE)
 		);
-		section.dataset.cardGlare = glare.toFixed(3);
+		mirror('cardGlare', glare.toFixed(3));
 		rotation.setFromEuler(euler.set(-tilt.y * TILT_PITCH * hoverStrength, tilt.x * TILT_YAW * hoverStrength, 0));
 	}
 
@@ -463,15 +508,17 @@ export function createRecognition(
 	}
 
 	// Frame: update spiral phase, inspect animation and card uniforms, then render.
-	function tick(_time: number, deltaTime: number) {
-		const scrollDelta = scroller.scrollTop - lastScroll;
-		lastScroll = scroller.scrollTop;
+	function frame(deltaMs: number) {
+		// NOTE • Read once: each scrollTop read can flush pending style and layout
+		const scrollTop = scroller.scrollTop;
+		const scrollDelta = scrollTop - lastScroll;
+		lastScroll = scrollTop;
 		if ((!visible && !preparingFrame) || disposed || !ready || document.hidden) {
 			scrollSpeed = 0;
 			return;
 		}
 
-		const dt = clamp(deltaTime / 1000, MIN_FRAME_SECONDS, MAX_FRAME_SECONDS);
+		const dt = clamp(deltaMs / 1000, MIN_FRAME_SECONDS, MAX_FRAME_SECONDS);
 		const settings = getSettings();
 		syncCameraZoom(settings);
 
@@ -483,11 +530,14 @@ export function createRecognition(
 		updateInspectPose(dt, size, settings);
 
 		const hovered = canHover() && !selected && pointerId === null ? pick() : null;
-		section.dataset.hover = String(Boolean(hovered));
+		mirror('hover', String(Boolean(hovered)));
 
 		placeCards(size, ease, hovered);
 		renderLayers();
 	}
+
+	// Ticker callback, stepped by this frame's vsync interval
+	const tick = () => frame(frameStep());
 
 	// Run the ticker only while visible, loaded and the tab is showing
 	function syncTicker() {
@@ -499,12 +549,68 @@ export function createRecognition(
 	}
 	document.addEventListener('visibilitychange', syncTicker, { signal });
 
-	// Loads one poster, or resolves null if the scene went away meanwhile
+	// Posters
+	// NOTE • Why: three.js uploads an <img> with texImage2D, which decodes the whole JPEG
+	// again, synchronously, on the main thread (2-25ms a poster, 52 of them while the panel
+	// scrolls). Each poster is fetched as before but decoded into a bitmap in the shared decode
+	// worker, a few at a time, and the bitmap is closed once its texture is on the GPU.
 	const loader = new THREE.TextureLoader();
-	const loadPoster = async (poster: string) => {
-		const texture = await loader.loadAsync(poster);
+	const useBitmaps = bitmapOptionsHonoured();
+	// Posters whose bitmap was closed after upload, by URL, in case the context needs them again
+	const closedPosters = new Map<Poster, string>();
+
+	// Every poster's bytes are requested up front, as the <img> loads were, and at the same low
+	// priority as those detached <img> requests. The image Accept header keeps a negotiated URL
+	// (should posters ever be served through one) returning the same file an <img> would get.
+	const fetchPoster = async (url: string) => {
+		if (!useBitmaps) return null;
+		return fetch(url, {
+			mode: 'cors',
+			credentials: 'same-origin',
+			priority: 'low',
+			headers: { Accept: imageAccept() },
+			signal,
+		})
+			.then(response => (response.ok ? response.blob() : null))
+			.catch(() => null);
+	};
+
+	// NOTE • WebKit keeps an ImageBitmap's pixels premultiplied whatever premultiplyAlpha says, so
+	// a transparent texel would lose its colour there. The posters are JPEGs (opaque, so nothing is
+	// lost); anything else takes the <img> path on WebKit.
+	const premultipliesBitmaps = isWebKit(navigator.userAgent);
+	const bitmapSafe = (blob: Blob) => !premultipliesBitmaps || blob.type === 'image/jpeg';
+
+	// The poster as a flipped bitmap; otherwise (fetch, CORS or bitmap failure) the original <img> path
+	const decodePoster = async (url: string, blob: Blob | null): Promise<Poster> => {
+		if (blob && bitmapSafe(blob)) {
+			try {
+				const texture = new THREE.Texture(await decodeBitmap(blob, POSTER_BITMAP_OPTIONS));
+				texture.flipY = false;
+				texture.needsUpdate = true;
+				return texture;
+			} catch {}
+		}
+		return loader.loadAsync(url);
+	};
+
+	const disposePoster = (texture: Poster) => {
+		if (texture.image instanceof ImageBitmap) texture.image.close();
+		texture.dispose();
+	};
+
+	// Loads one poster, or resolves null if it failed or the scene went away meanwhile
+	const loadPoster = async (poster: string, blob: Promise<Blob | null>) => {
+		const bytes = await blob;
+		if (signal.aborted) return null;
+		let texture: Poster;
+		try {
+			texture = await decodePoster(poster, bytes);
+		} catch {
+			return null;
+		}
 		if (signal.aborted) {
-			texture.dispose();
+			disposePoster(texture);
 			return null;
 		}
 		textures.push(texture);
@@ -513,12 +619,48 @@ export function createRecognition(
 		return texture;
 	};
 
+	// NOTE • The pixels live on the GPU once uploaded; three.js only reads texture.image again
+	// to re-upload after a context restore, and a loss after the scene is ready ends rendering
+	// for good. A loss before then keeps the bitmaps (see reopenPosters).
+	const releasePoster = (texture: Poster, url: string) => {
+		if (contextLost || !(texture.image instanceof ImageBitmap)) return;
+		texture.image.close();
+		closedPosters.set(texture, url);
+	};
+
+	// A context lost while loading may be restored, and three.js then uploads every texture
+	// again from texture.image: decode fresh images for the posters already released
+	// Stops at teardown, and never leaves a closed bitmap where three.js would upload it: a poster
+	// that can't be decoded again falls back to its <img>; if that fails too, the error reaches
+	// loadAwards, which shows the scene's fallback state.
+	const reopenPosters = async () => {
+		try {
+			for (const [texture, url] of closedPosters) {
+				if (signal.aborted) break;
+				const fresh = await decodePoster(url, await fetchPoster(url));
+				if (signal.aborted) {
+					disposePoster(fresh);
+					break;
+				}
+				texture.image = fresh.image;
+				texture.flipY = fresh.flipY;
+			}
+		} finally {
+			closedPosters.clear();
+		}
+	};
+
 	const addCard = (poster: THREE.Texture) => {
 		const material = new THREE.ShaderMaterial({
 			vertexShader: posterVertexShader,
 			fragmentShader,
 			transparent: true,
 			side: THREE.DoubleSide,
+			// NOTE • Why: a transparent double-sided material is otherwise drawn twice (back faces,
+			// then front) and its program re-checked for both passes, every card every frame. A
+			// card is a flat plane, so one of the two passes always drew nothing. The shader
+			// samples the same uv on both faces, so a single pass gives the same pixels.
+			forceSinglePass: true,
 			uniforms: {
 				poster: { value: poster },
 				depth: { value: 1 },
@@ -532,19 +674,34 @@ export function createRecognition(
 		scene.add(mesh);
 	};
 
-	// Load every poster in parallel, then build one card each (one task per card so the main thread stays responsive)
+	// Load every poster, then build one card each in poster order (one task per card so the main
+	// thread stays responsive). Decoding runs a few posters ahead of the upload.
 	const loadAwards = async () => {
 		if (signal.aborted) return;
-		const results = await Promise.allSettled(posters.map(poster => loadPoster(poster)));
-		if (signal.aborted) return;
+		const blobs = posters.map(fetchPoster);
+		// The <img> path loads every poster at once, as it always did
+		const ahead = useBitmaps ? POSTER_DECODE_WINDOW : posters.length;
+		const decoded: Promise<Poster | null>[] = [];
+		const decode = (index: number) => {
+			if (index < posters.length) decoded[index] = loadPoster(posters[index], blobs[index]);
+		};
+		for (let index = 0; index < ahead; index++) decode(index);
 
-		for (const result of results) {
-			await yieldSceneWork();
+		let uploaded = false;
+		for (let index = 0; index < posters.length; index++) {
+			const texture = await decoded[index];
+			decode(index + ahead);
+			// NOTE • Each upload (with its mipmaps) takes the GPU ~20ms. Waiting for it to finish the
+			// previous one keeps the main thread from blocking on a full command buffer mid-scroll.
+			if (uploaded) await whenGpuCaughtUp(renderer.getContext());
+			else await yieldSceneWork();
 			if (signal.aborted) return;
-			if (result.status !== 'fulfilled' || !result.value) continue;
+			if (!texture) continue;
 			// Upload one poster per task rather than all textures on the first scroll frame.
-			renderer.initTexture(result.value);
-			addCard(result.value);
+			renderer.initTexture(texture);
+			uploaded = true;
+			releasePoster(texture, posters[index]);
+			addCard(texture);
 		}
 
 		if (!cards.length) {
@@ -554,10 +711,12 @@ export function createRecognition(
 
 		await renderer.compileAsync(scene, camera);
 		if (signal.aborted) return;
+		if (contextLost) await reopenPosters();
+		if (signal.aborted) return;
 		ready = true;
 		// Draw the complete layout offscreen before allowing the canvas to fade in.
 		preparingFrame = true;
-		tick(0, 0);
+		frame(0);
 		preparingFrame = false;
 		section.dataset.state = 'ready';
 		section.dataset.awards = String(cards.length);
@@ -580,7 +739,7 @@ export function createRecognition(
 			gsap.ticker.remove(tick);
 			observer.disconnect();
 			for (const card of cards) card.material.dispose();
-			for (const texture of textures) texture.dispose();
+			for (const texture of textures) disposePoster(texture);
 			geometry.dispose();
 			renderer.dispose();
 			section.dataset.focus = 'false';

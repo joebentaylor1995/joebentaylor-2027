@@ -2,11 +2,11 @@
 
 // Imports
 // ------------
-import { introEasings } from '@parts/Hero/Background/scene-intro';
+import { waveEasings } from '@parts/NavigationWave/easing';
 import {
 	readWaveSettings,
+	saveWaveSettings,
 	WAVE_SETTINGS_CHANGED,
-	WAVE_STORAGE_KEY,
 	type WaveSettings,
 	waveDefaults,
 	wavePreview,
@@ -33,6 +33,11 @@ import { useEffect, useState } from 'react';
 // ------------
 import s from './styles.module.scss';
 
+// Constants
+// ------------
+// NOTE • The site's own tablet font scale: keep in step with --tablet-font-scale in src/css/global.scss
+const TABLET_FONT_SCALE = 75;
+
 // Component
 // ------------
 // A tuning panel for site-wide settings (opened with ?globalSettings): the page-transition wave,
@@ -40,7 +45,7 @@ import s from './styles.module.scss';
 // to localStorage and read back by the live site; the font scale is a live preview only.
 export default function GlobalSettings() {
 	// State
-	const [scale, setScale] = useState(100);
+	const [scale, setScale] = useState(TABLET_FONT_SCALE);
 
 	// Navigation wave. `preview` is the point (0-100%) to hold the wave at on this page, or null for off
 	const [wave, setWave] = useState<WaveSettings>(waveDefaults);
@@ -58,6 +63,12 @@ export default function GlobalSettings() {
 	// Effects
 	// Load saved settings after mount (localStorage is unavailable during server render)
 	useEffect(() => setWave(readWaveSettings()), []);
+	// Follow saves made elsewhere (the ?waveTuner panel), so this panel never shows stale values
+	useEffect(() => {
+		const reload = () => setWave(readWaveSettings());
+		window.addEventListener(WAVE_SETTINGS_CHANGED, reload);
+		return () => window.removeEventListener(WAVE_SETTINGS_CHANGED, reload);
+	}, []);
 	useEffect(() => setFill(readFillSettings()), []);
 
 	// Hold the fill at the chosen point, redrawn as any setting changes
@@ -80,16 +91,15 @@ export default function GlobalSettings() {
 	useEffect(() => () => wavePreview.clear?.(), []);
 
 	// Handlers
-	// Save to localStorage and announce the change so the live wave re-reads it
-	const updateWave = (settings: WaveSettings) => {
-		try {
-			localStorage.setItem(WAVE_STORAGE_KEY, JSON.stringify(settings));
-			window.dispatchEvent(new Event(WAVE_SETTINGS_CHANGED));
-			setWave(settings);
-			setWaveStatus('Saved. Navigate between Home and Projects to preview.');
-		} catch {
+	// Save the changed settings over what is stored; the live wave re-reads them
+	const updateWave = (changes: Partial<WaveSettings>) => {
+		const saved = saveWaveSettings(changes);
+		if (!saved) {
 			setWaveStatus('Browser storage is unavailable; settings could not be saved.');
+			return;
 		}
+		setWave(saved);
+		setWaveStatus('Saved. Navigate between Home and Projects to preview.');
 	};
 
 	// Save to localStorage; the ribbon reads it again when the next fill begins
@@ -154,11 +164,9 @@ export default function GlobalSettings() {
 						<select
 							aria-label='Wave easing'
 							value={wave.ease}
-							onChange={event =>
-								updateWave({ ...wave, ease: event.target.value as WaveSettings['ease'] })
-							}
+							onChange={event => updateWave({ ease: event.target.value as WaveSettings['ease'] })}
 						>
-							{Object.entries(introEasings).map(([value, label]) => (
+							{Object.entries(waveEasings).map(([value, label]) => (
 								<option key={value} value={value}>
 									{label}
 								</option>
@@ -178,7 +186,7 @@ export default function GlobalSettings() {
 								max={max}
 								step={step}
 								value={wave[key]}
-								onChange={event => updateWave({ ...wave, [key]: Number(event.target.value) })}
+								onChange={event => updateWave({ [key]: Number(event.target.value) })}
 							/>
 						</label>
 					))}
@@ -299,9 +307,12 @@ export default function GlobalSettings() {
 						onChange={event => setScale(Number(event.target.value))}
 					/>
 				</label>
-				<p>Live preview only. Mobile and desktop keep their normal sizing. Reload to restore 100%.</p>
-				<button type='button' onClick={() => setScale(100)}>
-					Reset to 100%
+				<p>
+					Live preview only. Mobile and desktop keep their normal sizing. Reload to restore{' '}
+					{TABLET_FONT_SCALE}%.
+				</p>
+				<button type='button' onClick={() => setScale(TABLET_FONT_SCALE)}>
+					Reset to {TABLET_FONT_SCALE}%
 				</button>
 			</details>
 		</aside>

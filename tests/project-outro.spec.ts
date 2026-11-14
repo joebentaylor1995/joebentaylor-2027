@@ -1,6 +1,7 @@
 // Imports
 // ------------
 import { expect, test } from '@playwright/test';
+import { settleAtPageEnd } from './helpers/page-end';
 
 // Tests
 // ------------
@@ -29,12 +30,14 @@ for (const mobile of [false, true]) {
 			)
 			.toBe(0);
 
-		// Scroll to the end: outro complete and everything revealed
-		await scroller.evaluate(el => el.scrollTo({ top: el.scrollHeight, behavior: 'instant' }));
+		// Scroll to the end (once late media has settled): outro complete and everything revealed
+		await settleAtPageEnd(page, scroller);
 		await expect.poll(progress).toBeCloseTo(1, 2);
 		await expect(outro.getByText('Jillian Phyllis')).toBeVisible();
 		const next = outro.locator('[data-next-project]');
-		await expect(next).toHaveAttribute('data-disabled', 'true');
+		// The next case study comes from the CMS Featured order, so it links on to a different project
+		await expect(next).toHaveAttribute('href', /^\/projects\/(?!pocketchange\/)[\w-]+\/$/);
+		await expect(next).not.toHaveAttribute('data-disabled');
 		for (const text of await outro.locator('[data-page-title-reveal]').all()) {
 			await expect(text).toHaveAttribute('data-wave-state', 'complete');
 		}

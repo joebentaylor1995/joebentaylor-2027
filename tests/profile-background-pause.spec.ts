@@ -13,6 +13,10 @@ const videoPlayback = execFileSync(
 	['build', resolve('src/utils/observeVideoPlayback.ts'), '--target=browser', '--format=esm'],
 	{ encoding: 'utf8' }
 );
+// NOTE • Recognition only reports ready once every award poster is decoded and uploaded, one per task and each
+// waiting for the GPU to finish the last (afb8ed8 paces uploads with fences). That takes ~6s on a desktop GPU
+// and longer on CI's software WebGL, past the default 5s assertion timeout.
+const SCENE_READY = { timeout: 45_000 };
 
 // Helpers
 // ------------
@@ -134,7 +138,7 @@ const checkPause = async (
 			const panel = element.closest<HTMLElement>('#profile-panel');
 			if (panel) panel.scrollTop += element.getBoundingClientRect().top - panel.getBoundingClientRect().top;
 		});
-		await expect(recognition).toHaveAttribute('data-state', 'ready');
+		await expect(recognition).toHaveAttribute('data-state', 'ready', SCENE_READY);
 		const profileDraws = (await sample(page, '[data-recognition]')).draws;
 		await expect.poll(async () => (await sample(page, '[data-recognition]')).draws).toBeGreaterThan(profileDraws);
 		expect((await sample(context, selector)).draws).toBe(covered.draws);

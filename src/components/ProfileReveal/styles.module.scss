@@ -222,6 +222,11 @@
 
 	[data-cursor='cta'] & { scale: 1.2; }
 
+	[data-cursor='drag'] & { scale: 1.2; }
+
+	// NOTE • Tightens round the pointer while the model is held
+	[data-cursor='drag']:has([data-cursor-drag]:active) & { scale: 0.85; }
+
 	@media (prefers-reduced-motion: reduce) { transition: none; }
 }
 
@@ -258,6 +263,19 @@
 	transition: opacity 0.2s ease;
 
 	[data-cursor='cta'] & { opacity: 1; }
+
+	@media (prefers-reduced-motion: reduce) { transition: none; }
+}
+
+.dragCursor {
+	position: absolute;
+	top: 0;
+	left: 0;
+	transform: translate(-50%, -50%);
+	opacity: 0;
+	transition: opacity 0.2s ease;
+
+	[data-cursor='drag'] & { opacity: 1; }
 
 	@media (prefers-reduced-motion: reduce) { transition: none; }
 }

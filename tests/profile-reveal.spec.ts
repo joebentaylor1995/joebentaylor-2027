@@ -1,6 +1,33 @@
 // Imports
 // ------------
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+
+// Helpers
+// ------------
+// Opens Profile from the header. React plays a chain of view transitions while the page hydrates, and a
+// click that lands while one covers the page reaches the document root instead of the button, so the
+// click is repeated until the trigger reports the panel as expanded.
+async function openProfile(page: Page) {
+	const trigger = page.getByRole('button', { name: 'Open Profile', exact: true });
+	await expect(async () => {
+		if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+		await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 1000 });
+	}).toPass();
+	return trigger;
+}
+
+// Moves the pointer to a point and waits for the Profile cursor's look there. Opening Profile pushes a route,
+// and React plays a short chain of view transitions around it; while one runs the page is covered by its
+// snapshot, so a pointer event hit-tests to the document root and the cursor hides until the next move. A
+// visitor's pointer keeps moving, so each attempt makes a fresh move to the same point.
+async function pointAt(page: Page, x: number, y: number, look: string) {
+	const shell = page.locator('#profile-panel').locator('..');
+	await expect(async () => {
+		await page.mouse.move(x, y - 1);
+		await page.mouse.move(x, y);
+		await expect(shell).toHaveAttribute('data-cursor', look, { timeout: 1000 });
+	}).toPass();
+}
 
 // Tests
 // ------------
@@ -71,13 +98,17 @@ for (const width of [1440, 440]) {
 		await expect(close).toBeInViewport();
 
 		// Keyboard focus stays trapped inside: Tab goes forward into the panel and Shift+Tab back to close
-		const toolkitBounds = await panel.locator('[data-toolkit="Design toolkit"]').boundingBox();
+		// NOTE • The toolkit title and tool ids come from the CMS (the title's casing, Sanity _keys), so match the
+		// toolkit case-insensitively and take its first tool by position rather than by a content id
+		const toolkit = panel.locator('[data-toolkit="Design toolkit" i]');
+		const firstTool = toolkit.locator('[data-tool]').first();
+		const toolkitBounds = await toolkit.boundingBox();
 		await panel.hover();
 		await page.mouse.wheel(0, (toolkitBounds?.y ?? 200) - 200);
-		await expect(panel.locator('[data-toolkit="Design toolkit"]')).toHaveAttribute('data-state', 'ready');
+		await expect(toolkit).toHaveAttribute('data-state', 'ready');
 		await close.press('Tab');
-		await expect(panel.locator('[data-tool="figma"]')).toBeFocused();
-		await panel.locator('[data-tool="figma"]').press('Shift+Tab');
+		await expect(firstTool).toBeFocused();
+		await firstTool.press('Shift+Tab');
 		await expect(close).toBeFocused();
 
 		// Closing restores focus and the scene, and reopening starts at the top
@@ -99,26 +130,24 @@ for (const width of [1440, 440]) {
 test('profile cursor follows, sticks to close, and dismisses from the backdrop', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');
-	const trigger = page.getByRole('button', { name: 'Open Profile', exact: true });
-	await trigger.click();
+	const trigger = await openProfile(page);
 	const panel = page.getByRole('dialog', { name: 'Profile', exact: true });
 	const shell = page.locator('#profile-panel').locator('..');
 	const close = page.getByRole('button', { name: 'Close profile', exact: true });
-	await page.mouse.move(1000, 450);
-	await expect(shell).toHaveAttribute('data-cursor', 'follow');
+	await expect(close).toBeFocused();
+	await pointAt(page, 1000, 450, 'follow');
 	await expect(panel).toHaveCSS('cursor', 'auto');
 	const closeBounds = await close.boundingBox();
 	if (!closeBounds) throw new Error('Close control missing');
-	await page.mouse.move(closeBounds.x + closeBounds.width + 16, closeBounds.y + closeBounds.height / 2);
-	await expect(shell).toHaveAttribute('data-cursor', 'sticky');
+	await pointAt(page, closeBounds.x + closeBounds.width + 16, closeBounds.y + closeBounds.height / 2, 'sticky');
 	await close.hover();
 	await expect(shell).toHaveAttribute('data-cursor', 'sticky');
 	await expect(close).toHaveCSS('cursor', 'pointer');
 	await expect(close).toHaveCSS('border-top-width', '0px');
-	await page.mouse.move(200, 450);
-	await expect(shell).toHaveAttribute('data-cursor', 'close');
+	await pointAt(page, 200, 450, 'close');
 	await expect(page.locator('[data-profile-scene] + button')).toHaveCSS('cursor', 'none');
 	await page.mouse.click(200, 450);
+	await expect(trigger).toHaveAttribute('aria-expanded', 'false');
 	await expect(panel).toBeHidden();
 	await expect(shell).not.toHaveAttribute('data-cursor');
 	await expect(trigger).toBeFocused();
@@ -129,8 +158,7 @@ test('profile cursor follows, sticks to close, and dismisses from the backdrop',
 test('profile supports reduced motion and viewport changes while open', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');
-	const trigger = page.getByRole('button', { name: 'Open Profile', exact: true });
-	await trigger.click();
+	const trigger = await openProfile(page);
 	const panel = page.getByRole('dialog', { name: 'Profile', exact: true });
 	await expect(panel).toBeVisible();
 	await expect(panel).not.toHaveClass(/\blenis\b/);

@@ -1,17 +1,16 @@
-// NOTE • Cards are sized off the stage height (cqh), matching layout.ts
+// NOTE • Cards sit centred on the stage and are sized off its width (cqw),
+// matching layout.ts; each frame only moves them vertically and turns them
 .card {
 	position: absolute;
-	top: 0;
-	left: 0;
-	width: calc(var(--card-width, 0.48) * 100cqh);
-	aspect-ratio: var(--card-aspect, 4 / 3);
+	inset: 0;
+	width: calc(var(--card-width, 0.66) * 100cqw);
+	height: calc(var(--card-width, 0.66) * 100cqw / var(--card-aspect, 1.3333));
+	margin: auto;
 	overflow: hidden;
 	border-radius: var(--br-xs);
 	box-shadow: 0 1.2rem 3.2rem alpha(--brand-c4, 18);
 	will-change: transform;
 	backface-visibility: hidden;
-
-	&[data-lane='hero'] { z-index: 1; }
 
 	img {
 		object-fit: cover;

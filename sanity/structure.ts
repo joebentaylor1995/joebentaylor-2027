@@ -20,6 +20,11 @@ import type { StructureBuilder, StructureResolver } from 'sanity/structure';
 const singleton = (S: StructureBuilder, type: string, title: string, icon: typeof CogIcon) =>
 	S.listItem().title(title).id(type).icon(icon).child(S.document().schemaType(type).documentId(type).title(title));
 
+// NOTE • Featured follows the Projects page's ribbon. Its refs point at published
+// ids, so the drafts. twin is matched too — an edited project stays in its list
+const RIBBON = '*[_id == "projectsPage"][0].featured';
+const IN_RIBBON = `(_id in ${RIBBON}[]._ref || _id in ${RIBBON}[]{"id": "drafts." + _ref}.id)`;
+
 // Exports
 // ------------
 export const structure: StructureResolver = S =>
@@ -40,18 +45,18 @@ export const structure: StructureResolver = S =>
 						.title('Projects')
 						.items([
 							S.listItem()
-								.title('Case studies')
+								.title('Featured')
 								.child(
 									S.documentTypeList('project')
-										.title('Case studies')
-										.filter('_type == "project" && hasCaseStudy == true')
+										.title('Featured')
+										.filter(`_type == "project" && ${IN_RIBBON}`)
 								),
 							S.listItem()
-								.title('Listing only')
+								.title('Standard')
 								.child(
 									S.documentTypeList('project')
-										.title('Listing only')
-										.filter('_type == "project" && hasCaseStudy != true')
+										.title('Standard')
+										.filter(`_type == "project" && !${IN_RIBBON}`)
 								),
 							S.divider(),
 							S.documentTypeListItem('project').title('All projects'),

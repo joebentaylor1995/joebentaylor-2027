@@ -7,10 +7,11 @@
 // Imports
 // ------------
 import { colorInput } from '@sanity/color-input';
-import { visionTool } from '@sanity/vision';
 import { defineConfig } from 'sanity';
 import { presentationTool } from 'sanity/presentation';
 import { structureTool } from 'sanity/structure';
+import { media } from 'sanity-plugin-media';
+import { StudioLogo } from './sanity/components/StudioLogo';
 import { resolve } from './sanity/presentation';
 import { schemaTypes, singletonTypes } from './sanity/schemaTypes';
 import { structure } from './sanity/structure';
@@ -25,19 +26,23 @@ const SINGLETON_ACTIONS = new Set(['publish', 'discardChanges', 'restore']);
 export default defineConfig({
 	name: 'default',
 	title: 'Joe Ben Taylor',
+	icon: StudioLogo,
 	basePath: '/studio',
 
 	projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'placeholder',
 	dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || 'production',
 
 	plugins: [
-		structureTool({ structure }),
+		// NOTE • Titles only — the tool names (and so /studio/structure and
+		// /studio/presentation URLs) stay as Sanity's defaults
+		structureTool({ structure, title: 'Editor' }),
 		// NOTE • The `color` field type (swatch picker + hex + transparency) — toolkit tiles
 		colorInput(),
 		// NOTE • Visual Editing: previews the site (same origin as this embedded
 		// Studio) with click-to-edit overlays. Draft mode is toggled by the
 		// routes in app/api/draft-mode — trailing slashes match next.config.js
 		presentationTool({
+			title: 'Live Editor',
 			resolve,
 			previewUrl: {
 				initial: '/',
@@ -47,8 +52,12 @@ export default defineConfig({
 				},
 			},
 		}),
-		visionTool(),
+		// NOTE • Browse, search and tag every uploaded image and file
+		media(),
 	],
+
+	// NOTE • Content Releases off — edits publish directly
+	releases: { enabled: false },
 
 	schema: {
 		types: schemaTypes,

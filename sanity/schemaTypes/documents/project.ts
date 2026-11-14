@@ -58,7 +58,7 @@ export const project = defineType({
 			group: ['listing', 'caseStudy', 'builder'],
 			initialValue: false,
 			description:
-				'On: a full case study at /projects/<slug> — only case studies can be featured in the ribbon. Off: listing-only — it appears in All projects and opens the external link below.',
+				'On: a full case study at /projects/<slug> — only case studies can be featured in the ribbon. Off: it appears in All projects and opens the external link below.',
 		}),
 
 		defineField({
@@ -248,7 +248,7 @@ export const project = defineType({
 			group: 'caseStudy',
 			fieldset: 'details',
 			description:
-				'Collaborators. Pick someone from People (or create them inline) and type their role on this project. Leave empty to hide the Credits section.',
+				'Collaborators. Pick someone from People (or create them inline) and type their role on this project. Names link to their People entry’s link, or a link set here. Leave empty to hide the Credits section.',
 			hidden: isListingOnly,
 			of: [
 				defineArrayMember({
@@ -263,6 +263,15 @@ export const project = defineType({
 							validation: rule => rule.required(),
 						}),
 						defineField({ name: 'role', title: 'Role', type: 'string', placeholder: 'e.g. 3D' }),
+						defineField({
+							name: 'url',
+							title: 'Link (optional)',
+							type: 'url',
+							placeholder: 'https://',
+							description:
+								'Where their name links for this project — e.g. their work on it. Leave empty to use the link on their People entry.',
+							validation: rule => rule.uri({ scheme: ['https', 'http'] }),
+						}),
 					],
 					preview: {
 						select: { title: 'person.name', subtitle: 'role', media: 'person.image' },
@@ -332,14 +341,15 @@ export const project = defineType({
 			type: 'array',
 			group: 'builder',
 			description:
-				'Stack full-width, two-up, 3D model and animated gallery blocks. Drag to reorder. At least one is required.',
+				'Stack full-width, two-up, 3D model, animated gallery, parallax gallery and before/after blocks. Drag to reorder. At least one is required. The Scatter Drift animation is a side of a Two up block.',
 			of: [
 				defineArrayMember({ type: 'caseSingle' }),
 				defineArrayMember({ type: 'caseDual' }),
 				defineArrayMember({ type: 'caseModel' }),
-				defineArrayMember({ type: 'caseGalleryScatterDrift' }),
 				defineArrayMember({ type: 'caseGalleryPanorama' }),
 				defineArrayMember({ type: 'caseGalleryOrbit' }),
+				defineArrayMember({ type: 'caseParallaxGallery' }),
+				defineArrayMember({ type: 'caseBeforeAfter' }),
 			],
 			options: {
 				insertMenu: {
@@ -348,10 +358,12 @@ export const project = defineType({
 						{
 							name: 'animated',
 							title: 'Animated galleries',
-							of: ['caseGalleryScatterDrift', 'caseGalleryPanorama', 'caseGalleryOrbit'],
+							of: ['caseGalleryPanorama', 'caseGalleryOrbit'],
 						},
+						{ name: 'interactive', title: 'Interactive', of: ['caseParallaxGallery', 'caseBeforeAfter'] },
 					],
-					views: [{ name: 'list' }, { name: 'grid', previewImageUrl: insertPreviewUrl }],
+					// NOTE • Grid first, so editors see each block's animated preview straight away
+					views: [{ name: 'grid', previewImageUrl: insertPreviewUrl }, { name: 'list' }],
 				},
 			},
 			hidden: isListingOnly,
@@ -372,7 +384,7 @@ export const project = defineType({
 		},
 		prepare: ({ title, thumbnail, poster, thumbnailType, hasCaseStudy }) => ({
 			title,
-			subtitle: hasCaseStudy ? 'Case study' : 'Listing only',
+			subtitle: hasCaseStudy ? 'Case study' : 'External link',
 			media: thumbnailType === 'video' ? poster : thumbnail,
 		}),
 	},

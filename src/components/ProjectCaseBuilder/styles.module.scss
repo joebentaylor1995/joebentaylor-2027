@@ -14,8 +14,14 @@
 	// from Sanity's dimensions); the ratio below only applies until it's known
 	&[data-media-layout='single'] .media { aspect-ratio: var(--media-aspect, 894 / 615); }
 
-	// NOTE • Animated galleries play on a fixed 3:4 stage at every size
-	&[data-media-layout='gallery'] .media { aspect-ratio: 3 / 4; }
+	// NOTE • Animated galleries play on a 3:4 stage on phones and tablets and a
+	// 4:3 one on desktop; their cards are sized off the shorter side (cqmin), so
+	// the composition keeps its size and the wide stage just shows more round it
+	&[data-media-layout='gallery'] .media {
+		aspect-ratio: 3 / 4;
+
+		@include bp(l) { aspect-ratio: 4 / 3; }
+	}
 
 	&[data-media-layout='dual'] {
 		.media { aspect-ratio: 443 / 560; }

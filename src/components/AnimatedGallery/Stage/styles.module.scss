@@ -3,7 +3,7 @@
 	inset: 0;
 	overflow: hidden;
 	background: var(--gallery-background, var(--brand-c5));
-	// NOTE • Animations size their cards in container units (cqw/cqh) off this stage
+	// NOTE • Animations size their cards in container units (cqw/cqh/cqmin) off this stage
 	container-type: size;
 	// NOTE • Card positions need the stage's size, so they fade in once measured
 	opacity: 0;

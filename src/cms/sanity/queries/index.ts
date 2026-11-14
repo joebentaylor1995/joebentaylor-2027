@@ -94,7 +94,19 @@ export const GET_PROJECT = defineQuery(`
 		"caseBuilder": caseBuilder[]{
 			"id": _key,
 			_type == "caseSingle" => { "type": "single", "media": media${MEDIA} },
-			_type == "caseDual" => { "type": "dual", "media": media[]${MEDIA} },
+			// NOTE • A two-up side is a media item or the Scatter Drift gallery
+			_type == "caseDual" => {
+				"type": "dual",
+				"media": media[]{
+					_type == "caseGalleryScatterDrift" => {
+						"type": "gallery",
+						"animation": "scatterDrift",
+						"images": images[defined(asset)]${GALLERY_IMAGE},
+						"background": background.hex
+					},
+					_type != "caseGalleryScatterDrift" => ${MEDIA}
+				}
+			},
 			_type == "caseModel" => {
 				"type": "model",
 				"src": model.asset->url,
@@ -103,7 +115,20 @@ export const GET_PROJECT = defineQuery(`
 				"aspect": poster.asset->metadata.dimensions.aspectRatio,
 				"background": background.hex
 			},
-			// NOTE • Each animated gallery is its own block type, named after its animation
+			_type == "caseParallaxGallery" => {
+				"type": "parallax",
+				"aspect": coalesce(aspect, "16:10"),
+				"images": images[defined(asset)]${GALLERY_IMAGE}
+			},
+			_type == "caseBeforeAfter" => {
+				"type": "beforeAfter",
+				"aspect": coalesce(aspect, "16:10"),
+				"start": coalesce(start, 50),
+				"before": before${GALLERY_IMAGE},
+				"after": after${GALLERY_IMAGE}
+			},
+			// NOTE • Each animated gallery is its own block type, named after its animation.
+			// Scatter Drift now lives inside Two up; its mapping stays for any block not yet migrated
 			_type match "caseGallery*" => {
 				"type": "gallery",
 				"animation": select(
@@ -128,7 +153,9 @@ export const GET_PROJECT = defineQuery(`
 			"credits": credits[defined(person) || defined(name)]{
 				"name": coalesce(person->name, name),
 				"role": coalesce(role, ""),
-				"image": coalesce(person->image.asset->url, image.asset->url)
+				"image": coalesce(person->image.asset->url, image.asset->url),
+				// NOTE • This project's link wins over the person's own
+				"url": coalesce(url, person->url)
 			},
 			// NOTE • organisation is the legacy free-text field, read until migrations/awards-to-organisations has run
 			"recognition": recognition[defined(name)]{ name, "organisation": coalesce(body->name, organisation, "") },

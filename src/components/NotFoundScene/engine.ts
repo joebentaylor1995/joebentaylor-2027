@@ -26,7 +26,8 @@ import {
 	silenceRainRipples,
 	uploadRainGlyphs,
 } from '@utils/digitalRain';
-import { setClampedLinear } from '@utils/webgl';
+import { frameStep } from '@utils/frameClock';
+import { enableParallelCompile, setClampedLinear, waitForProgram } from '@utils/webgl';
 import { gsap } from 'gsap';
 import { fragment, vertex } from './shaders';
 
@@ -87,10 +88,18 @@ const CURSOR_MAGNET = 0.65;
 const TILT_X = 0.65;
 const TILT_Y = 0.35;
 
+// State
+// ------------
+// Canvases that already hold a frame (a route shown again from React Activity remounts on its old canvas)
+const drawnCanvases = new WeakSet<HTMLCanvasElement>();
+
 // Helpers
 // ------------
 // '#rrggbb' to [r, g, b] in 0..1
 const rgb = (hex: string) => [1, 3, 5].map(offset => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
+
+// Lets the browser render a frame between heavy setup steps
+const nextTask = () => new Promise(resolve => setTimeout(resolve, 0));
 
 // GL object factories: each one registers what it creates so free() can delete it
 function createGpuRegistry(gl: WebGLRenderingContext) {
@@ -105,12 +114,11 @@ function createGpuRegistry(gl: WebGLRenderingContext) {
 		shaders.push(shader);
 		gl.shaderSource(shader, source);
 		gl.compileShader(shader);
-		if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
-			throw new Error(gl.getShaderInfoLog(shader) || 'Shader failed');
 		return shader;
 	};
 
 	return {
+		// Compiles and links without reading the result (see verify())
 		program(vs: string, fs: string) {
 			const result = gl.createProgram();
 			if (!result) throw new Error('Program unavailable');
@@ -118,9 +126,15 @@ function createGpuRegistry(gl: WebGLRenderingContext) {
 			gl.attachShader(result, compile(gl.VERTEX_SHADER, vs));
 			gl.attachShader(result, compile(gl.FRAGMENT_SHADER, fs));
 			gl.linkProgram(result);
-			if (!gl.getProgramParameter(result, gl.LINK_STATUS))
-				throw new Error(gl.getProgramInfoLog(result) || 'Link failed');
 			return result;
+		},
+		// Throws with the compiler's log if the program failed; call once it has linked
+		verify(program: WebGLProgram) {
+			if (gl.getProgramParameter(program, gl.LINK_STATUS)) return;
+			for (const shader of gl.getAttachedShaders(program) ?? [])
+				if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+					throw new Error(gl.getShaderInfoLog(shader) || 'Shader failed');
+			throw new Error(gl.getProgramInfoLog(program) || 'Link failed');
 		},
 		buffer() {
 			const result = gl.createBuffer();
@@ -190,12 +204,22 @@ function drawAtlas() {
 // point-sprite pass where every glyph is a point whose position, brightness and shape are decided
 // in the vertex shader. A canvas-baked "404" height map lifts the rain into relief.
 // Pointer input adds ripples (a tap) or a charge-and-release burst that dissolves the glyphs (a hold).
-// Returns { pause, destroy }; throws on setup failure after releasing GL resources.
+// Returns { pause, destroy } straight away and finishes setting up once the shaders have linked,
+// then reports onReady(true). Throws if the GPU can't create its programs; a later setup failure
+// releases the GL resources and reports onReady(false).
 export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: boolean) => void) {
 	// Context
-	const context = canvas.getContext('webgl', { alpha: false, antialias: false, powerPreference: 'low-power' });
+	// NOTE • depth: false — nothing here depth-tests, so the default depth buffer (a full-size
+	// allocation) was never read or written
+	const context = canvas.getContext('webgl', {
+		alpha: false,
+		antialias: false,
+		depth: false,
+		powerPreference: 'low-power',
+	});
 	if (!context) return { destroy() {}, pause(_value: boolean) {} };
 	const gl = context;
+	enableParallelCompile(gl);
 	const bindProgram = gl.useProgram.bind(gl);
 	const events = new AbortController();
 	const motion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -210,254 +234,332 @@ export function mountNotFoundRain(canvas: HTMLCanvasElement, onReady: (ready: bo
 		count = 0,
 		elapsed = 0;
 
+	// The running scene's handles, once setup has finished
+	let running: { pause: (value: boolean) => void; destroy: () => void } | null = null;
+
+	// NOTE • Why: the shaders link in parallel and the setup is spread over a few tasks, so the
+	// page keeps rendering in between. An opaque (alpha: false) WebGL canvas that hasn't drawn
+	// yet can show as a black box over the CSS "404" meanwhile; it stays transparent until the
+	// point where the old single-task setup first showed it, straight after its first frame.
+	// A canvas that has drawn before keeps showing what it showed, as it always has.
+	const isNewCanvas = !drawnCanvases.has(canvas);
+	if (isNewCanvas) canvas.dataset.state = 'pending';
+	const reveal = () => {
+		if (isNewCanvas) delete canvas.dataset.state;
+	};
+
+	// Releases everything a setup that never finished created
+	const abandon = () => {
+		events.abort();
+		gpu.free();
+		reveal();
+	};
+
 	try {
 		// Programs: the glyph rain, and the gradient backdrop
 		const rain = gpu.program(vertex, fragment);
 		const background = gpu.program(BACKDROP_VERTEX, BACKDROP_FRAGMENT);
-		bindProgram(background);
-		gl.uniform3fv(gl.getUniformLocation(background, 'top'), rgb(baseColors.brand.c4));
-		gl.uniform3fv(gl.getUniformLocation(background, 'bottom'), rgb(baseColors.brand.c1));
 
-		const backdrop = gpu.buffer();
-		gl.bindBuffer(gl.ARRAY_BUFFER, backdrop);
-		gl.bufferData(gl.ARRAY_BUFFER, RAIN_BACKDROP_VERTICES, gl.STATIC_DRAW);
-		const position = gl.getAttribLocation(background, 'position');
+		// NOTE • Why: reading LINK_STATUS straight after linking blocked the main thread until the
+		// GPU process had compiled the rain's large vertex shader, as the 404 opened. This waits
+		// for both programs without blocking, then sets up exactly as before.
+		const start = async () => {
+			const linked = await Promise.all([
+				waitForProgram(gl, rain, () => disposed),
+				waitForProgram(gl, background, () => disposed),
+			]);
+			if (!linked.every(Boolean)) return;
+			// A context lost mid-setup (before its listener exists) abandons the setup, so the CSS 404 stays
+			if (gl.isContextLost()) throw new Error('Rain context lost');
+			gpu.verify(rain);
+			gpu.verify(background);
 
-		bindProgram(rain);
-
-		const uniforms = lookupRainUniforms(gl, rain, ['blue']);
-		const value = (name: string, amount: number) => gl.uniform1f(uniforms[name], amount);
-
-		gpu.upload(HEIGHT_MAP_UNIT, drawHeightMap());
-		gpu.upload(ATLAS_UNIT, drawAtlas());
-
-		// Texture units, then static look settings
-		gl.uniform1i(uniforms.atlas, ATLAS_UNIT);
-		gl.uniform1i(uniforms.portrait, HEIGHT_MAP_UNIT);
-		gl.uniform3fv(uniforms.blue, rgb(baseColors.brand.c1));
-		for (const [name, amount] of Object.entries(LOOK)) value(name, amount);
-
-		// Particle buffer: 6 floats per glyph (x, y, speed, glyph, size, brightness), rebuilt on resize
-		const particles = gpu.buffer(),
-			drop = gl.getAttribLocation(rain, 'a_drop'),
-			style = gl.getAttribLocation(rain, 'a_style');
-
-		// Size the canvas and regenerate the rain
-		const resize = () => {
-			width = Math.max(1, canvas.clientWidth);
-			height = Math.max(1, canvas.clientHeight);
-			const ratio = Math.min(
-				devicePixelRatio || 1,
-				width <= PHONE_MAX_WIDTH ? PHONE_PIXEL_RATIO : DESKTOP_PIXEL_RATIO
-			);
-			canvas.width = Math.round(width * ratio);
-			canvas.height = Math.round(height * ratio);
-			gl.viewport(0, 0, canvas.width, canvas.height);
-			bindProgram(rain);
-			gl.uniform2f(uniforms.resolution, width, height);
-			value('dpr', ratio);
-
-			count = uploadRainGlyphs(gl, particles, width, height, GLYPH_SCALE, COLUMN_DENSITY);
-			dirty = true;
-		};
-
-		// Pointer, tap ripples and press-and-hold charge.
-		// Releasing after the hold threshold dissolves the glyphs (dead) and then re-forms them.
-		const cursor = createRainCursor();
-		const ripples = createRainRipples();
-		const charge = {
-			holding: false,
-			started: 0,
-			held: 0,
-			amount: 0,
-			age: BURST_REST_AGE,
-			dead: false,
-			x: 0,
-			y: 0,
-			pointer: -1,
-		};
-
-		const point = (event: PointerEvent) => {
-			aimRainCursor(canvas, cursor, event);
-			cursor.target = 1;
-		};
-
-		// End a press: a long hold bursts the scene, a short one drops a ripple; cancel just discards it
-		const finish = (cancel = false) => {
-			if (!charge.holding) return;
-			charge.holding = false;
-			const seconds = (performance.now() - charge.started) / 1000;
-			if (cancel || paused || motion.matches) return;
-			if (seconds >= RAIN_CHARGE_SECONDS) {
-				charge.dead = true;
-				charge.age = 0;
-				charge.x = cursor.x;
-				charge.y = cursor.y;
-				cursor.target = 0;
-				silenceRainRipples(ripples);
-			} else {
-				dropRainRipple(ripples, cursor.x, cursor.y, seconds);
-			}
-		};
-
-		const press = (event: PointerEvent) => {
-			if (event.button !== 0 || paused || motion.matches || charge.dead) return;
-			point(event);
-			cursor.x = cursor.tx;
-			cursor.y = cursor.ty;
-			charge.holding = true;
-			charge.started = performance.now();
-			charge.pointer = event.pointerId;
-			canvas.setPointerCapture(event.pointerId);
-		};
-		const lift = (event: PointerEvent) => {
-			if (event.pointerId !== charge.pointer) return;
-			finish();
-			if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
-			if (event.pointerType === 'touch') cursor.target = 0;
-		};
-		const leave = () => {
-			if (!charge.holding) cursor.target = 0;
-		};
-		const abandon = () => {
-			finish(true);
-			cursor.target = 0;
-		};
-		const onVisibilityChange = () => {
-			finish(true);
-			dirty = true;
-		};
-		const onMotionChange = () => {
-			finish(true);
-			charge.amount = 0;
-			dirty = true;
-		};
-		const onContextLost = (event: Event) => {
-			event.preventDefault();
-			disposed = true;
-			onReady(false);
-		};
-
-		// Input listeners, all removed with events.abort()
-		const { signal } = events;
-		canvas.addEventListener('pointermove', point, { signal });
-		canvas.addEventListener('pointerdown', press, { signal });
-		canvas.addEventListener('pointerup', lift, { signal });
-		canvas.addEventListener('pointerleave', leave, { signal });
-		canvas.addEventListener('pointercancel', abandon, { signal });
-		canvas.addEventListener('lostpointercapture', () => finish(true), { signal });
-		window.addEventListener('blur', abandon, { signal });
-		document.addEventListener('visibilitychange', onVisibilityChange, { signal });
-		motion.addEventListener('change', onMotionChange, { signal });
-		canvas.addEventListener('webglcontextlost', onContextLost, { signal });
-
-		const observer = new ResizeObserver(resize);
-		observer.observe(canvas);
-		resize();
-
-		cursor.x = cursor.tx = width / 2;
-		cursor.y = cursor.ty = height / 2;
-
-		// Advances the clock, cursor, burst timeline, charge and ripples by one frame
-		const advanceMotion = (dt: number) => {
-			if (!charge.dead || charge.age >= RAIN_RETURN_START) elapsed += dt * TIME_SCALE;
-
-			easeRainCursor(cursor, dt);
-			charge.age = Math.min(BURST_REST_AGE, charge.age + dt);
-			if (charge.age >= RAIN_CYCLE_END) charge.dead = false;
-			charge.held = charge.holding ? (performance.now() - charge.started) / 1000 : 0;
-			charge.amount = easeRainCharge(charge.amount, charge.holding, charge.held, dt);
-			ageRainRipples(ripples, dt);
-		};
-
-		const drawBackdropPass = () => {
-			gl.disable(gl.BLEND);
 			bindProgram(background);
-			drawRainBackdrop(gl, backdrop, position);
-		};
+			gl.uniform3fv(gl.getUniformLocation(background, 'top'), rgb(baseColors.brand.c4));
+			gl.uniform3fv(gl.getUniformLocation(background, 'bottom'), rgb(baseColors.brand.c1));
 
-		const bindRainAttributes = () => {
+			const backdrop = gpu.buffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, backdrop);
+			gl.bufferData(gl.ARRAY_BUFFER, RAIN_BACKDROP_VERTICES, gl.STATIC_DRAW);
+			const position = gl.getAttribLocation(background, 'position');
+
 			bindProgram(rain);
-			gl.bindBuffer(gl.ARRAY_BUFFER, particles);
-			gl.enableVertexAttribArray(drop);
-			gl.enableVertexAttribArray(style);
-			gl.vertexAttribPointer(drop, 4, gl.FLOAT, false, 24, 0);
-			gl.vertexAttribPointer(style, 2, gl.FLOAT, false, 24, 16);
-			// Additive blending
-			gl.enable(gl.BLEND);
-			gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ZERO, gl.ONE);
-		};
 
-		// Charging deepens the relief, brightens and magnetises the glyphs
-		const setRainUniforms = () => {
-			const q = charge.amount,
-				enabled = motion.matches || charge.dead ? 0 : 1;
+			const uniforms = lookupRainUniforms(gl, rain, ['blue']);
+			const value = (name: string, amount: number) => gl.uniform1f(uniforms[name], amount);
 
-			value('time', elapsed);
-			value('depth', LOOK.depth + q * RAIN_CHARGE_BOOST.depth);
-			value('bend', LOOK.bend * (1 - q));
-			value('glow', LOOK.glow + q * RAIN_CHARGE_BOOST.glow);
-			value('portraitSize', LOOK.portraitSize * (1 + q * RAIN_CHARGE_BOOST.portraitScale));
-			value('chargeDetail', q * RAIN_CHARGE_BOOST.detail);
-			value('magnet', (CURSOR_MAGNET * cursor.active + q * RAIN_CHARGE_BOOST.magnet) * enabled);
-			value('ripple', LOOK.ripple * enabled);
+			// The two canvas bakes are the heaviest steps; each gets its own task
+			gpu.upload(HEIGHT_MAP_UNIT, drawHeightMap());
+			await nextTask();
+			if (disposed) return;
+			if (gl.isContextLost()) throw new Error('Rain context lost');
+			gpu.upload(ATLAS_UNIT, drawAtlas());
+			await nextTask();
+			if (disposed) return;
+			if (gl.isContextLost()) throw new Error('Rain context lost');
 
-			gl.uniform2f(uniforms.cursor, cursor.x, cursor.y);
-			gl.uniform2f(
-				uniforms.tilt,
-				(cursor.x / width - 0.5) * TILT_X * cursor.active * enabled,
-				(cursor.y / height - 0.5) * TILT_Y * cursor.active * enabled
-			);
-			gl.uniform2f(uniforms.chargeWave, charge.held, rainChargeWave(charge.holding, q));
-			gl.uniform4f(uniforms.burst, charge.x, charge.y, charge.age, charge.dead ? 1 : 0);
-			gl.uniform4fv(uniforms['waves[0]'], packRainRipples(ripples));
-		};
+			// Texture units, then static look settings
+			gl.uniform1i(uniforms.atlas, ATLAS_UNIT);
+			gl.uniform1i(uniforms.portrait, HEIGHT_MAP_UNIT);
+			gl.uniform3fv(uniforms.blue, rgb(baseColors.brand.c1));
+			for (const [name, amount] of Object.entries(LOOK)) value(name, amount);
 
-		const drawRainPass = () => {
-			bindRainAttributes();
-			setRainUniforms();
-			drawRainPasses(gl, uniforms.pass, count);
-			gl.disableVertexAttribArray(drop);
-			gl.disableVertexAttribArray(style);
-		};
+			// Particle buffer: 6 floats per glyph (x, y, speed, glyph, size, brightness), rebuilt on resize
+			const particles = gpu.buffer(),
+				drop = gl.getAttribLocation(rain, 'a_drop'),
+				style = gl.getAttribLocation(rain, 'a_style');
 
-		// Frame: skips while hidden, mid-navigation, or idle in a paused/reduced-motion state with nothing to redraw
-		const tick = (_time: number, delta: number) => {
-			if (
-				disposed ||
-				document.hidden ||
-				document.documentElement.matches('[data-navigation-pending], [data-navigation-wave]') ||
-				((paused || motion.matches) && !dirty)
-			)
-				return;
+			// Size the canvas and regenerate the rain
+			let applied = '';
+			const resize = () => {
+				width = Math.max(1, canvas.clientWidth);
+				height = Math.max(1, canvas.clientHeight);
+				const ratio = Math.min(
+					devicePixelRatio || 1,
+					width <= PHONE_MAX_WIDTH ? PHONE_PIXEL_RATIO : DESKTOP_PIXEL_RATIO
+				);
+				// NOTE • The glyph layout is seeded, so the same size and ratio rebuild the same
+				// buffer. The ResizeObserver's first callback (straight after the explicit call
+				// below) would otherwise redo ~300k numbers and the upload for nothing.
+				const size = `${width}x${height}@${ratio}`;
+				if (size === applied) return;
+				applied = size;
+				canvas.width = Math.round(width * ratio);
+				canvas.height = Math.round(height * ratio);
+				gl.viewport(0, 0, canvas.width, canvas.height);
+				bindProgram(rain);
+				gl.uniform2f(uniforms.resolution, width, height);
+				value('dpr', ratio);
 
-			dirty = false;
-			advanceMotion(paused || motion.matches ? 0 : Math.min(delta / 1000, RAIN_MAX_FRAME_SECONDS));
-			drawBackdropPass();
-			drawRainPass();
-		};
+				count = uploadRainGlyphs(gl, particles, width, height, GLYPH_SCALE, COLUMN_DENSITY);
+				dirty = true;
+			};
 
-		gsap.ticker.add(tick);
-		tick(0, 0);
-		onReady(true);
+			// Pointer, tap ripples and press-and-hold charge.
+			// Releasing after the hold threshold dissolves the glyphs (dead) and then re-forms them.
+			const cursor = createRainCursor();
+			const ripples = createRainRipples();
+			const charge = {
+				holding: false,
+				started: 0,
+				held: 0,
+				amount: 0,
+				age: BURST_REST_AGE,
+				dead: false,
+				x: 0,
+				y: 0,
+				pointer: -1,
+			};
 
-		return {
-			pause(value: boolean) {
-				paused = value;
+			const point = (event: PointerEvent) => {
+				aimRainCursor(canvas, cursor, event);
+				cursor.target = 1;
+			};
+
+			// End a press: a long hold bursts the scene, a short one drops a ripple; cancel just discards it
+			const finish = (cancel = false) => {
+				if (!charge.holding) return;
+				charge.holding = false;
+				const seconds = (performance.now() - charge.started) / 1000;
+				if (cancel || paused || motion.matches) return;
+				if (seconds >= RAIN_CHARGE_SECONDS) {
+					charge.dead = true;
+					charge.age = 0;
+					charge.x = cursor.x;
+					charge.y = cursor.y;
+					cursor.target = 0;
+					silenceRainRipples(ripples);
+				} else {
+					dropRainRipple(ripples, cursor.x, cursor.y, seconds);
+				}
+			};
+
+			const press = (event: PointerEvent) => {
+				if (event.button !== 0 || paused || motion.matches || charge.dead) return;
+				point(event);
+				cursor.x = cursor.tx;
+				cursor.y = cursor.ty;
+				charge.holding = true;
+				charge.started = performance.now();
+				charge.pointer = event.pointerId;
+				canvas.setPointerCapture(event.pointerId);
+			};
+			const lift = (event: PointerEvent) => {
+				if (event.pointerId !== charge.pointer) return;
+				finish();
+				if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+				if (event.pointerType === 'touch') cursor.target = 0;
+			};
+			const leave = () => {
+				if (!charge.holding) cursor.target = 0;
+			};
+			const abandonPress = () => {
+				finish(true);
+				cursor.target = 0;
+			};
+			const onVisibilityChange = () => {
 				finish(true);
 				dirty = true;
-			},
-			destroy() {
+			};
+			const onMotionChange = () => {
+				finish(true);
+				charge.amount = 0;
+				dirty = true;
+			};
+			const onContextLost = (event: Event) => {
+				event.preventDefault();
 				disposed = true;
-				gsap.ticker.remove(tick);
-				events.abort();
-				observer.disconnect();
-				gpu.free();
-			},
+				onReady(false);
+			};
+
+			// Input listeners, all removed with events.abort()
+			const { signal } = events;
+			canvas.addEventListener('pointermove', point, { signal });
+			canvas.addEventListener('pointerdown', press, { signal });
+			canvas.addEventListener('pointerup', lift, { signal });
+			canvas.addEventListener('pointerleave', leave, { signal });
+			canvas.addEventListener('pointercancel', abandonPress, { signal });
+			canvas.addEventListener('lostpointercapture', () => finish(true), { signal });
+			window.addEventListener('blur', abandonPress, { signal });
+			document.addEventListener('visibilitychange', onVisibilityChange, { signal });
+			motion.addEventListener('change', onMotionChange, { signal });
+			canvas.addEventListener('webglcontextlost', onContextLost, { signal });
+
+			const observer = new ResizeObserver(resize);
+			observer.observe(canvas);
+			resize();
+
+			cursor.x = cursor.tx = width / 2;
+			cursor.y = cursor.ty = height / 2;
+
+			// Advances the clock, cursor, burst timeline, charge and ripples by one frame
+			const advanceMotion = (dt: number) => {
+				if (!charge.dead || charge.age >= RAIN_RETURN_START) elapsed += dt * TIME_SCALE;
+
+				easeRainCursor(cursor, dt);
+				charge.age = Math.min(BURST_REST_AGE, charge.age + dt);
+				if (charge.age >= RAIN_CYCLE_END) charge.dead = false;
+				charge.held = charge.holding ? (performance.now() - charge.started) / 1000 : 0;
+				charge.amount = easeRainCharge(charge.amount, charge.holding, charge.held, dt);
+				ageRainRipples(ripples, dt);
+			};
+
+			const drawBackdropPass = () => {
+				gl.disable(gl.BLEND);
+				bindProgram(background);
+				drawRainBackdrop(gl, backdrop, position);
+			};
+
+			const bindRainAttributes = () => {
+				bindProgram(rain);
+				gl.bindBuffer(gl.ARRAY_BUFFER, particles);
+				gl.enableVertexAttribArray(drop);
+				gl.enableVertexAttribArray(style);
+				gl.vertexAttribPointer(drop, 4, gl.FLOAT, false, 24, 0);
+				gl.vertexAttribPointer(style, 2, gl.FLOAT, false, 24, 16);
+				// Additive blending
+				gl.enable(gl.BLEND);
+				gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ZERO, gl.ONE);
+			};
+
+			// Charging deepens the relief, brightens and magnetises the glyphs
+			const setRainUniforms = () => {
+				const q = charge.amount,
+					enabled = motion.matches || charge.dead ? 0 : 1;
+
+				value('time', elapsed);
+				value('depth', LOOK.depth + q * RAIN_CHARGE_BOOST.depth);
+				value('bend', LOOK.bend * (1 - q));
+				value('glow', LOOK.glow + q * RAIN_CHARGE_BOOST.glow);
+				value('portraitSize', LOOK.portraitSize * (1 + q * RAIN_CHARGE_BOOST.portraitScale));
+				value('chargeDetail', q * RAIN_CHARGE_BOOST.detail);
+				value('magnet', (CURSOR_MAGNET * cursor.active + q * RAIN_CHARGE_BOOST.magnet) * enabled);
+				value('ripple', LOOK.ripple * enabled);
+
+				gl.uniform2f(uniforms.cursor, cursor.x, cursor.y);
+				gl.uniform2f(
+					uniforms.tilt,
+					(cursor.x / width - 0.5) * TILT_X * cursor.active * enabled,
+					(cursor.y / height - 0.5) * TILT_Y * cursor.active * enabled
+				);
+				gl.uniform2f(uniforms.chargeWave, charge.held, rainChargeWave(charge.holding, q));
+				gl.uniform4f(uniforms.burst, charge.x, charge.y, charge.age, charge.dead ? 1 : 0);
+				gl.uniform4fv(uniforms['waves[0]'], packRainRipples(ripples));
+			};
+
+			const drawRainPass = () => {
+				bindRainAttributes();
+				setRainUniforms();
+				drawRainPasses(gl, uniforms.pass, count);
+				gl.disableVertexAttribArray(drop);
+				gl.disableVertexAttribArray(style);
+			};
+
+			// Frame: skips while hidden, mid-navigation, or idle in a paused/reduced-motion state with nothing to redraw
+			const tick = (_time: number, delta: number) => {
+				if (
+					disposed ||
+					document.hidden ||
+					document.documentElement.matches('[data-navigation-pending], [data-navigation-wave]') ||
+					((paused || motion.matches) && !dirty)
+				)
+					return;
+
+				dirty = false;
+				// NOTE • The vsync step (see src/utils/frameClock.ts), so the rain falls evenly;
+				// GSAP's own delta is whole milliseconds. Falls back to it on a run's first frame.
+				// The synchronous first draw below passes 0 and still advances nothing.
+				const step = delta === 0 ? 0 : frameStep() || delta;
+				advanceMotion(paused || motion.matches ? 0 : Math.min(step / 1000, RAIN_MAX_FRAME_SECONDS));
+				drawBackdropPass();
+				drawRainPass();
+			};
+
+			gsap.ticker.add(tick);
+			tick(0, 0);
+			drawnCanvases.add(canvas);
+			reveal();
+			onReady(true);
+
+			running = {
+				pause(value: boolean) {
+					paused = value;
+					finish(true);
+					dirty = true;
+				},
+				destroy() {
+					disposed = true;
+					gsap.ticker.remove(tick);
+					events.abort();
+					observer.disconnect();
+					gpu.free();
+				},
+			};
 		};
+
+		void start().catch(() => {
+			abandon();
+			onReady(false);
+		});
 	} catch (error) {
-		events.abort();
-		gpu.free();
+		abandon();
 		throw error;
 	}
+
+	return {
+		pause(value: boolean) {
+			if (running) running.pause(value);
+			else {
+				paused = value;
+				dirty = true;
+			}
+		},
+		destroy() {
+			if (running) running.destroy();
+			else {
+				disposed = true;
+				abandon();
+			}
+		},
+	};
 }

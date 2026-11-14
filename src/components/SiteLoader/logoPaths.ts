@@ -5,6 +5,12 @@
 // ------------
 export const LOGO_BOX = { width: 405, height: 153 } as const;
 
+// NOTE • The wash mask was tuned on the 68px-wide logo; the mark now draws in
+// the logo's native 405-unit artboard, so its blur scales with it.
+const ARTBOARD_SCALE = LOGO_BOX.width / 68;
+// The wash circle's edge blur (stdDeviation), in artboard units
+export const WASH_BLUR = 1.2 * ARTBOARD_SCALE;
+
 export type Word = {
 	// Centre and size of the word's bounding box inside LOGO_BOX
 	cx: number;

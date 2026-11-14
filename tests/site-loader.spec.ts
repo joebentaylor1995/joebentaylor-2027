@@ -2,11 +2,24 @@
 // ------------
 import { expect, test } from '@playwright/test';
 
+// Constants
+// ------------
+// Half-width (in %) of PageTitleReveal's soft wave edge: its gradient turns transparent at --tfw-fill + 8%
+const TITLE_WAVE_SOFT_EDGE = 8;
+// The loader's CSS fail-open delay (SiteLoader styles.module.scss)
+const LOADER_FAIL_OPEN_MS = 9000;
+// How long the homepage loader waits for the WebGL scene before revealing without it (SiteLoader timeline.ts)
+const HOMEPAGE_SCENE_DEADLINE_MS = 15000;
+// Asset wait (at most 1.5s), the intro to the landed logo, the hold and the wave
+const LOADER_INTRO_AND_WAVE_MS = 5000;
+// Headroom for a slow runner
+const EXPECT_SLACK_MS = 3000;
+
 // Tests
 // ------------
-// Protects the loader on routes other than the homepage: it fades out (no wave), the view-transition is not
-// involved, the aperture closes and the page title reveals afterwards.
-for (const route of ['/projects/pocketchange/', '/projects/', '/cookies']) {
+// Protects the loader on routes other than the homepage and the projects listing: it fades out (no wave), the
+// view-transition is not involved, the aperture closes and the page title reveals afterwards.
+for (const route of ['/projects/pocketchange/', '/cookies']) {
 	test(`non-homepage loader fades without a wave on ${route}`, async ({ page }) => {
 		await page.goto(route);
 		const loader = page.locator('[data-site-loader]');
@@ -21,24 +34,53 @@ for (const route of ['/projects/pocketchange/', '/projects/', '/cookies']) {
 		await expect(page.locator('[data-loader-ring]')).toHaveCSS('opacity', '0');
 		await expect(page.locator('[data-glitch-aperture]')).toHaveCount(0);
 		await expect(loader).toBeHidden();
-		if (route !== '/projects/') {
-			const title = page.locator('h1 [data-page-title-reveal]');
-			await expect(title).toHaveAttribute('data-wave-state', 'complete');
-			await expect(title).toBeVisible();
-		}
+		const title = page.locator('h1 [data-page-title-reveal]');
+		await expect(title).toHaveAttribute('data-wave-state', 'complete');
+		await expect(title).toBeVisible();
 	});
 }
 
-// Protects the mobile case study loader: fade outro and a block title reveal that waits until the loader is done.
-test('mobile project uses the fade outro and block title reveal', async ({ page }) => {
+// Protects the projects listing loader: unlike other inner pages it opens the ribbon with the wave (the
+// listing is excluded from the fade since 8a07e80, so the ribbon's refraction can follow the wavefront),
+// without involving the view-transition, and it still clears completely.
+test('projects listing loader opens the ribbon with the wave', async ({ page }) => {
+	await page.goto('/projects/');
+	const loader = page.locator('[data-site-loader]');
+	await expect(loader).toHaveAttribute('data-outro', 'wave');
+	await expect(page.locator('html')).toHaveAttribute('data-loader-pending');
+	expect(await page.locator('html').evaluate(el => getComputedStyle(el, '::view-transition').display)).toBe('none');
+	await expect(loader).toHaveAttribute('data-complete', 'true', { timeout: 15000 });
+	await expect(page.locator('html')).not.toHaveAttribute('data-loader-pending');
+	// The wavefront opened the aperture rather than fading the loader over a closed one
+	expect(Number(await page.locator('[data-circle-aperture]').getAttribute('r'))).toBeGreaterThan(0);
+	await expect(page.locator('[data-loader-ring]')).toHaveCSS('opacity', '0');
+	await expect(page.locator('[data-glitch-aperture]')).toHaveCount(0);
+	await expect(loader).toBeHidden();
+});
+
+// Protects the mobile case study loader: the loader fades (no radial wave, 48c9ac8) and the title's wave
+// reveal (the case study hero's only variant since 8a07e80) stays hidden until the loader is done.
+test('mobile project fades the loader and holds the title reveal until it is done', async ({ page }) => {
 	await page.setViewportSize({ width: 440, height: 780 });
 	await page.goto('/projects/pocketchange/');
+	const loader = page.locator('[data-site-loader]');
 	const title = page.locator('h1 [data-page-title-reveal]');
 	await expect(title).toHaveAttribute('data-wave-state', 'waiting');
-	await expect(title).toHaveAttribute('data-reveal-variant', 'block');
-	await expect(title.locator('span')).toHaveCSS('opacity', '0');
+	await expect(title).toHaveAttribute('data-reveal-variant', 'wave');
+	// Waiting: the text is painted by a gradient whose transparent stop (at --tfw-fill + 8%) still sits
+	// before the text's first pixel, so none of the title shows. State and fill are read together, so the
+	// reveal can't start between the two reads.
+	await expect(title).toHaveCSS('-webkit-text-fill-color', 'rgba(0, 0, 0, 0)');
+	const waiting = await title.evaluate(el => ({
+		state: (el as HTMLElement).dataset.waveState,
+		fill: Number.parseFloat(getComputedStyle(el).getPropertyValue('--tfw-fill')),
+	}));
+	expect(waiting.state).toBe('waiting');
+	expect(waiting.fill + TITLE_WAVE_SOFT_EDGE).toBeLessThanOrEqual(0);
 	await expect(page.locator('[data-circle-aperture]')).toHaveAttribute('r', '0');
-	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true');
+	await expect.poll(() => loader.evaluate(element => Number(getComputedStyle(element).opacity))).toBeLessThan(1);
+	await expect(loader).toHaveAttribute('data-complete', 'true');
+	await expect(page.locator('[data-circle-aperture]')).toHaveAttribute('r', '0');
 	await expect(title).toHaveAttribute('data-wave-state', 'complete');
 	await expect(page.locator('[data-project-water]')).toHaveAttribute('data-intro', 'complete');
 });
@@ -122,12 +164,19 @@ test('old preview URL has no chooser and reduced motion completes', async ({ pag
 	await expect(page.locator('header')).toHaveAttribute('data-header-entrance', 'complete');
 });
 
-// Protects against a stuck loader when the first image fails.
+// Protects against a stuck loader when the first image fails: the CSS fail-open (9s) uncovers the page,
+// and the homepage's scene deadline (HOMEPAGE_SCENE_DEADLINE_MS, 15s since 99a77b3 so slow hero textures
+// still get the WebGL wave) then completes the loader without the WebGL scene.
 test('failed first-view image cannot trap the loader', async ({ page }) => {
 	await page.route('**/_next/image/**', route => route.abort());
 	await page.goto('/');
-	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 8000 });
-	await expect(page.locator('[data-site-loader]')).toBeHidden();
+	const loader = page.locator('[data-site-loader]');
+	await expect(loader).toBeHidden({ timeout: LOADER_FAIL_OPEN_MS + EXPECT_SLACK_MS });
+	await expect(loader).toHaveAttribute('data-complete', 'true', {
+		timeout: HOMEPAGE_SCENE_DEADLINE_MS + LOADER_INTRO_AND_WAVE_MS + EXPECT_SLACK_MS,
+	});
+	await expect(loader).not.toHaveAttribute('data-webgl-reveal', 'true');
+	await expect(page.locator('header')).toHaveAttribute('data-header-entrance', 'complete');
 });
 
 // Protects the first paint: before any script runs the loader is already opaque, so the page never flashes.

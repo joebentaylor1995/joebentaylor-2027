@@ -70,10 +70,12 @@ export default function Matrix({ title }: MatrixProps) {
 					const { createMatrixFooter } = await import('./engine');
 					if (!controller.signal.aborted) dispose = createMatrixFooter(element, host, title, () => DEFAULTS);
 				} catch {
-					/* Keep the plain gradient if the preview is unavailable. */
+					/* Keep the plain background if the preview is unavailable. */
 				}
 			};
 
+			// NOTE • Two screens ahead: the shaders now link in the background without blocking, so
+			// this leaves a cold-cache link (a few hundred ms) time to finish before the outro shows
 			observer = new IntersectionObserver(
 				entries => {
 					if (entries.some(entry => entry.isIntersecting)) {
@@ -81,7 +83,7 @@ export default function Matrix({ title }: MatrixProps) {
 						void load();
 					}
 				},
-				{ root: mediaScrollRoot(host), rootMargin: '600px' }
+				{ root: mediaScrollRoot(host), rootMargin: '1200px' }
 			);
 			observer.observe(host);
 		};

@@ -5,6 +5,8 @@
 
 .stage { position: relative; }
 
+.heroClip { display: contents; }
+
 .hero { position: relative; }
 
 .panel {
@@ -31,6 +33,14 @@
 		isolation: isolate;
 	}
 
+	// NOTE • Above the panel, which it uncovers as its clip-path closes (see ProjectExperience)
+	.heroClip {
+		position: absolute;
+		z-index: 2;
+		inset: 0;
+		display: block;
+	}
+
 	.hero { will-change: transform; }
 
 	.returnToTop {
@@ -45,12 +55,14 @@
 		background: var(--global-black);
 		cursor: n-resize;
 
+		[data-cursor='close'] & { cursor: none; }
+
 		&:disabled { pointer-events: none; }
 	}
 
 	.panel {
 		position: absolute;
-		z-index: 2;
+		z-index: 1;
 		top: 0;
 		right: 0;
 		width: min(67.65%, 97.4rem);

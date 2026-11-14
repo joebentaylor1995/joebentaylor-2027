@@ -39,7 +39,10 @@ test('desktop reveal waits for slow shader compilation and renders the whole wav
 		};
 	});
 	await page.goto('/');
-	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 12000 });
+	// The homepage loader holds its reveal for up to 15s while the GPU scene gets ready, then plays the wave.
+	// Software WebGL (CI) needs several seconds for that on top of the simulated 1.4s compile, so allow
+	// the full hold plus the wave rather than 12s.
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 30_000 });
 	const audit = await page.evaluate(
 		() => (window as unknown as { waveAudit: { readyAtReveal: boolean; values: number[] } }).waveAudit
 	);

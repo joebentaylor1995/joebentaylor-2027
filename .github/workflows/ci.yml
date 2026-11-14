@@ -12,6 +12,13 @@ jobs:
       # A real site URL so robots and canonical metadata render as in
       # production — without one the site is deliberately noindex
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      # The site's real content. The tests drive actual projects, profile
+      # sections and media, which an unconfigured CMS leaves empty. Both values
+      # are public (they ship in the client bundle) and the dataset is
+      # public-read, so no secret is needed.
+      NEXT_PUBLIC_SANITY_PROJECT_ID: lsgdcp1a
+      NEXT_PUBLIC_SANITY_DATASET: production
+      NEXT_PUBLIC_MEDIA_URL: https://cdn.joebentaylor.com
     steps:
       - uses: actions/checkout@v6
 

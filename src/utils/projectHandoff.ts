@@ -44,10 +44,13 @@ const waitForNextHero = (previousHero: Element | null, destination: string, leni
 		let frame = 0;
 
 		const check = () => {
+			// NOTE • Runs every frame and on every mutation batch: test the route first, since the hero lookup below
+			// forces a layout and can't succeed before the route has changed
+			if (trimTrailingSlash(location.pathname) !== destination) return;
 			const hero = Array.from(document.querySelectorAll<HTMLElement>('[data-project-hero]')).find(
 				element => element !== previousHero && element.getBoundingClientRect().width > 0
 			);
-			if (trimTrailingSlash(location.pathname) !== destination || !hero) return;
+			if (!hero) return;
 			scrollLenisToTop(lenis);
 			document.querySelector('#page')?.scrollTo(0, 0);
 			observer.disconnect();

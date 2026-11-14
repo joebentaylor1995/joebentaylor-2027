@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test';
 test('water survives a hidden route becoming visible again', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', error => errors.push(error.message));
-	await page.goto('/projects/jillian-phyllis/');
+	await page.goto('/projects/pocketchange/');
 	const canvas = page.locator('[data-project-water]');
 	await expect(canvas).toHaveAttribute('data-ready', 'true', { timeout: 20000 });
 	// Hide the hero briefly (display none) and restore it, as a hidden route would
@@ -39,7 +39,7 @@ test('failed framebuffer allocation during resize restores the native hero', asy
 				: original.call(this, target);
 		};
 	});
-	await page.goto('/projects/jillian-phyllis/');
+	await page.goto('/projects/pocketchange/');
 	const canvas = page.locator('[data-project-water]');
 	await expect(canvas).toHaveAttribute('data-ready', 'true', { timeout: 20000 });
 

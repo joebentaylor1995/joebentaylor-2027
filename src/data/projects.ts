@@ -15,15 +15,30 @@ export type ProjectMedia =
 	| { type: 'youtube'; src: string; alt: string };
 
 // NOTE • Each value is one code-driven animation, picked in Sanity as its own
-// "Animated Gallery — …" block (sanity/schemaTypes/objects/caseGalleries.ts)
+// "Animated Gallery — …" block (sanity/schemaTypes/objects/caseGalleries.ts),
+// or — for Scatter Drift — as one side of a Two up
 export const GALLERY_ANIMATIONS = ['scatterDrift', 'panorama', 'orbit'] as const;
 export type GalleryAnimation = (typeof GALLERY_ANIMATIONS)[number];
 // NOTE • Each animation crops its cards to a fixed shape; the hotspot (0–1 from the top left) keeps the subject in frame
 export type GalleryImage = { src: string; alt: string; hotspot?: { x: number; y: number } | null };
 
+// NOTE • The shapes an interactive block can take (width:height), as picked in
+// Sanity (sanity/schemaTypes/objects/caseInteractive.ts), and their ratios
+export const BLOCK_ASPECT_RATIOS = { '16:10': 16 / 10, '4:3': 4 / 3, '3:4': 3 / 4 } as const;
+export type BlockAspect = keyof typeof BLOCK_ASPECT_RATIOS;
+
+// An animated gallery playing in one tile of a Two up
+export type ProjectGalleryMedia = {
+	type: 'gallery';
+	animation: GalleryAnimation;
+	images: GalleryImage[];
+	background?: string | null;
+};
+export type ProjectDualMedia = ProjectMedia | ProjectGalleryMedia;
+
 export type ProjectCaseBlock =
 	| { id: string; type: 'single'; media: ProjectMedia }
-	| { id: string; type: 'dual'; media: [ProjectMedia, ProjectMedia] }
+	| { id: string; type: 'dual'; media: [ProjectDualMedia, ProjectDualMedia] }
 	| {
 			id: string;
 			type: 'gallery';
@@ -31,6 +46,16 @@ export type ProjectCaseBlock =
 			images: GalleryImage[];
 			// NOTE • A hex colour behind the cards; the stage falls back to a light neutral
 			background?: string | null;
+	  }
+	| { id: string; type: 'parallax'; aspect: BlockAspect; images: GalleryImage[] }
+	| {
+			id: string;
+			type: 'beforeAfter';
+			aspect: BlockAspect;
+			// NOTE • Where the handle starts, as a percent from the left
+			start: number;
+			before: GalleryImage;
+			after: GalleryImage;
 	  }
 	| {
 			id: string;
@@ -54,7 +79,7 @@ export interface Project {
 	overview: {
 		objectives: string[];
 		deliverables: string[];
-		credits: { name: string; role: string; image?: string | null }[];
+		credits: { name: string; role: string; image?: string | null; url?: string | null }[];
 		recognition: { name: string; organisation: string }[];
 		website?: string | null;
 	};

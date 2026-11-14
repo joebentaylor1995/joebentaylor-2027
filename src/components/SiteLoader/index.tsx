@@ -6,7 +6,7 @@ import { useAnimation } from '@utils/useAnimation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { resetLoader } from './events';
 import { BAR_SLOTS, CUT_SLOTS, type IntroIds } from './intro';
-import { BEN, JOE, LOGO, LOGO_BOX } from './logoPaths';
+import { BEN, JOE, LOGO, LOGO_BOX, WASH_BLUR } from './logoPaths';
 import { LOADER_REPLAY, loaderControl } from './settings';
 // Styles + Interfaces
 // ------------
@@ -22,13 +22,6 @@ import {
 	resetLoaderVisuals,
 	type SceneWait,
 } from './timeline';
-
-// Constants
-// ------------
-// NOTE • The wash mask was tuned on the 68px-wide logo; the mark now draws in
-// the logo's native 405-unit artboard, so its blur scales with it.
-const ARTBOARD_SCALE = LOGO_BOX.width / 68;
-const WASH_BLUR = 1.2 * ARTBOARD_SCALE;
 
 // Component
 // ------------

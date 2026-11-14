@@ -2,6 +2,12 @@
 // ------------
 import { expect, test } from '@playwright/test';
 
+// Constants
+// ------------
+// GSAP's default lag smoothing, which the site's frame clock reproduces (src/utils/frameClock.ts)
+const LAG_THRESHOLD_MS = 500;
+const ADJUSTED_LAG_MS = 33;
+
 // Tests
 // ------------
 // Protects the cinematic loader fade on a case study: the loader fades once the logo has landed while
@@ -63,18 +69,44 @@ test('cinematic fade starts immediately after the logo while the hero settles sl
 	await expect(hero).not.toHaveAttribute('style', /--project-intro-scale/, { timeout: 8000 });
 });
 
-// Protects the real (unscrubbed) timing: the loader finishes between 100ms and 900ms after the logo lands.
+// Protects the real (unscrubbed) timing: the loader finishes between 100ms and 900ms after the logo lands,
+// with no wait on the hero scene in between. Measured on the loader's own clock: the site drives GSAP from
+// requestAnimationFrame with lag smoothing (src/utils/frameClock.ts), so a main-thread stall over 500ms (the
+// water shader compiles at landing, much slower on a busy or GPU-less machine) only advances the timeline
+// 33ms. Wall time is logged for reference.
 test('a fresh project load fades out promptly after the logo lands', async ({ page }) => {
-	// Record when the loader lands and settles, as plain script so it is ready before the app runs
-	await page.addInitScript(
-		`window.loaderTimes = {}; for (const name of ['site-loader:landed', 'site-loader:settled']) window.addEventListener(name, () => window.loaderTimes[name] = performance.now());`
-	);
+	// Replays the frame clock from rAF timestamps between landing and settling, as plain script so it is
+	// ready before the app runs
+	await page.addInitScript(`
+		const clock = (window.loaderClock = { landed: 0, settled: 0, smoothed: 0 });
+		let last = 0;
+		const advance = now => {
+			const delta = now - last;
+			if (delta <= 0) return;
+			clock.smoothed += delta > ${LAG_THRESHOLD_MS} ? ${ADJUSTED_LAG_MS} : delta;
+			last = now;
+		};
+		const step = now => {
+			if (clock.settled) return;
+			advance(now);
+			requestAnimationFrame(step);
+		};
+		window.addEventListener('site-loader:landed', () => {
+			last = clock.landed = document.timeline.currentTime;
+			requestAnimationFrame(step);
+		});
+		window.addEventListener('site-loader:settled', () => {
+			advance(document.timeline.currentTime);
+			clock.settled = document.timeline.currentTime;
+		});
+	`);
 	await page.goto('/projects/pocketchange/');
 	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: 10000 });
-	const elapsed = await page.evaluate<number>(
-		`window.loaderTimes['site-loader:settled'] - window.loaderTimes['site-loader:landed']`
+	const { smoothed, wall } = await page.evaluate<{ smoothed: number; wall: number }>(
+		`({ smoothed: window.loaderClock.smoothed, wall: window.loaderClock.settled - window.loaderClock.landed })`
 	);
-	expect(elapsed).toBeGreaterThan(100);
-	expect(elapsed).toBeLessThan(900);
+	console.log('Landed to settled:', Math.round(smoothed), 'ms on the loader clock,', Math.round(wall), 'ms wall');
+	expect(smoothed).toBeGreaterThan(100);
+	expect(smoothed).toBeLessThan(900);
 	await expect(page.locator('h1 [data-page-title-reveal]')).toHaveAttribute('data-wave-state', 'complete');
 });

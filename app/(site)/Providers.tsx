@@ -24,6 +24,7 @@ const Providers = ({ children, contact }: { children: React.ReactNode; contact: 
 	// State
 	const [Settings, setSettings] = useState<ComponentType | null>(null);
 	const [LoaderTweaks, setLoaderTweaks] = useState<ComponentType | null>(null);
+	const [WaveTuner, setWaveTuner] = useState<ComponentType | null>(null);
 
 	// Effects
 	// Opt-in tooling panels, loaded only when their query parameter is present
@@ -42,6 +43,12 @@ const Providers = ({ children, contact }: { children: React.ReactNode; contact: 
 				if (!disposed) setLoaderTweaks(() => module.default);
 			});
 
+		// NOTE • ?waveTuner holds, scrubs and retimes the page-change wave on real navigations
+		if (params.has('waveTuner'))
+			void import('@parts/NavigationWave/Tuner').then(module => {
+				if (!disposed) setWaveTuner(() => module.default);
+			});
+
 		return () => {
 			disposed = true;
 		};
@@ -52,6 +59,7 @@ const Providers = ({ children, contact }: { children: React.ReactNode; contact: 
 		<>
 			{Settings && <Settings />}
 			{LoaderTweaks && <LoaderTweaks />}
+			{WaveTuner && <WaveTuner />}
 			{/* GridExposer only rendered in development environment */}
 			{GridExposer && <GridExposer />}
 

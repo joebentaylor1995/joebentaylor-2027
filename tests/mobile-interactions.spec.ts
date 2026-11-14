@@ -1,6 +1,28 @@
 // Imports
 // ------------
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+
+// Constants
+// ------------
+// NOTE • The awards spiral uploads every CMS poster (50+) one per GPU-paced task before it reports
+// ready (afb8ed8): several seconds on a GPU, longer on CI's software WebGL.
+const RECOGNITION_READY_TIMEOUT = 30_000;
+const LOADER_TIMEOUT = 15_000;
+
+// Helpers
+// ------------
+// Opens the settings mode and waits for it to settle. The panel opens Profile, which the site loader
+// closes and reopens scrolled to the top once it settles, so a section shown before then is scrolled
+// away again. Opening Profile also moves the URL to /profile/ (ea57c53), dropping ?modalSettings, so a
+// reload has to come back through this URL rather than page.reload().
+const openSettings = async (page: Page) => {
+	await page.goto('/?modalSettings');
+	await expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', {
+		timeout: LOADER_TIMEOUT,
+	});
+	await expect(page.locator('#profile-panel').locator('..')).toHaveAttribute('data-state', 'open');
+	return page.getByRole('complementary', { name: 'Modal settings' });
+};
 
 // Tests
 // ------------
@@ -10,14 +32,13 @@ test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 // Protects the device split in the modal settings: mobile and desktop keep separate values, the right
 // set applies after resizing, and both survive a reload until reset.
 test('mobile and desktop scene settings stay independent across resize and reload', async ({ page }) => {
-	await page.goto('/?modalSettings');
-	const panel = page.getByRole('complementary', { name: 'Modal settings' });
+	const panel = await openSettings(page);
 	const device = panel.getByLabel('Settings device');
 	await expect(device).toHaveValue('mobile');
 	await panel.getByRole('button', { name: 'Show Recognition', exact: true }).click();
 	// Mobile edits
 	const awards = page.locator('[data-recognition]');
-	await expect(awards).toHaveAttribute('data-state', 'ready');
+	await expect(awards).toHaveAttribute('data-state', 'ready', { timeout: RECOGNITION_READY_TIMEOUT });
 	await expect(awards).toHaveAttribute('data-spiral-zoom', '1.55');
 	await panel.locator('#modal-awardZoom').fill('2');
 	await expect(awards).toHaveAttribute('data-spiral-zoom', '2');
@@ -41,7 +62,7 @@ test('mobile and desktop scene settings stay independent across resize and reloa
 	await expect(awards).toHaveAttribute('data-award-size', '60');
 
 	// Reload keeps mobile edits; reset clears them
-	await page.reload();
+	await openSettings(page);
 	await expect(device).toHaveValue('mobile');
 	await expect(panel.locator('#modal-awardZoom')).toHaveValue('2');
 	await expect(panel.locator('#modal-awardSize')).toHaveValue('60');
@@ -52,7 +73,8 @@ test('mobile and desktop scene settings stay independent across resize and reloa
 
 	// Same split for the toolkit size
 	await panel.getByRole('button', { name: 'Show Design toolkit', exact: true }).click();
-	const toolkit = page.locator('[data-toolkit="Design toolkit"]');
+	// The label comes from the CMS ("Design Toolkit"), so match it case-insensitively like the panel does
+	const toolkit = page.locator('[data-toolkit="Design toolkit" i]');
 	await expect(toolkit).toHaveAttribute('data-state', 'ready');
 	await panel.locator('#modal-designToolkitSize').fill('70');
 	await expect
@@ -70,8 +92,7 @@ test('mobile and desktop scene settings stay independent across resize and reloa
 // Protects two mobile details: the face size comparison setting is saved, and a touch pointerenter does
 // not trigger the Connect CTA hover fill.
 test('mobile face preview saves its comparison setting and touch does not trigger CTA hover', async ({ page }) => {
-	await page.goto('/?modalSettings');
-	const settings = page.getByRole('complementary', { name: 'Modal settings' });
+	const settings = await openSettings(page);
 	const toggle = settings.getByLabel('Smaller mobile face');
 	const size = settings.getByLabel('Mobile face size');
 
@@ -80,7 +101,7 @@ test('mobile face preview saves its comparison setting and touch does not trigge
 	await size.fill('1');
 	await toggle.uncheck();
 	await expect(size).toBeDisabled();
-	await page.reload();
+	await openSettings(page);
 	await expect(toggle).not.toBeChecked();
 	await expect(size).toHaveValue('1');
 	await toggle.check();

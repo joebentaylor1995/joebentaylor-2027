@@ -4,7 +4,7 @@
 // around the camera, all facing it, so turning the ring pans the view: the
 // current card swings away to the left, growing as its near edge sweeps past,
 // and the next one swings in from the right before gliding to rest. With the
-// perspective set to the stage width, a 64° gap shows one card at a time with
+// perspective set to the stage's shorter side, a 64° gap shows one card at a time with
 // a brief overlap mid-turn — measured from the reference loop.
 //
 // Inside each card the image sits a little behind the surface, like a view
@@ -29,7 +29,7 @@ export interface Card {
 // NOTE • A rest, then a 2s turn: slow lift-off, a peak a third of the way in, a long glide
 export const TIMING = { step: 2.5, move: 1.97, turn: [0.48, 0, 0, 1.04] } as const;
 export const CARD_ASPECT = 3 / 4;
-// Card width, as a fraction of the stage width
+// Card width, as a fraction of the stage's shorter side (its width on a portrait stage)
 export const CARD_WIDTH = 0.64;
 // Degrees between neighbouring cards on the ring
 export const CARD_GAP = 64;
@@ -39,9 +39,12 @@ export const PARALLAX = { reach: 3.3, softness: 7 } as const;
 export const PARALLAX_SCALE = 1 + (2 * PARALLAX.reach + 0.4) / 100;
 
 const DEGREES = 180 / Math.PI;
-// NOTE • With perspective = stage width, the stage edge sits atan(½) off-axis
-// and a card spans atan(width ÷ 2) either side of its centre
-const VISIBLE_ANGLE = (Math.atan(0.5) + Math.atan(CARD_WIDTH / 2)) * DEGREES;
+// NOTE • With perspective = the stage's shorter side, a card spans atan(width ÷ 2)
+// either side of its centre, and the stage edge sits atan(½ width ÷ shorter side)
+// off-axis — atan(½) on a portrait stage, further out on a landscape one
+const CARD_HALF_ANGLE = Math.atan(CARD_WIDTH / 2);
+const visibleAngle = (stage: { width: number; height: number }) =>
+	(Math.atan(stage.width / 2 / Math.min(stage.width, stage.height)) + CARD_HALF_ANGLE) * DEGREES;
 
 // Exports
 // ------------
@@ -51,7 +54,8 @@ export const buildCards = (images: GalleryImage[]): Card[] =>
 // NOTE • Positive angles sit to the right; progress counts whole turns
 export const angleFor = (card: Card, count: number, progress: number) => wrap(card.slot - progress, count) * CARD_GAP;
 
-export const isOnStage = (angle: number) => Math.abs(angle) < VISIBLE_ANGLE;
+export const isOnStage = (angle: number, stage: { width: number; height: number }) =>
+	Math.abs(angle) < visibleAngle(stage);
 
 // NOTE • Percent of the card width; positive slides right, toward a right-hand card's outer edge
 export const slideFor = (angle: number) => PARALLAX.reach * Math.tanh(angle / PARALLAX.softness);

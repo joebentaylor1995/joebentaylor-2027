@@ -1,0 +1,91 @@
+// NOTE • Osmo's handle is sized in em; a 16px base keeps its proportions on
+// this site's 10px rem. The block's shape comes from the tile it sits in.
+.jacket {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	font-size: 1.6rem;
+	user-select: none;
+}
+
+.content {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	width: 100%;
+	height: 100%;
+
+	img {
+		object-fit: cover;
+		object-position: var(--focus, 50% 50%);
+
+		&::selection { background: none; }
+	}
+}
+
+.handle {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	z-index: 2;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 0.25em;
+	height: 100%;
+	background-color: var(--brand-c5);
+	color: var(--brand-c4);
+	cursor: ew-resize;
+	touch-action: none;
+
+	// NOTE • A wider invisible strip, so the thin bar is easy to grab
+	&::before {
+		content: '';
+		position: absolute;
+		inset: 0 -1.2em;
+	}
+
+	&:focus-visible { outline: none; }
+
+	&:focus-visible .center::after,
+	&:hover .center::after {
+		width: 130%;
+		height: 130%;
+		opacity: 0.5;
+	}
+}
+
+.center {
+	position: relative;
+	display: flex;
+	flex: none;
+	justify-content: center;
+	align-items: center;
+	gap: 0.125em;
+	width: 2.5em;
+	height: 2.5em;
+	border-radius: var(--br-round);
+	background-color: var(--brand-c5);
+
+	&::after {
+		content: '';
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		z-index: 1;
+		width: 100%;
+		height: 100%;
+		border: 1px solid var(--brand-c5);
+		border-radius: var(--br-round);
+		opacity: 1;
+		transform: translate(-50%, -50%);
+		transition: all 0.4s cubic-bezier(0.35, 1, 0.6, 1);
+	}
+}
+
+.icon {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 1.25em;
+}

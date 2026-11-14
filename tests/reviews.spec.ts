@@ -4,10 +4,16 @@ import { expect, type Page, test } from '@playwright/test';
 
 // Helpers
 // ------------
-// Opens Profile, scrolls to Reviews and waits for the carousel to enhance
+// Opens Profile, scrolls to Reviews and waits for the carousel to enhance. React plays a chain of view
+// transitions while the page hydrates, and a click that lands while one covers the page reaches the document
+// root instead of the button, so the click is repeated until the trigger reports the panel as expanded.
 async function openReviews(page: Page) {
 	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	const trigger = page.getByRole('button', { name: 'Open Profile', exact: true });
+	await expect(async () => {
+		if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+		await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 1000 });
+	}).toPass();
 	const section = page.locator('[data-reviews]');
 	await section.scrollIntoViewIfNeeded();
 	await expect(section).toHaveAttribute('data-enhanced', 'true');
@@ -17,26 +23,42 @@ async function openReviews(page: Page) {
 // Tests
 // ------------
 // Protects the Reviews carousel: ten slides, Next and Previous wrap in both directions, the section height and
-// author position never jump between slides, and every portrait loads.
+// author position never jump between slides, and every portrait and company logo loads.
 test('Reviews animate, wrap in both directions, and keep all portraits and logos available', async ({ page }) => {
+	// NOTE • Thirteen animated slide changes (about a second each, and Next is ignored while one runs) on top of
+	// opening Profile, whose WebGL scenes keep the main thread busy; on a loaded or software-GL runner the walk
+	// alone can pass the default 60s
+	test.slow();
 	const section = await openReviews(page);
 	await expect(section.locator('[data-review-slide]')).toHaveCount(10);
 	await expect(section).not.toContainText('Need to get this ASAP');
-	// Baselines the layout must hold across all slides
-	const initialHeight = (await section.boundingBox())?.height;
-	const authorOffset = () =>
+	// NOTE • Measured in one round trip: the open Profile keeps several WebGL scenes busy, and each separate
+	// query costs the walk below enough time to outrun the test timeout on a loaded machine
+	const activeSlide = () =>
 		section.evaluate(el => {
-			const author = el.querySelector('[data-active=true] figcaption');
-			return (author?.getBoundingClientRect().top ?? 0) - el.getBoundingClientRect().top;
+			const top = el.getBoundingClientRect().top;
+			const slide = el.querySelector('[data-active=true]');
+			// Every slide has a portrait; a company logo sits beside it when the review has one (CMS content)
+			const images = Array.from(
+				slide?.querySelectorAll<HTMLImageElement>('[data-review-face] img, [data-review-logo] img') ?? []
+			);
+			return {
+				height: el.getBoundingClientRect().height,
+				authorOffset: (slide?.querySelector('figcaption')?.getBoundingClientRect().top ?? 0) - top,
+				portraits: slide?.querySelectorAll('[data-review-face] img').length ?? 0,
+				// Loaded, and drawn at a size (they scale in from zero as the slide arrives)
+				imagesShown: images.every(image => image.naturalWidth > 0 && image.getBoundingClientRect().width > 0),
+			};
 		});
-	const initialAuthorOffset = await authorOffset();
+	// Baselines the layout must hold across all slides
+	const initial = await activeSlide();
 
 	// One step forward, then back past the start wraps to the last slide
 	await section.getByRole('button', { name: 'Next review' }).click();
 	await expect(section).toHaveAttribute('data-animating', 'true');
 	await expect(section).toHaveAttribute('data-active-review', '1');
 	await expect(section.locator('[data-active=true]')).toContainText('Jillian Phyllis');
-	expect((await section.boundingBox())?.height).toBeCloseTo(initialHeight ?? 0, 0);
+	expect((await activeSlide()).height).toBeCloseTo(initial.height, 0);
 	await section.getByRole('button', { name: 'Previous review' }).click();
 	await expect(section).toHaveAttribute('data-active-review', '0');
 	await section.getByRole('button', { name: 'Previous review' }).click();
@@ -47,11 +69,11 @@ test('Reviews animate, wrap in both directions, and keep all portraits and logos
 	for (let index = 0; index < 10; index++) {
 		await section.getByRole('button', { name: 'Next review' }).click();
 		await expect(section).toHaveAttribute('data-active-review', String(index));
-		expect((await section.boundingBox())?.height).toBeCloseTo(initialHeight ?? 0, 0);
-		expect(await authorOffset()).toBeCloseTo(initialAuthorOffset, 0);
-		const image = section.locator('[data-active=true] img');
-		await expect(image).toBeVisible();
-		await expect.poll(() => image.evaluate(el => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+		const slide = await activeSlide();
+		expect(slide.height).toBeCloseTo(initial.height, 0);
+		expect(slide.authorOffset).toBeCloseTo(initial.authorOffset, 0);
+		expect(slide.portraits).toBe(1);
+		await expect.poll(async () => (await activeSlide()).imagesShown).toBe(true);
 	}
 });
 

@@ -3,43 +3,57 @@
 // Imports
 // ------------
 import AnimatedGallery from '@parts/AnimatedGallery';
+import BeforeAfter from '@parts/BeforeAfter';
 import ModelViewer from '@parts/ModelViewer';
+import ParallaxGallery from '@parts/ParallaxGallery';
 import { preloadNearbyMedia } from '@utils/preloadNearbyMedia';
 import { YOUTUBE_ASPECT } from '@utils/youtube';
 import Image from 'next/image';
 import { type ComponentType, type CSSProperties, useEffect, useRef, useState } from 'react';
+import { BLOCK_ASPECT_RATIOS } from '@/data/projects';
 
 // Styles + Interfaces
 // ------------
 import type {
+	BeforeAfterMediaProps,
 	DualMediaProps,
 	GalleryMediaProps,
 	MediaProps,
 	ModelMediaProps,
+	ParallaxMediaProps,
 	ProjectCaseBuilderProps,
 	SingleMediaProps,
 } from './interface';
 import { mountMediaReveal } from './reveal';
 import { MEDIA_REPLAY, MEDIA_SETTINGS_CHANGED } from './settings';
+import { DUAL_GALLERY_SIZES, DUAL_SIZES, GALLERY_SIZES, SINGLE_SIZES } from './sizes';
 import s from './styles.module.scss';
 import Video from './Video';
 import YouTube from './YouTube';
 
 // Media tiles
 // ------------
-// One tile: a figure that holds a video, YouTube embed or image. The `sizes` strings
-// are the responsive image widths for the layout the tile sits in.
+// One tile: a figure that holds a video, YouTube embed, image or (in a two-up) an
+// animated gallery. The `sizes` strings are the responsive image widths for the
+// layout the tile sits in.
 const Media = ({ media, sizes }: MediaProps) => {
 	// Derived
 	// NOTE • Only full-width tiles read this; two-up tiles keep their fixed shape
-	const aspect = media.type === 'youtube' ? YOUTUBE_ASPECT : media.aspect;
+	const aspect = media.type === 'youtube' ? YOUTUBE_ASPECT : media.type === 'gallery' ? null : media.aspect;
 	const style = aspect ? ({ '--media-aspect': aspect } as CSSProperties) : undefined;
 
 	// Render
 	return (
 		<div className={s.mediaSlot} data-media-tile>
 			<figure className={s.media} style={style}>
-				{media.type === 'video' ? (
+				{media.type === 'gallery' ? (
+					<AnimatedGallery
+						animation={media.animation}
+						images={media.images}
+						background={media.background}
+						sizes={DUAL_GALLERY_SIZES}
+					/>
+				) : media.type === 'video' ? (
 					<Video key={media.src} media={media} />
 				) : media.type === 'youtube' ? (
 					<YouTube key={media.src} media={media} sizes={sizes} />
@@ -54,22 +68,43 @@ const Media = ({ media, sizes }: MediaProps) => {
 // Layouts: one full-width tile
 export const SingleMedia = ({ media }: SingleMediaProps) => (
 	<div className={s.jacket} data-media-layout='single'>
-		<Media
-			media={media}
-			sizes='(max-width: 1023px) calc(100vw - 32px), (max-width: 1440px) calc(67.65vw - 80px), 894px'
-		/>
+		<Media media={media} sizes={SINGLE_SIZES} />
 	</div>
 );
+
+// NOTE • Interactive blocks fill a full-width tile in the shape the editor picked
+const aspectStyle = (aspect: ParallaxMediaProps['aspect']) =>
+	({ '--media-aspect': BLOCK_ASPECT_RATIOS[aspect] }) as CSSProperties;
+
+export const ParallaxMedia = ({ aspect, images }: ParallaxMediaProps) => (
+	<div className={s.jacket} data-media-layout='single'>
+		<div className={s.mediaSlot} data-media-tile>
+			<figure className={s.media} style={aspectStyle(aspect)}>
+				<ParallaxGallery images={images} sizes={SINGLE_SIZES} />
+			</figure>
+		</div>
+	</div>
+);
+
+export const BeforeAfterMedia = ({ aspect, before, after, start }: BeforeAfterMediaProps) => (
+	<div className={s.jacket} data-media-layout='single'>
+		<div className={s.mediaSlot} data-media-tile>
+			<figure className={s.media} style={aspectStyle(aspect)}>
+				<BeforeAfter before={before} after={after} start={start} sizes={SINGLE_SIZES} />
+			</figure>
+		</div>
+	</div>
+);
+
+// NOTE • A gallery has no single src, so it's keyed by its first image
+const dualKey = (media: DualMediaProps['media'][number]) =>
+	media.type === 'gallery' ? `gallery-${media.images[0]?.src}` : media.src;
 
 // Two tiles side by side
 export const DualMedia = ({ media }: DualMediaProps) => (
 	<div className={s.jacket} data-media-layout='dual'>
 		{media.map(item => (
-			<Media
-				key={item.src}
-				media={item}
-				sizes='(max-width: 1023px) calc(100vw - 32px), (max-width: 1440px) calc(33.825vw - 44px), 443px'
-			/>
+			<Media key={dualKey(item)} media={item} sizes={DUAL_SIZES} />
 		))}
 	</div>
 );
@@ -79,12 +114,7 @@ export const GalleryMedia = ({ animation, images, background }: GalleryMediaProp
 	<div className={s.jacket} data-media-layout='gallery'>
 		<div className={s.mediaSlot} data-media-tile>
 			<figure className={s.media}>
-				<AnimatedGallery
-					animation={animation}
-					images={images}
-					background={background}
-					sizes='(max-width: 1023px) 60vw, (max-width: 1440px) 40vw, 560px'
-				/>
+				<AnimatedGallery animation={animation} images={images} background={background} sizes={GALLERY_SIZES} />
 			</figure>
 		</div>
 	</div>
@@ -95,13 +125,7 @@ export const ModelMedia = ({ src, poster, alt, aspect, background }: ModelMediaP
 	<div className={s.jacket} data-media-layout='single'>
 		<div className={s.mediaSlot} data-media-tile>
 			<figure className={s.media} style={aspect ? ({ '--media-aspect': aspect } as CSSProperties) : undefined}>
-				<ModelViewer
-					src={src}
-					poster={poster}
-					alt={alt}
-					background={background}
-					sizes='(max-width: 1023px) calc(100vw - 32px), (max-width: 1440px) calc(67.65vw - 80px), 894px'
-				/>
+				<ModelViewer src={src} poster={poster} alt={alt} background={background} sizes={SINGLE_SIZES} />
 			</figure>
 		</div>
 	</div>
@@ -195,6 +219,10 @@ const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
 					<DualMedia key={block.id} media={block.media} />
 				) : block.type === 'model' ? (
 					<ModelMedia key={block.id} {...block} />
+				) : block.type === 'parallax' ? (
+					<ParallaxMedia key={block.id} {...block} />
+				) : block.type === 'beforeAfter' ? (
+					<BeforeAfterMedia key={block.id} {...block} />
 				) : (
 					<GalleryMedia key={block.id} {...block} />
 				)

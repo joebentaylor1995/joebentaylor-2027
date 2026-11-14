@@ -13,8 +13,23 @@ for (const width of [1440, 440]) {
 		await page.getByRole('button', { name: 'Accept Necessary' }).click();
 		await expect(page.locator('[data-loader-overlay]')).not.toBeVisible({ timeout: 15000 });
 		const gallery = page.locator('[data-project-case-builder]');
-		await expect(gallery.locator('[data-media-layout]')).toHaveCount(9);
-		await expect(gallery.locator('img')).toHaveCount(12);
+		// Every CMS block renders as one top-level layout: a dual holds two tiles, every other layout one, and
+		// each tile holds its media. Counted from the page, not hard-coded, so editors can add or drop blocks.
+		await expect(gallery.locator('[data-media-layout]').first()).toBeAttached();
+		const blocks = await gallery.evaluate(el =>
+			[...el.querySelectorAll(':scope > [data-media-layout]')].map(layout => ({
+				type: layout.getAttribute('data-media-layout'),
+				tiles: [...layout.querySelectorAll('[data-media-tile]')].map(
+					tile => tile.querySelector('figure img, figure video, figure iframe, figure canvas') !== null
+				),
+			}))
+		);
+		await expect(gallery.locator('[data-media-layout]')).toHaveCount(blocks.length);
+		expect(blocks.some(block => block.type === 'dual')).toBe(true);
+		for (const block of blocks) {
+			expect(block.tiles).toHaveLength(block.type === 'dual' ? 2 : 1);
+			expect(block.tiles).not.toContain(false);
+		}
 		// A dual layout: 8px gap, beside each other on desktop and one above the other on mobile
 		const pair = gallery.locator('[data-media-layout="dual"]').first();
 		const a = await pair.locator('figure').nth(0).boundingBox();
@@ -31,10 +46,12 @@ for (const width of [1440, 440]) {
 			expect(a.width / a.height).toBeCloseTo(443 / 560, 2);
 		}
 
-		// Scroll the gallery to the top of the viewport (Lenis wrapper), allowing for the hero above it
+		// Scroll the gallery to the top of the viewport (Lenis wrapper), allowing for the hero above it. Desktop
+		// scrolls the hero away and then slides the panel in over 90% of a viewport; on mobile the panel rises
+		// over the hero's held, viewport-tall second row, so it starts one viewport above the hero's bottom.
 		const offset = await gallery.evaluate(el => (el as HTMLElement).offsetTop);
 		const heroHeight = await page.locator('[data-project-hero-layer]').evaluate(el => el.clientHeight);
-		const target = width === 1440 ? heroHeight - 900 + 810 + offset : heroHeight + offset;
+		const target = width === 1440 ? heroHeight - 900 + 810 + offset : heroHeight - 900 + offset;
 		await page
 			.locator('#page .lenis')
 			.first()

@@ -6,7 +6,7 @@
 // featured ribbon (a subdivided two-sided cylinder drawn by one shader pair), the tuning panel, input,
 // the poster/video atlas, catalogue loading and the frame loop. Plain scripts share one global scope, so
 // every top-level name here is public: later scripts (export.js) and the tests reach in by name.
-// Loaded after the helper scripts in index.html (navigation, grid, video-atlas, frame-meter, intro, idle,
+// Loaded after the helper scripts in index.html (navigation, gl-async, grid, video-atlas, frame-meter, intro, idle,
 // mouse-tilt, velocity-shape, project-transition, loader-wave) and uses their classes directly.
 //
 // Frame loop: input and host messages call `requestRender()`, which schedules `render()`. Each frame
@@ -624,10 +624,51 @@ canvas.addEventListener(
 	},
 	{ passive: false }
 );
-// Active ribbon drag, or null. Grid drags live in `gridView.drag`.
+// Touch paging: with Snap on, one touch swipe moves exactly one slide, however far or fast the finger travels.
+// The drag follows the finger up to one slide either side of where it began (resisting beyond that); on release
+// a flick, or a drag past `threshold` of a slide, steps one slide that way, otherwise it springs back.
+// Speeds are in slides per second, measured over the last `sampleMs` of movement so a held finger has no flick.
+const TOUCH_PAGING = { threshold: 0.3, flickSpeed: 1.2, overdrag: 0.2, sampleMs: 100, flickDeadZone: 0.05 };
+// Damps travel past one slide so the finger can't drag a second slide into view.
+function resistOverdrag(travel) {
+	const excess = Math.abs(travel) - 1;
+	return excess <= 0 ? travel : Math.sign(travel) * (1 + excess * TOUCH_PAGING.overdrag);
+}
+// Finger speed over the recent samples, or 0 when it has been still (or there is only one sample).
+function flickVelocity(samples, now) {
+	const recent = samples.filter(sample => now - sample.time <= TOUCH_PAGING.sampleMs);
+	if (recent.length < 2) return 0;
+	const first = recent[0],
+		last = recent[recent.length - 1];
+	const seconds = (last.time - first.time) / 1000;
+	return seconds > 0 ? (last.travel - first.travel) / seconds : 0;
+}
+// -1, 0 or 1 slides from the anchor. A flick against the drag's direction cancels it rather than reversing.
+function pageStep(travel, velocity) {
+	if (Math.abs(velocity) > TOUCH_PAGING.flickSpeed)
+		return Math.abs(travel) < TOUCH_PAGING.flickDeadZone || Math.sign(velocity) === Math.sign(travel)
+			? Math.sign(velocity)
+			: 0;
+	return Math.abs(travel) > TOUCH_PAGING.threshold ? Math.sign(travel) : 0;
+}
+// Ends the ribbon drag: a paging touch settles on its page at once (a cancelled one ignores its flick),
+// anything else snaps once scrolling stops.
+function releaseDrag(e, cancelled) {
+	// A tap that opened a project leaves the ribbon where it is, as `scheduleSnap` does
+	const opening = projectTransition.loading || projectTransition.active;
+	if (drag?.paging && !opening) {
+		const velocity = cancelled || !drag.moved ? 0 : flickVelocity(drag.samples, e.timeStamp);
+		target = drag.anchor + pageStep(drag.travel, velocity);
+		requestRender();
+	} else scheduleSnap();
+	drag = null;
+}
+
+// Active ribbon drag, or null. Grid drags live in `gridView.drag`. Only the finger that started it moves it.
 let drag = null;
 canvas.addEventListener('pointerdown', e => {
 	if (returningToFeatured()) return;
+	if (drag && drag.pointerId !== e.pointerId) return;
 	tooltipInput = e.pointerType === 'touch' ? 'touch' : 'pointer';
 	tooltipPoint = { x: e.clientX, y: e.clientY };
 	tooltipDismissed = false;
@@ -638,7 +679,20 @@ canvas.addEventListener('pointerdown', e => {
 		gridView.pointerDown(e);
 		return;
 	}
-	drag = { x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, moved: false };
+	// `anchor` is the slide the drag pages from; `travel` is the finger's unresisted travel from it, in slides
+	const anchor = Math.round(target);
+	drag = {
+		pointerId: e.pointerId,
+		paging: e.pointerType === 'touch' && document.querySelector('#snap').checked,
+		anchor,
+		travel: target - anchor,
+		samples: [{ time: e.timeStamp, travel: target - anchor }],
+		x: e.clientX,
+		y: e.clientY,
+		startX: e.clientX,
+		startY: e.clientY,
+		moved: false,
+	};
 	canvas.style.cursor = 'grabbing';
 });
 // Dragging converts pointer travel to slides: 30% of the viewport (at least 220 px) is one slide, scaled by
@@ -656,13 +710,20 @@ canvas.addEventListener('pointermove', e => {
 		refreshFeaturedTooltip();
 		return;
 	}
+	if (e.pointerId !== drag.pointerId) return;
 	clearProjectTooltip();
-	target +=
+	const delta =
 		((state.vertical
 			? (e.clientY - drag.y) / Math.max(220, innerHeight * 0.3)
 			: (drag.x - e.clientX) / Math.max(220, innerWidth * 0.3)) *
 			state.speed) /
 		100;
+	if (drag.paging) {
+		drag.travel += delta;
+		target = drag.anchor + resistOverdrag(drag.travel);
+		drag.samples = drag.samples.filter(sample => e.timeStamp - sample.time <= TOUCH_PAGING.sampleMs);
+		drag.samples.push({ time: e.timeStamp, travel: drag.travel });
+	} else target += delta;
 	drag.x = e.clientX;
 	drag.y = e.clientY;
 	drag.moved ||= Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > 5;
@@ -711,15 +772,17 @@ canvas.addEventListener('pointerup', e => {
 			if (hit) projectClick(hit.project, { ...hit, grid: true });
 		}
 	} else {
+		if (drag && e.pointerId !== drag.pointerId) return;
 		if (drag && !drag.moved) projectClick(pickFeatured(e.clientX, e.clientY));
-		drag = null;
-		scheduleSnap();
+		releaseDrag(e, false);
 	}
 	requestRender();
 });
-canvas.addEventListener('pointercancel', () => {
-	drag = null;
+// The browser took the gesture (a system swipe, say): still settle on a whole slide.
+canvas.addEventListener('pointercancel', e => {
 	if (gridView) gridView.drag = null;
+	if (!drag || e.pointerId !== drag.pointerId) return;
+	releaseDrag(e, true);
 });
 canvas.addEventListener('pointerleave', e => {
 	if (e.pointerType === 'touch') return;
@@ -745,13 +808,14 @@ canvas.addEventListener('blur', () => {
 	requestRender();
 });
 // Hit-tests under the pointer (viewport centre for keyboard) and updates the cursor and tooltip.
+// NOTE • Runs every ribbon frame (updateUI), so the cursor and label are only written when they change.
 function refreshFeaturedTooltip() {
 	const point = tooltipInput === 'keyboard' ? { x: innerWidth / 2, y: innerHeight / 2 } : tooltipPoint;
 	const project = ready && point && !drag && !returningToFeatured() ? pickFeatured(point.x, point.y) : null;
-	canvas.style.cursor = drag ? 'grabbing' : isProjectClickable(project) ? 'pointer' : 'grab';
+	setChangedStyle(canvas, 'cursor', drag ? 'grabbing' : isProjectClickable(project) ? 'pointer' : 'grab');
 	showProjectTooltip(project, point);
 	if (!project)
-		canvas.setAttribute('aria-label', 'Featured projects. Scroll, drag, or use the arrow keys to explore.');
+		setChangedAttribute(canvas, 'aria-label', 'Featured projects. Scroll, drag, or use the arrow keys to explore.');
 }
 // Hit-test for the featured ribbon: the CPU mirror of the vertex shader's `surface()`, sharing the geometry helpers in
 // project-transition.js. Returns the project under a client position plus `ribbonHit` ({ band, slide }), or null.
@@ -833,6 +897,14 @@ function setProjectView(all) {
 }
 document.querySelector('#view-featured').onclick = () => setProjectView(false);
 document.querySelector('#view-all').onclick = () => setProjectView(true);
+// Host message: the site's Projects link always lands on the featured ribbon. `instant` skips the
+// grid's hand-back when the page isn't showing yet, so it arrives already settled.
+window.addEventListener('message', event => {
+	if (!fromHost(event) || event.data?.type !== 'projects:featured' || !gridView) return;
+	if (gridView.target) setProjectView(false);
+	if (event.data.instant === true) gridView.finishReturn();
+	requestRender();
+});
 // Tuning panel
 // ------------
 // Opens or closes the panel; it is inert while closed so it cannot take focus.
@@ -883,14 +955,6 @@ panel(showRibbonSettings);
 document.querySelector('#intro-controls').open = showRibbonSettings;
 // Rendering setup
 // ------------
-// Compiles one shader; throws the info log on failure.
-function shader(type, source) {
-	const s = gl.createShader(type);
-	gl.shaderSource(s, source);
-	gl.compileShader(s);
-	if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(s));
-	return s;
-}
 // Entrance animation (intro.js). Its callback returns the view to the ribbon and settles `position` on `target`.
 const introduction = new RibbonIntroduction(requestRender, () => {
 	if (gridView?.target || gridView?.mix) {
@@ -937,12 +1001,12 @@ const projectTransition = new ProjectTransition(gl);
 // Twist leaves the central 1.24 slides flat.
 const meshSegments = mobile ? 320 : 1200,
 	meshRows = mobile ? 4 : 8;
-// Compiles the ribbon program, builds the mesh and caches the uniform locations.
+// Starts linking the ribbon program, builds the mesh and sets the fixed GL state. Returns the pending link.
+// NOTE • The link isn't read back here, so the GPU process compiles it while the ribbon boots: the boot waits for
+// whenLinked() (gl-async.js) and then finishSetup() reads the result, throwing any error as this once did.
 function setup() {
-	program = gl.createProgram();
-	gl.attachShader(
-		program,
-		shader(
+	const linking = linkProgramAsync(gl, [
+		[
 			gl.VERTEX_SHADER,
 			`
 				precision highp float;
@@ -1008,12 +1072,9 @@ function setup() {
 					// x is the slide coordinate / 6 (the fragment shader multiplies it back); y runs top to bottom.
 					vUV = vec2(angle / mix(1.0471975512, .6544984695, uVertical) / 6.0, .5 - aPosition.y * .5);
 				}
-			`
-		)
-	);
-	gl.attachShader(
-		program,
-		shader(
+			`,
+		],
+		[
 			gl.FRAGMENT_SHADER,
 			`
 				precision highp float;
@@ -1081,12 +1142,10 @@ function setup() {
 					// Fade the entire surface into the scene, including the image's dark areas.
 					gl_FragColor = vec4(colour.rgb * vLight, uOpacity * reveal * uFade);
 				}
-			`
-		)
-	);
-	gl.linkProgram(program);
-	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
-	gl.useProgram(program);
+			`,
+		],
+	]);
+	program = linking.program;
 	// Mesh: (meshSegments + 1) by (meshRows + 1) vertices over angle -PI..PI and height -1..1, two triangles per quad.
 	const vertices = [],
 		indices = [];
@@ -1105,8 +1164,22 @@ function setup() {
 	ribbonIndices = gl.createBuffer();
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ribbonIndices);
 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+	gl.enable(gl.DEPTH_TEST);
+	gl.disable(gl.CULL_FACE);
+	// Clear colour is the page background (computed rgb) so the opaque canvas blends with the host.
+	const background = getComputedStyle(document.documentElement)
+		.backgroundColor.match(/[\d.]+/g)
+		.map(Number);
+	gl.clearColor(background[0] / 255, background[1] / 255, background[2] / 255, 1);
+	return linking;
+}
+// Once the ribbon program has linked: checks it, binds it with the mesh and caches the attribute and uniform locations.
+function finishSetup(linking) {
+	checkProgram(gl, linking);
+	gl.useProgram(program);
 	const a = gl.getAttribLocation(program, 'aPosition');
 	ribbonAttrib = a;
+	gl.bindBuffer(gl.ARRAY_BUFFER, ribbonBuffer);
 	gl.enableVertexAttribArray(a);
 	gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 	// Cache every uniform location as `uniforms.<Name>` for `u<Name>`.
@@ -1138,13 +1211,6 @@ function setup() {
 	uniforms.AtlasSize = gl.getUniformLocation(program, 'uAtlasSize');
 	uniforms.CascadeEase = gl.getUniformLocation(program, 'uCascadeEase');
 	uniforms.CascadeStagger = gl.getUniformLocation(program, 'uCascadeStagger');
-	gl.enable(gl.DEPTH_TEST);
-	gl.disable(gl.CULL_FACE);
-	// Clear colour is the page background (computed rgb) so the opaque canvas blends with the host.
-	const background = getComputedStyle(document.documentElement)
-		.backgroundColor.match(/[\d.]+/g)
-		.map(Number);
-	gl.clearColor(background[0] / 255, background[1] / 255, background[2] / 255, 1);
 }
 
 // Rendering
@@ -1498,39 +1564,51 @@ function cover(ctx, img, x, y, w, h) {
 		sh = h / s;
 	ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, y, w, h);
 }
-// Packs the posters into one canvas of equal 16:10 tiles, uploads it as the ribbon texture and attaches it to the video
-// uploader. Desktop uses one row; phones wrap at 12 columns. Tile width is at most 1024 and shrinks so the atlas fits
+// Packs the posters into one canvas of equal 16:10 tiles and uploads it into a new texture, which commitAtlas() then
+// swaps in. Desktop uses one row; phones wrap at 12 columns. Tile width is at most 1024 and shrinks so the atlas fits
 // the GPU and canvas limits, rounded down to a multiple of 16.
-function makeAtlas(images) {
-	stopVideos();
+// NOTE • At boot, while nothing is on screen yet, this resolves once the GPU process has the upload (gl-async.js), so
+// commitAtlas()'s getError and framebuffer check answer at once instead of holding the main thread (the host's too)
+// until the 31 MB upload has run. A re-apply while the ribbon is showing (a breakpoint change, a file drop) swaps in the
+// same task as it always did, so no frame draws the old atlas.
+async function buildAtlas(images) {
 	// Keep the backing canvas within mobile browser memory limits as well as
 	// the GPU texture limit (the two limits are not necessarily the same).
 	const max = Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), mobile ? 8192 : 16384);
-	atlasColumns = mobile ? Math.min(12, images.length) : images.length;
-	atlasRows = Math.ceil(images.length / atlasColumns);
-	const W = Math.min(1024, Math.floor(max / atlasColumns / 16) * 16),
+	const columns = mobile ? Math.min(12, images.length) : images.length,
+		rows = Math.ceil(images.length / columns);
+	const W = Math.min(1024, Math.floor(max / columns / 16) * 16),
 		H = (W * 10) / 16;
 	const atlas = document.createElement('canvas');
-	atlas.width = W * atlasColumns;
-	atlas.height = H * atlasRows;
-	atlasWidth = W;
-	atlasHeight = H;
+	atlas.width = W * columns;
+	atlas.height = H * rows;
 	const c = atlas.getContext('2d');
 	c.imageSmoothingEnabled = true;
 	c.imageSmoothingQuality = 'high';
-	images.forEach((im, i) => cover(c, im, (i % atlasColumns) * W, Math.floor(i / atlasColumns) * H, W, H));
+	images.forEach((im, i) => cover(c, im, (i % columns) * W, Math.floor(i / columns) * H, W, H));
 
-	if (texture) gl.deleteTexture(texture);
-	texture = gl.createTexture();
+	const next = gl.createTexture();
 	gl.activeTexture(gl.TEXTURE0);
-	gl.bindTexture(gl.TEXTURE_2D, texture);
+	gl.bindTexture(gl.TEXTURE_2D, next);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas);
+	if (!ready) await whenGpuCaughtUp(gl);
+	return { texture: next, columns, rows, width: W, height: H };
+}
+// Swaps a built atlas in as the ribbon texture and attaches it to the video uploader.
+function commitAtlas(atlas) {
+	stopVideos();
+	atlasColumns = atlas.columns;
+	atlasRows = atlas.rows;
+	atlasWidth = atlas.width;
+	atlasHeight = atlas.height;
+	if (texture) gl.deleteTexture(texture);
+	texture = atlas.texture;
 	if (gl.getError() !== gl.NO_ERROR) throw Error('The project images could not be loaded into WebGL. Please reload.');
-	if (!videoUploader) videoUploader = new VideoAtlasUploader(gl);
+	videoUploader.finishLink();
 	videoUploader.attach(texture);
 	ready = !!texture;
 	requestRender();
@@ -1695,10 +1773,11 @@ document.querySelector('#files').onchange = async e => {
 	const urls = files.map(f => URL.createObjectURL(f));
 	try {
 		const images = await Promise.all(urls.map(imageLoad));
+		const atlas = await buildAtlas(images);
 		names = files.map(f => f.name.replace(/\.[^.]+$/, ''));
 		count = names.length;
 		position = target = 0;
-		makeAtlas(images, true);
+		commitAtlas(atlas);
 		featured = names.map((name, index) => ({ name, index, poster: urls[index] }));
 		gridView.setProjects(featured, featured);
 		document.querySelector('#all-count').textContent = featured.length;
@@ -1759,6 +1838,11 @@ async function applyRibbonCatalog() {
 	);
 	await waitForUncoveredScene();
 	if (revision !== catalogRevision) return;
+	const atlas = await buildAtlas(images);
+	if (revision !== catalogRevision) {
+		gl.deleteTexture(atlas.texture);
+		return;
+	}
 	featured = items.map((item, index) => ({ ...item, index }));
 	names = featured.map(item => item.name);
 	count = names.length;
@@ -1766,7 +1850,7 @@ async function applyRibbonCatalog() {
 		0,
 		featured.findIndex(item => item.poster === previousPoster)
 	);
-	makeAtlas(images);
+	commitAtlas(atlas);
 	gridView.setProjects(featured, allProjects);
 	buildDots();
 	startFeaturedVideos();
@@ -1785,8 +1869,9 @@ async function applyRibbonCatalog() {
 	try {
 		if (!gl) throw Error('WebGL is unavailable. Please open this in a browser with hardware acceleration enabled.');
 		await waitForUncoveredScene();
-		setup();
+		const ribbonLink = setup();
 		gridView = new ProjectGrid(gl, requestRender);
+		videoUploader = new VideoAtlasUploader(gl);
 		gridView.setPaused(hostSuspended());
 		syncDirection();
 		// Only the published CMS catalogue may populate the live ribbon.
@@ -1796,13 +1881,23 @@ async function applyRibbonCatalog() {
 				return response.json();
 			});
 		const preloaded = window.parent.getPreloadedProjects?.();
-		const catalog = preloaded
-			? preloaded.catch(() => loadJson('/api/projects-ribbon/'))
-			: loadJson('/api/projects-ribbon/');
-		[featuredProjects, allProjects] = await catalog.then(data => {
+		const catalog = (
+			preloaded ? preloaded.catch(() => loadJson('/api/projects-ribbon/')) : loadJson('/api/projects-ribbon/')
+		).then(data => {
 			window.ribbonPlaceholder = data.placeholder;
 			return [data.featured, data.all];
 		});
+		// A shader error below is reported instead, as before; don't also report this as unhandled.
+		catalog.catch(() => {});
+		// NOTE • The three programs compile in the GPU process while the catalogue loads; their results are read once
+		// they're done, in the order the old synchronous setup threw its errors (the video uploader's when the atlas
+		// first attaches).
+		await Promise.all(
+			[ribbonLink.program, gridView.program, videoUploader.program].map(item => whenLinked(gl, item))
+		);
+		finishSetup(ribbonLink);
+		gridView.finishCompile();
+		[featuredProjects, allProjects] = await catalog;
 		allProjects = allProjects.map((project, index) => ({ ...project, index }));
 		await applyRibbonCatalog();
 		// Internal navigation already has its page wave: only cascade the slides afterwards.

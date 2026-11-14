@@ -2,6 +2,16 @@
 // ------------
 import { expect, test } from '@playwright/test';
 
+// Config
+// ------------
+// The banner waits for the site loader, which plays for several seconds by design and runs longer
+// on a busy or GPU-less runner
+const LOADER_TIMEOUT = 20_000;
+// Desktop positions are checked to ±0.05px, which absorbs one 1/64px layout unit: the desktop root
+// font-size is min(100vw / 144, 62.5%), whose float result can floor 34.5rem to 344.984375px.
+// Below that breakpoint the root is a whole 10px, so the 440px layout stays pinned exactly.
+const DESKTOP_PIXEL_PRECISION_DIGITS = 1;
+
 // Tests
 // ------------
 // Protects the cookie banner layout from phone to desktop: it fits the viewport, shows its icon,
@@ -12,7 +22,7 @@ for (const width of [390, 440, 768, 1440]) {
 		await page.emulateMedia({ reducedMotion: 'reduce' });
 		await page.goto('/');
 		const banner = page.getByRole('region', { name: 'Cookies', exact: true });
-		await expect(page.locator('[data-loader-overlay]')).not.toBeVisible();
+		await expect(page.locator('[data-loader-overlay]')).not.toBeVisible({ timeout: LOADER_TIMEOUT });
 		// The banner only appears once the loader overlay has cleared
 		await expect(banner).toBeVisible();
 		await expect(banner.getByRole('link', { name: 'Cookies' })).toHaveAttribute('href', /^\/cookies\/?$/);
@@ -28,8 +38,8 @@ for (const width of [390, 440, 768, 1440]) {
 		expect(bounds.x).toBeGreaterThanOrEqual(0);
 		expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
 		if (width === 1440) {
-			expect(bounds.width).toBe(345);
-			expect(bounds.x).toBe(1055);
+			expect(bounds.width).toBeCloseTo(345, DESKTOP_PIXEL_PRECISION_DIGITS);
+			expect(bounds.x).toBeCloseTo(1055, DESKTOP_PIXEL_PRECISION_DIGITS);
 		} else if (width === 440) {
 			expect(bounds.x).toBe(32);
 			expect(bounds.y).toBe(90);

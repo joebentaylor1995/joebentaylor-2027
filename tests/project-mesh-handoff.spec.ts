@@ -14,8 +14,8 @@ declare const projectTransition: { active: boolean; progress: number; settled: b
 
 // Tests
 // ------------
-// Protects the Projects to case study handoff in each ribbon mode: the ribbon expands into the real hero image
-// before the URL changes, the header is never covered or replaced, text does not appear early, page scroll
+// Protects the Projects to case study handoff in each ribbon mode: the ribbon finishes expanding into the real hero
+// image before the URL changes, the header is never covered or replaced, text does not appear early, page scroll
 // is blocked during the handoff, and Back returns to the ribbon.
 for (const mode of ['featured', 'grid', 'mobile']) {
 	test(`${mode} finishes expanding into the real hero before navigating`, async ({ page }) => {
@@ -92,6 +92,25 @@ for (const mode of ['featured', 'grid', 'mobile']) {
 				})
 		);
 
+		// Runs in the ribbon while the handoff happens: resolves when the host URL changes, with whether the
+		// flight had already settled (finished expanding) in a sample taken while the URL was still unchanged.
+		// Timers, not frames, so it still samples if the ribbon is hidden in the same commit as the navigation.
+		const settledBeforeNavigation = renderer.evaluate(
+			() =>
+				new Promise<boolean>(resolve => {
+					const start = parent.location.pathname;
+					let settled = false;
+					const timer = setInterval(() => {
+						if (parent.location.pathname === start) {
+							settled ||= projectTransition.settled;
+							return;
+						}
+						clearInterval(timer);
+						resolve(settled);
+					}, 4);
+				})
+		);
+
 		// Start the transition; the URL must not change until it has finished expanding
 		await frame.locator('#stage').press('Enter');
 		await renderer.waitForFunction(() => projectTransition.active && projectTransition.progress < 1);
@@ -100,10 +119,8 @@ for (const mode of ['featured', 'grid', 'mobile']) {
 		const destination = (await renderer.evaluate(
 			'({ hero: projectTransition.image.src, href: projectTransition.href, height: projectTransition.heroHeight, top: projectTransition.heroTop })'
 		)) as { hero: string; href: string; height: number; top: number };
-		await renderer.waitForFunction(() => projectTransition.settled);
-		await page.waitForTimeout(40);
-		expect(new URL(page.url()).pathname).toMatch(/^\/projects\/?$/);
 		await expect(page).toHaveURL(new RegExp(`${destination.href}/?$`), { timeout: 20000 });
+		expect(await settledBeforeNavigation).toBe(true);
 
 		// Real hero matches the transition target
 		const hero = page.locator('[data-project-hero-media] img');
@@ -125,17 +142,13 @@ for (const mode of ['featured', 'grid', 'mobile']) {
 			scrollEscaped: false,
 		});
 
-		// Title wave has played; paragraph waits for scrolling
+		// Title wave has played (the hero is title-only since 082d1de, so there is no paragraph to reveal)
 		await expect(page.locator('[data-project-hero] h1 [data-reveal-variant="wave"]')).toHaveAttribute(
 			'data-wave-state',
 			'complete'
 		);
-		await expect(page.locator('[data-project-hero] p [data-reveal-variant="wave"]')).toHaveAttribute(
-			'data-wave-state',
-			'waiting'
-		);
 
-		// After the handoff the page scrolls normally and the paragraph reveals
+		// After the handoff the page scrolls normally
 		await page.mouse.move(200, 300);
 		await page.mouse.wheel(0, 600);
 		await expect
@@ -143,10 +156,6 @@ for (const mode of ['featured', 'grid', 'mobile']) {
 				page.evaluate(() => Math.max(...Array.from(document.querySelectorAll('*'), el => el.scrollTop)))
 			)
 			.toBeGreaterThan(100);
-		await expect(page.locator('[data-project-hero] p [data-reveal-variant="wave"]')).toHaveAttribute(
-			'data-wave-state',
-			'complete'
-		);
 
 		// Back returns to the interactive ribbon with no page errors
 		await page.goBack();

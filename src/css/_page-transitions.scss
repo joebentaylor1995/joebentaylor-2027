@@ -70,14 +70,24 @@
 		&::view-transition-group(site-header) { z-index: 1; }
 	}
 
-	::view-transition-old(site-header) {
+	// Fixed chrome drawn live above the page change rather than crossfaded: the header, and the
+	// wave tuner (?waveTuner) above that, so it can scrub the wave it is holding
+	::view-transition-old(site-header),
+	::view-transition-old(wave-tuner) {
 		animation: none;
 		opacity: 0;
 	}
-	::view-transition-new(site-header) { animation: none; }
+
+	::view-transition-new(site-header),
+	::view-transition-new(wave-tuner) { animation: none; }
 
 	::view-transition-group(site-header) {
 		z-index: 10;
+		animation: none;
+	}
+
+	::view-transition-group(wave-tuner) {
+		z-index: 20;
 		animation: none;
 	}
 

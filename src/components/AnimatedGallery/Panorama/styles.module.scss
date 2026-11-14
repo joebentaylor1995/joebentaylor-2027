@@ -1,20 +1,20 @@
 // NOTE • The camera sits one stage-width in front of the cards (perspective
-// = 100cqw), and each card turns about that point — matching layout.ts
+// = 100cqmin), and each card turns about that point — matching layout.ts
 .scene {
 	position: absolute;
 	inset: 0;
-	perspective: 100cqw;
+	perspective: 100cqmin;
 }
 
 .card {
 	position: absolute;
 	inset: 0;
-	width: calc(var(--card-width, 0.64) * 100cqw);
-	height: calc(var(--card-width, 0.64) * 100cqw / var(--card-aspect, 0.75));
+	width: calc(var(--card-width, 0.64) * 100cqmin);
+	height: calc(var(--card-width, 0.64) * 100cqmin / var(--card-aspect, 0.75));
 	margin: auto;
 	overflow: hidden;
-	border-radius: 5.5cqw;
-	transform: translateZ(100cqw) rotateY(var(--turn, 0deg)) translateZ(-100cqw);
+	border-radius: 5.5cqmin;
+	transform: translateZ(100cqmin) rotateY(var(--turn, 0deg)) translateZ(-100cqmin);
 	will-change: transform;
 	backface-visibility: hidden;
 }

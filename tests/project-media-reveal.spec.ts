@@ -13,7 +13,8 @@ for (const width of [440, 1440]) {
 		await page.getByRole('button', { name: 'Accept Necessary' }).click();
 		await expect(page.locator('[data-site-loader]')).toBeHidden({ timeout: 15000 });
 		const gallery = page.locator('[data-project-case-builder]');
-		await expect(gallery.locator('canvas')).toHaveCount(0);
+		// The reveal is a CSS clip, not WebGL: the only canvases left are the draggable 3D model blocks' own viewers
+		await expect(gallery.locator('canvas:not([data-cursor-drag])')).toHaveCount(0);
 		const tile = page.locator('[data-media-tile]').first();
 		// Scrolls so the tile sits at a given progress through the reveal zone (the bottom 30% of the viewport).
 		// Negative progress is below the viewport. Enhanced layouts scroll the hero away first, so the offset differs.

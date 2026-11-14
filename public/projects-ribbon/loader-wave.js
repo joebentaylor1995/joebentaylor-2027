@@ -33,36 +33,30 @@ class RibbonLoaderWave {
 			reflection: 1,
 			caustic: 1,
 		};
+
+		// NOTE • Linked now without reading it back (gl-async.js), so the GPU process compiles it while the ribbon loads
+		// its posters; create() reads the result in the first wave frame, which used to compile it there and then.
+		this.linking = linkProgramAsync(gl, this.shaders());
 	}
 
-	// Compiles the program and allocates the buffer, scene texture, framebuffer and depth buffer.
-	create() {
+	// The wave's shaders, as [type, source] pairs.
+	shaders() {
 		const gl = this.gl;
-
-		const compile = (type, source) => {
-			const shader = gl.createShader(type);
-			gl.shaderSource(shader, source);
-			gl.compileShader(shader);
-			if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(shader));
-			return shader;
-		};
-
-		// Shaders
-		const vertex = compile(
-			gl.VERTEX_SHADER,
-			`
+		return [
+			[
+				gl.VERTEX_SHADER,
+				`
 				attribute vec2 position;
 				varying vec2 uv;
 				void main() {
 					uv = position * .5 + .5;
 					gl_Position = vec4(position, 0., 1.);
 				}
-			`
-		);
-
-		const fragment = compile(
-			gl.FRAGMENT_SHADER,
-			`
+			`,
+			],
+			[
+				gl.FRAGMENT_SHADER,
+				`
 				precision highp float;
 				varying vec2 uv;
 				uniform sampler2D scene;
@@ -111,16 +105,18 @@ class RibbonLoaderWave {
 					colour += vec3(.8, .91, 1.) * exp(-pow((edge + .65) * 2., 2.)) * envelope * strength * .025 * caustic;
 					gl_FragColor = vec4(colour, 1.);
 				}
-			`
-		);
+			`,
+			],
+		];
+	}
 
-		const program = gl.createProgram();
-		gl.attachShader(program, vertex);
-		gl.attachShader(program, fragment);
-		gl.linkProgram(program);
-		gl.deleteShader(vertex);
-		gl.deleteShader(fragment);
-		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
+	// Reads the program's link result (throwing any compile or link error) and allocates the buffer, scene texture,
+	// framebuffer and depth buffer.
+	create() {
+		const gl = this.gl;
+		const linking = this.linking || linkProgramAsync(gl, this.shaders());
+		this.linking = null;
+		const program = checkProgram(gl, linking, true);
 
 		// One oversized triangle that covers the whole viewport.
 		const buffer = gl.createBuffer();
@@ -211,10 +207,16 @@ class RibbonLoaderWave {
 
 	// Frees every GL resource; `create()` runs again if the pass is needed later.
 	dispose() {
+		const gl = this.gl;
+		// A wave that never drew still has its early link to release.
+		if (this.linking) {
+			gl.deleteProgram(this.linking.program);
+			for (const shader of this.linking.shaders) gl.deleteShader(shader);
+			this.linking = null;
+		}
 		const r = this.resources;
 		if (!r) return;
 
-		const gl = this.gl;
 		gl.deleteProgram(r.program);
 		gl.deleteBuffer(r.buffer);
 		gl.deleteTexture(r.texture);

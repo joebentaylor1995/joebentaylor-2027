@@ -92,6 +92,7 @@ const ModelViewer = ({ src, poster, alt, background, sizes }: I.ModelViewerProps
 				ref={canvasRef}
 				className={s.canvas}
 				role='img'
+				data-cursor-drag
 				aria-label={alt}
 				aria-hidden={!isReady || undefined}
 			/>
@@ -99,7 +100,7 @@ const ModelViewer = ({ src, poster, alt, background, sizes }: I.ModelViewerProps
 				<button
 					type='button'
 					className={s.open}
-					data-type='captionL'
+					data-type='bodyM'
 					onClick={handleOpen}
 					disabled={status === 'loading'}
 					aria-live='polite'
@@ -109,13 +110,13 @@ const ModelViewer = ({ src, poster, alt, background, sizes }: I.ModelViewerProps
 			)}
 			{isReady && (
 				<>
-					<p className={s.hint} data-type='captionS' aria-hidden='true'>
+					<p className={s.hint} data-type='bodyS' aria-hidden='true'>
 						<span>Drag to turn</span>
 					</p>
 					<button
 						type='button'
 						className={s.toggle}
-						data-type='captionS'
+						data-type='bodyS'
 						aria-label={`${isRotating ? 'Pause' : 'Play'} rotation`}
 						onClick={handleToggleRotation}
 					>

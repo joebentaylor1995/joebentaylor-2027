@@ -7,6 +7,15 @@
 // ------------
 import { expect, test } from '@playwright/test';
 
+// Config
+// ------------
+// The banner waits for the site loader, which plays for several seconds by design and runs longer
+// on a busy or GPU-less runner
+const LOADER_TIMEOUT = 20_000;
+// The calendar is a lazily loaded chunk that injects Cal.com's script when it mounts; on a contended
+// runner the chunk alone can take several seconds to arrive
+const CALENDAR_MOUNT_TIMEOUT = 15_000;
+
 // Helpers
 // ------------
 // Runs in the page: the consent choice is mirrored onto <html> as a data attribute.
@@ -17,7 +26,7 @@ const consentAttribute = () => document.documentElement.getAttribute('data-cooki
 test('stores a per-category choice and hides the banner for returning visitors', async ({ page }) => {
 	await page.goto('/');
 	const banner = page.getByRole('region', { name: 'Cookies' });
-	await expect(banner).toBeVisible();
+	await expect(banner).toBeVisible({ timeout: LOADER_TIMEOUT });
 
 	// Opt in to analytics only
 	await banner.getByRole('button', { name: 'Let me choose' }).click();
@@ -53,15 +62,28 @@ test('Accept All includes the calendar and stays accepted after reload', async (
 	await page.getByRole('button', { name: 'Accept All', exact: true }).click();
 	expect(await page.evaluate(consentAttribute)).toBe('analytics marketing');
 	await page.getByRole('button', { name: 'Open Booking Form' }).click();
+	const dialog = page.getByRole('dialog');
+	await expect(dialog.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'true', {
+		timeout: CALENDAR_MOUNT_TIMEOUT,
+	});
 	await expect(page.getByRole('button', { name: 'Allow cookies and load calendar' })).toHaveCount(0);
 	await expect.poll(() => calendarRequests.length).toBeGreaterThan(0);
 
-	// Consent persists, so the calendar loads on the next visit without the prompt
+	// Consent persists: opening the form moved to /contact/, so a reload reopens the modal once the
+	// loader has played, and the calendar loads again without the prompt
+	await expect(page).toHaveURL(/\/contact\/$/);
+	calendarRequests.length = 0;
 	await page.reload();
+	await expect(dialog).toBeVisible({ timeout: LOADER_TIMEOUT });
+	// Checked once the loader has settled, when the banner would otherwise have appeared
 	await expect(page.getByRole('region', { name: 'Cookies', exact: true })).toBeHidden();
-	await page.getByRole('button', { name: 'Open Booking Form' }).click();
+	expect(await page.evaluate(consentAttribute)).toBe('analytics marketing');
+	await expect(dialog.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'true', {
+		timeout: CALENDAR_MOUNT_TIMEOUT,
+	});
 	await expect(page.getByRole('button', { name: 'Allow cookies and load calendar' })).toHaveCount(0);
-	await expect(page.getByRole('status')).toHaveText('Loading calendar…');
+	await expect(dialog.getByRole('status')).toHaveText('Loading calendar…');
+	await expect.poll(() => calendarRequests.length).toBeGreaterThan(0);
 });
 
 // Withdrawing consent must remove tracking cookies and reload so nothing keeps running.

@@ -1,14 +1,27 @@
 // Imports
 // ------------
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+
+// Helpers
+// ------------
+// NOTE • An Open Profile click that lands as the intro loader settles can be dropped (no /profile/ push),
+// so wait for the loader to finish, as a visitor would, and confirm the panel opened before going on.
+const LOADER_TIMEOUT = 15_000;
+const waitForLoader = (page: Page) =>
+	expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: LOADER_TIMEOUT });
+const openProfile = async (page: Page) => {
+	await page.goto('/');
+	await waitForLoader(page);
+	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await expect(page.locator('#profile-panel')).toHaveAttribute('aria-hidden', 'false');
+};
 
 // Tests
 // ------------
 // Protects the Connect footer end to end: social links and resume download work, images load
 // and holding the canvas runs the whole matrix charge cycle.
 test('connect footer renders its assets, links and complete charge cycle', async ({ page, request }) => {
-	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	const section = page.locator('[data-connect]');
 	await section.scrollIntoViewIfNeeded();
 	// Wait for the section to report ready before interacting with it
@@ -55,8 +68,7 @@ test('connect footer renders its assets, links and complete charge cycle', async
 test('connect fits mobile and remains usable with reduced motion', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.emulateMedia({ reducedMotion: 'reduce' });
-	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	const section = page.locator('[data-connect]');
 	await section.scrollIntoViewIfNeeded();
 	await expect(section).toHaveAttribute('data-state', 'ready', { timeout: 20_000 });
@@ -77,8 +89,7 @@ test('connect fits mobile and remains usable with reduced motion', async ({ page
 test('connect matches the mobile frame and fits narrow screens', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.setViewportSize({ width: 440, height: 1211 });
-	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	const section = page.locator('[data-connect]');
 	await section.scrollIntoViewIfNeeded();
 	await expect(section).toHaveAttribute('data-state', 'ready', { timeout: 20_000 });
@@ -105,8 +116,7 @@ test('connect matches the mobile frame and fits narrow screens', async ({ page }
 // Protects the Connect interactions: headline reveals, the cursor reacts to each link type,
 // the CTA lights its lines and opens the booking dialog without closing Profile.
 test('connect reveals its copy, attracts the cursor and opens contact without closing Profile', async ({ page }) => {
-	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	const section = page.locator('[data-connect]');
 	await section.scrollIntoViewIfNeeded();
 	const cta = section.getByRole('button', { name: /Ready.*Let’s grow/ });

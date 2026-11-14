@@ -35,15 +35,19 @@ test('mobile overview scrolls over the settled hero and reverses', async ({ page
 	for (const overlap of [100, 350]) {
 		await scroller.evaluate((e, top) => e.scrollTo({ top, behavior: 'instant' }), height - 796 + overlap);
 		await expect.poll(async () => Math.round((await panel.boundingBox())?.y ?? 0)).toBe(796 - overlap);
-		const bounds = await image.boundingBox();
 		await expect
 			.poll(async () => {
 				const copy = await page.locator('[data-project-hero] h1').boundingBox();
 				return (copy?.y ?? 0) + (copy?.height ?? 0);
 			})
 			.toBeLessThan(796 - overlap);
-		// The held image drifts up at a third of the scroll (CSS scroll-driven parallax)
-		expect((bounds?.y ?? 0) + (bounds?.height ?? 0)).toBeCloseTo(796 - overlap / 3, 0);
+		// The held image drifts up at a third of the scroll (CSS scroll-driven parallax, which can land a frame after the scroll)
+		await expect
+			.poll(async () => {
+				const bounds = await image.boundingBox();
+				return (bounds?.y ?? 0) + (bounds?.height ?? 0);
+			})
+			.toBeCloseTo(796 - overlap / 3, 0);
 		expect(
 			await page.evaluate(() => document.elementFromPoint(220, 780)?.closest('[data-project-panel]') !== null)
 		).toBe(true);

@@ -5,6 +5,7 @@
 import ContactModal from '@parts/ContactModal';
 import { GlobalContext } from '@parts/Contexts';
 import Logo from '@parts/Logo';
+import { showFeaturedProjects } from '@parts/ProjectsRibbon/events';
 import { isLoaderSettled, LOADER_SETTLED } from '@parts/SiteLoader/events';
 import { prepareNavigationScene } from '@utils/navigationScene';
 import { useAnimation } from '@utils/useAnimation';
@@ -41,15 +42,25 @@ const Header = () => {
 	useEffect(() => {
 		const header = ref.current;
 		if (!header) return;
+		const blur = header.querySelector<HTMLElement>('[data-header-blur]');
+		let scroller: Element | null = null;
+		let opacity = -1;
 
 		// Reads the Lenis scroller when present, else the window; ignores scrolls outside #page
 		const update = (event?: Event) => {
 			const target = event?.target;
 			if (target instanceof Element && !target.closest('#page')) return;
-			const scroller = document.querySelector('#page .lenis');
+			if (!scroller?.isConnected) scroller = document.querySelector('#page .lenis');
 			const scroll = scroller ? scroller.scrollTop : window.scrollY;
 			const progress = Math.max(0, Math.min(1, scroll / 96));
-			header.style.setProperty('--header-blur-opacity', String(progress * progress * (3 - 2 * progress)));
+			const next = progress * progress * (3 - 2 * progress);
+			if (next === opacity) return;
+			opacity = next;
+			header.style.setProperty('--header-blur-opacity', String(next));
+			// NOTE • At opacity 0 the stack is hidden outright: Chromium still composites
+			// backdrop-filter layers at zero opacity, re-blurring whatever animates beneath
+			// (the hero and the ribbon) every frame for nothing
+			blur?.toggleAttribute('data-idle', next === 0);
 		};
 
 		update();
@@ -160,7 +171,12 @@ const Header = () => {
 						</button>
 						<Link
 							href='/projects'
-							onNavigate={() => prepareNavigationScene('/projects')}
+							onNavigate={() => {
+								// NOTE • The ribbon lives on between pages, so it would reopen on whichever view was left;
+								// the Projects link always lands on Featured
+								showFeaturedProjects(!/^\/projects\/?$/.test(pathname));
+								prepareNavigationScene('/projects');
+							}}
 							aria-current={/^\/projects\/?$/.test(pathname) ? 'page' : undefined}
 							data-type='bodyS'
 						>

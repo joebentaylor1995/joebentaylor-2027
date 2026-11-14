@@ -49,14 +49,20 @@ export async function holdProjectHero(src: string, height: number, top: number, 
 
 	// Releases the cover once the destination hero is on screen with its image decoded
 	const check = async () => {
+		// NOTE • Runs on every DOM mutation batch while the case study commits, and the lookup below forces a layout:
+		// once releasing, nothing can change the outcome, so skip it
+		if (releasing) return;
 		// Cached case studies can remain in hidden Activity trees. Only the live
 		// destination can release the cover; an old hidden hero would time out.
 		const hero = Array.from(document.querySelectorAll<HTMLElement>('[data-project-hero]')).find(
 			element => element.getBoundingClientRect().width > 0
 		);
 		const photo = hero?.querySelector<HTMLImageElement>('img');
-		if (releasing || !photo?.complete || !photo.naturalWidth || !hero?.getBoundingClientRect().width) return;
+		if (!photo?.complete || !photo.naturalWidth || !hero?.getBoundingClientRect().width) return;
 		releasing = true;
+		// Nothing else can release the cover now
+		observer.disconnect();
+		document.removeEventListener('load', onLoad, true);
 		try {
 			await photo.decode();
 			await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));

@@ -1,6 +1,39 @@
 // Imports
 // ------------
-import { expect, type Locator, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
+
+// Constants
+// ------------
+// NOTE • The spiral only reports ready once every poster is decoded and uploaded, one per task and each
+// waiting for the GPU to finish the last (afb8ed8 paces uploads with fences to keep scrolling smooth). The
+// 50-odd posters take ~6s on a desktop GPU, and much longer on CI's software WebGL, so the default 5s
+// assertion timeout can't cover it.
+const SCENE_READY = { timeout: 45_000 };
+// NOTE • The posters come from the CMS, so their count changes with the content; any loaded count is fine
+const AWARD_COUNT = /^[1-9]\d*$/;
+
+// Helpers
+// ------------
+// Clicks an idempotent control until its effect shows. Loading ?modalSettings opens Profile, which pushes a
+// route, and React plays view transitions while it does; a click that lands while one covers the page reaches
+// the document root instead of the control.
+async function clickUntil(control: Locator, settled: () => Promise<void>) {
+	await expect(async () => {
+		await control.click();
+		await settled();
+	}).toPass();
+}
+
+// Opens Profile from the header, repeating the click until the trigger reports the panel as expanded: React
+// plays view transitions while the page hydrates and while a modal route changes, and a click that lands while
+// one covers the page reaches the document root instead of the button.
+async function openProfile(page: Page) {
+	const trigger = page.getByRole('button', { name: 'Open Profile', exact: true });
+	await expect(async () => {
+		if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+		await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 1000 });
+	}).toPass();
+}
 
 // Tests
 // ------------
@@ -9,9 +42,11 @@ import { expect, type Locator, test } from '@playwright/test';
 test('Recognition settings update live, persist, reset, and scrolling controls direction', async ({ page }) => {
 	await page.goto('/?modalSettings');
 	const settings = page.getByRole('complementary', { name: 'Modal settings' });
-	await settings.getByRole('button', { name: 'Show Recognition', exact: true }).click();
 	const section = page.locator('[data-recognition]');
-	await expect(section).toHaveAttribute('data-state', 'ready');
+	await clickUntil(settings.getByRole('button', { name: 'Show Recognition', exact: true }), () =>
+		expect(section).toBeInViewport({ timeout: 1000 })
+	);
+	await expect(section).toHaveAttribute('data-state', 'ready', SCENE_READY);
 	await settings.locator('#modal-awardSize').fill('120');
 	await settings.locator('#modal-awardSpeed').fill('2');
 	await settings.locator('#modal-awardDragEasing').fill('0.4');
@@ -37,15 +72,18 @@ test('Recognition settings update live, persist, reset, and scrolling controls d
 	await expect.poll(speed).toBeLessThan(0);
 	await expect.poll(speed).toBeCloseTo(-0.046, 3);
 
-	// Values persist; reset restores defaults
-	await page.reload();
+	// Values persist across a fresh load; reset restores defaults
+	// NOTE • Opening Profile pushes /profile/ (ea57c53), which drops the dev-only ?modalSettings query, so load
+	// the settings URL again rather than reloading
+	await page.goto('/?modalSettings');
 	await expect(settings.locator('#modal-awardSize')).toHaveValue('120');
 	await expect(settings.locator('#modal-awardSpeed')).toHaveValue('2');
 	await expect(settings.locator('#modal-awardDragEasing')).toHaveValue('0.4');
 	await expect(settings.locator('#modal-awardHoverIntensity')).toHaveValue('0.5');
 	await expect(settings.locator('#modal-awardFocusDuration')).toHaveValue('1.2');
-	await settings.getByRole('button', { name: 'Reset defaults' }).click();
-	await expect(settings.locator('#modal-awardSize')).toHaveValue('85');
+	await clickUntil(settings.getByRole('button', { name: 'Reset defaults' }), () =>
+		expect(settings.locator('#modal-awardSize')).toHaveValue('85', { timeout: 1000 })
+	);
 	await expect(settings.locator('#modal-awardSpeed')).toHaveValue('2.4');
 	await expect(settings.locator('#modal-awardDragEasing')).toHaveValue('0.18');
 	await expect(settings.locator('#modal-awardScrollBoost')).toHaveValue('2');
@@ -70,11 +108,11 @@ async function scrollRecognition(section: Locator, progress: number) {
 // block rather than pinning.
 test('Recognition keeps its copy outside the scene and scrolls as a normal section', async ({ page }) => {
 	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	const section = page.locator('[data-recognition]');
 	await scrollRecognition(section, 0.1);
-	await expect(section).toHaveAttribute('data-state', 'ready');
-	await expect(section).toHaveAttribute('data-awards', '52');
+	await expect(section).toHaveAttribute('data-state', 'ready', SCENE_READY);
+	await expect(section).toHaveAttribute('data-awards', AWARD_COUNT);
 	const stage = section.locator('[data-recognition-stage]');
 	await expect(stage).toHaveCSS('position', 'relative');
 	for (const copy of await section.locator('[data-recognition-copy]').all()) {
@@ -93,10 +131,12 @@ test('Recognition keeps its copy outside the scene and scrolls as a normal secti
 // to the spiral without closing Profile, and reopening starts clean.
 test('Recognition isolates an award, returns without closing Profile, and reopens cleanly', async ({ page }) => {
 	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	const section = page.locator('[data-recognition]');
 	await scrollRecognition(section, 0.25);
-	await expect(section).toHaveAttribute('data-state', 'ready');
+	await expect(section).toHaveAttribute('data-state', 'ready', SCENE_READY);
+	const awards = await section.getAttribute('data-awards');
+	expect(awards).toMatch(AWARD_COUNT);
 	const canvas = section.locator('canvas');
 
 	// Focus an award
@@ -124,13 +164,13 @@ test('Recognition isolates an award, returns without closing Profile, and reopen
 	await expect(page.locator('#profile-panel')).toHaveAttribute('aria-hidden', 'false');
 	await expect(section.locator('[data-recognition-pause]')).toHaveCount(0);
 
-	// Closing resets the section; reopening prepares it again
+	// Closing resets the section; reopening prepares it again with every poster
 	await page.getByRole('button', { name: 'Close profile', exact: true }).click();
 	await expect(section).toHaveAttribute('data-state', 'loading');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	await scrollRecognition(section, 0.25);
-	await expect(section).toHaveAttribute('data-state', 'ready');
-	await expect(section).toHaveAttribute('data-awards', '52');
+	await expect(section).toHaveAttribute('data-state', 'ready', SCENE_READY);
+	await expect(section).toHaveAttribute('data-awards', awards ?? '');
 });
 
 // Protects the phone layout and reduced motion: the spiral does not spin, text sizes and spacing match the
@@ -139,10 +179,10 @@ test('Recognition fits mobile and respects reduced motion', async ({ page }) => 
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');
-	await page.getByRole('button', { name: 'Open Profile', exact: true }).click();
+	await openProfile(page);
 	const section = page.locator('[data-recognition]');
 	await scrollRecognition(section, 0);
-	await expect(section).toHaveAttribute('data-state', 'ready');
+	await expect(section).toHaveAttribute('data-state', 'ready', SCENE_READY);
 	await expect(section).toHaveAttribute('data-spiral-speed', '0.0000');
 	for (const width of [320, 390, 440]) {
 		await page.setViewportSize({ width, height: 1000 });

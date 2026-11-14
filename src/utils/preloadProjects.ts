@@ -8,6 +8,9 @@ import { preload } from 'react-dom';
 const RIBBON_URL = '/projects-ribbon/index.html';
 const CATALOG_LIFETIME = 60_000;
 const CATALOG_FETCH_TIMEOUT_MS = 10_000;
+// NOTE • Every poster downloads at once, but only this many decode at a time: ~30 full-size decodes queued
+// together compete with the page's own image decodes and raster while the visitor scrolls
+const POSTER_DECODE_CONCURRENCY = 2;
 
 // State
 // ------------
@@ -39,7 +42,7 @@ export function preloadProjects() {
 	// NOTE • The ribbon page reads the catalog back through this hook while it is still fresh
 	window.getPreloadedProjects = () => (Date.now() - created < CATALOG_LIFETIME ? catalog : undefined);
 
-	// Decode every poster up front, at low priority
+	// Download every poster up front, at low priority, and decode them a few at a time
 	void catalog
 		.then(async data => {
 			if (!data || typeof data !== 'object') return;
@@ -55,15 +58,19 @@ export function preloadProjects() {
 					posters.add(new URL(item.poster, new URL(RIBBON_URL, location.origin)).href);
 			}
 
-			await Promise.allSettled(
-				Array.from(posters, src => {
-					const image = new Image();
-					image.crossOrigin = 'anonymous';
-					image.fetchPriority = 'low';
-					image.src = src;
-					return image.decode();
-				})
-			);
+			const images = Array.from(posters, src => {
+				const image = new Image();
+				image.crossOrigin = 'anonymous';
+				image.fetchPriority = 'low';
+				image.src = src;
+				return image;
+			});
+
+			let next = 0;
+			const decodeQueue = async () => {
+				while (next < images.length) await images[next++].decode().catch(() => undefined);
+			};
+			await Promise.all(Array.from({ length: POSTER_DECODE_CONCURRENCY }, decodeQueue));
 		})
 		.catch(() => {
 			window.getPreloadedProjects = undefined;

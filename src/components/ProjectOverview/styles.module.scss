@@ -88,11 +88,14 @@
 
 .credits { gap: var(--gap-s); }
 
-.credit {
+.credit,
+.creditLink {
 	display: flex;
 	align-items: center;
 	gap: var(--gap-s);
+}
 
+.credit {
 	img {
 		flex: 0 0 4.8rem;
 		width: 4.8rem;
@@ -100,7 +103,36 @@
 		border-radius: var(--br-round);
 	}
 
-	span { color: alpha(--global-white, 40); }
+	span[data-type] { color: alpha(--global-white, 40); }
+}
+
+.creditLink {
+	width: fit-content;
+	color: inherit;
+	text-decoration: none;
+
+	// NOTE • No underline: on hover (or keyboard focus) the name and role swap
+	// brightness — the role turns fully white and the name dims to the role's 40%
+	.creditName,
+	span[data-type] { transition: color var(--time-m) var(--easing-bezzy); }
+
+	@media (hover: hover) and (pointer: fine) {
+		&:hover {
+			.creditName { color: alpha(--global-white, 40); }
+			span[data-type] { color: var(--global-white); }
+		}
+	}
+
+	&:focus-visible {
+		.creditName { color: alpha(--global-white, 40); }
+		span[data-type] { color: var(--global-white); }
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--global-white);
+		outline-offset: 4px;
+		border-radius: var(--br-s);
+	}
 }
 
 .awards {
