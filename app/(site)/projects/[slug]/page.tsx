@@ -18,6 +18,10 @@ type Params = { params: Promise<{ slug: string }> };
 
 // A cold case study must resolve before the transition captures its new view.
 export const instant = false;
+// NOTE • An unpublished slug would otherwise get the App Shell straight away,
+// committing a 200 before notFound() runs — a soft 404. 'navigation' makes the
+// first request for a slug wait for the complete render (cached from then on).
+export const ensureStatic = 'navigation';
 
 // Static Params
 // ------------

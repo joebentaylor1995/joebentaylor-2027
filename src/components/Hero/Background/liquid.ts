@@ -78,6 +78,41 @@ const MOBILE_INTRO_ZOOM = 0.45;
 // Hands the main thread back for a moment
 const nextTask = () => new Promise(resolve => setTimeout(resolve, 0));
 
+// NOTE • Safari has no CanvasRenderingContext2D.filter: setting it is a silent no-op, so the
+// logos' CSS `invert(1)` never reached the strip and the white source logos vanished into the
+// light hero. Without it the invert is applied to the pixels instead — the only filter the
+// marquee uses (see LogoMarquee/styles.module.scss).
+const supportsCanvasFilter =
+	typeof CanvasRenderingContext2D !== 'undefined' && 'filter' in CanvasRenderingContext2D.prototype;
+const INVERT_FILTER = /^invert\(([\d.]+)(%?)\)$/;
+
+// The invert() amount (0 to 1) in a computed `filter` value; 0 for anything else
+const invertAmount = (filter: string) => {
+	const match = INVERT_FILTER.exec(filter);
+	if (!match) return 0;
+	return Math.min(1, Number(match[1]) / (match[2] ? 100 : 1));
+};
+
+// A copy of `image` at `width` × `height` device pixels with its colours inverted by `amount`
+function invertedCopy(image: HTMLImageElement, width: number, height: number, amount: number) {
+	const copy = document.createElement('canvas');
+	copy.width = width;
+	copy.height = height;
+	const ctx = copy.getContext('2d', { willReadFrequently: true });
+	if (!ctx) throw new Error('Logo invert canvas unavailable');
+	ctx.drawImage(image, 0, 0, width, height);
+	const pixels = ctx.getImageData(0, 0, width, height);
+	const data = pixels.data;
+	// ImageData is straight (not premultiplied) alpha, so RGB invert cleanly and alpha is kept
+	for (let i = 0; i < data.length; i += 4) {
+		data[i] += amount * (255 - 2 * data[i]);
+		data[i + 1] += amount * (255 - 2 * data[i + 1]);
+		data[i + 2] += amount * (255 - 2 * data[i + 2]);
+	}
+	ctx.putImageData(pixels, 0, 0);
+	return copy;
+}
+
 // Renderer
 // ------------
 // NOTE • The hero's WebGL layer: a portrait, the logo marquee and the hero text are
@@ -497,13 +532,27 @@ export async function createLiquidLayer(
 			raster.height = Math.max(1, Math.ceil(stripHeight * ratio));
 			const ctx = raster.getContext('2d');
 			if (!ctx) throw new Error('Logo texture canvas unavailable');
-			ctx.scale(raster.width / stripWidth, raster.height / stripHeight);
+			const scaleX = raster.width / stripWidth,
+				scaleY = raster.height / stripHeight;
+			ctx.scale(scaleX, scaleY);
 			for (const image of images) {
 				const r = image.getBoundingClientRect(),
 					s = getComputedStyle(image);
+				const x = r.left - bounds.left,
+					y = r.top - bounds.top;
 				ctx.globalAlpha = Number(s.opacity);
-				ctx.filter = s.filter;
-				ctx.drawImage(image, r.left - bounds.left, r.top - bounds.top, r.width, r.height);
+				const invert = supportsCanvasFilter ? 0 : invertAmount(s.filter);
+				if (supportsCanvasFilter) ctx.filter = s.filter;
+				const source =
+					invert > 0
+						? invertedCopy(
+								image,
+								Math.max(1, Math.ceil(r.width * scaleX)),
+								Math.max(1, Math.ceil(r.height * scaleY)),
+								invert
+							)
+						: image;
+				ctx.drawImage(source, x, y, r.width, r.height);
 			}
 			return raster;
 		};
