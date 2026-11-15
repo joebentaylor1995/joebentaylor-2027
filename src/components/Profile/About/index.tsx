@@ -5,11 +5,12 @@
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
 import { defaults, getSettings, subscribe } from '@parts/ProfileReveal/Settings/store';
 import SpecialHeading from '@parts/SpecialHeading';
+import { warmScene } from '@utils/prepareScene';
 import { useAnimation } from '@utils/useAnimation';
 import Grid, { Col } from '@waffl';
 import gsap from 'gsap';
-import Image from 'next/image';
-import { type CSSProperties, use, useRef, useSyncExternalStore } from 'react';
+import Image, { getImageProps } from 'next/image';
+import { type CSSProperties, use, useEffect, useRef, useSyncExternalStore } from 'react';
 import type { AboutImage } from '@/data/site';
 
 // Styles + Interfaces
@@ -25,6 +26,9 @@ const FRAME_SIZES =
 
 // Helpers
 // ------------
+// One portrait frame's image, as mounted and as warmed ahead of it
+const frameImage = (src: string) => ({ src, quality: 90, alt: '', fill: true, sizes: FRAME_SIZES }) as const;
+
 // Scroll-scrubbed trigger inside the profile panel, recalculated on refresh
 const scrubTrigger = (scroller: Element, vars: ScrollTrigger.Vars): ScrollTrigger.Vars => ({
 	scroller,
@@ -53,6 +57,35 @@ const About = ({ paragraphs, images }: { paragraphs: string[]; images: AboutImag
 
 	// Refs
 	const sectionRef = useRef<HTMLElement>(null);
+
+	// Derived
+	// NOTE • Keyed on the URLs so a re-render with the same portraits doesn't warm them again
+	const frameKey = images.map(({ src }) => src).join('|');
+
+	// Effects
+	// NOTE • Why: the frames only mount once the profile is present, so the portraits (the largest
+	// images in the panel) started downloading as it opened. A detached image with the same
+	// srcset and sizes picks the same file, so warming it while the profile is closed leaves the
+	// mounted frame to load from the cache.
+	useEffect(
+		() =>
+			warmScene(sectionRef.current, () =>
+				Promise.all(
+					frameKey
+						.split('|')
+						.filter(Boolean)
+						.map(src => {
+							const { props } = getImageProps(frameImage(src));
+							const image = document.createElement('img');
+							if (props.sizes) image.sizes = props.sizes;
+							if (props.srcSet) image.srcset = props.srcSet;
+							image.src = props.src;
+							return image.decode().catch(() => {});
+						})
+				)
+			),
+		[frameKey]
+	);
 
 	// Animations
 	useAnimation(
@@ -180,7 +213,7 @@ const About = ({ paragraphs, images }: { paragraphs: string[]; images: AboutImag
 						style={{ '--about-focus': focus } as CSSProperties}
 					>
 						<div className={s.zoom} data-about-zoom>
-							{present && <Image src={src} quality={90} alt='' fill loading='lazy' sizes={FRAME_SIZES} />}
+							{present && <Image {...frameImage(src)} loading='lazy' />}
 						</div>
 					</div>
 				))}

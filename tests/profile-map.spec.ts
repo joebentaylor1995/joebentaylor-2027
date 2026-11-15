@@ -2,6 +2,7 @@
 // ------------
 import { expect, type Page, test } from '@playwright/test';
 import { simplifyRing } from '../src/components/Profile/Usps/Map/geometry';
+import { GEOMETRY_URL, pack, unpack } from '../src/components/Profile/Usps/Map/packing';
 import { framing, projectLocation, rotation, SETTLED } from '../src/components/Profile/Usps/Map/projection';
 import { defaults, mobileDefaults } from '../src/components/ProfileReveal/Settings/store';
 
@@ -170,18 +171,27 @@ test('coastline simplification removes subpixel detail while preserving signific
 	expect(result.at(-1)).toEqual(ring.at(-1));
 });
 
-// Protects scrolling while the globe prepares: the geometry is processed in a worker (not on the main
-// thread), the modal layout does not shift, and scroll position changes smoothly each frame.
+// Pure packing check: the shipped vertex buffers must come back bit for bit, including shared and unshared
+// segment ends, both sides of the sphere and signed zeros.
+test('globe geometry survives packing bit for bit', () => {
+	const geometry = {
+		outlines: new Float32Array([0, 0, 1, 0.6, 0, 0.8, 0.6, 0, 0.8, 0, 0.6, -0.8, -0, 1, 0, -1, -0, 0]),
+		grid: new Float32Array([0.36, 0.48, -0.8, 0.36, 0.48, 0.8]),
+		dots: new Float32Array([0, -1, 0, 0.1, 0.2, 0.3, -0.5, 0.5, -Math.SQRT1_2]),
+	};
+	const restored = unpack(pack(geometry));
+	for (const layer of ['outlines', 'grid', 'dots'] as const)
+		expect(Buffer.from(restored[layer].buffer).equals(Buffer.from(geometry[layer].buffer))).toBe(true);
+});
+
+// Protects scrolling while the globe prepares: the geometry arrives prebuilt (the page downloads the baked
+// vertex buffers, never the coastline data they are built from), the modal layout does not shift, and
+// scroll position changes smoothly each frame.
 test('globe preparation stays off the scroll thread and preserves modal layout', async ({ page }) => {
-	// NOTE • Turbopack names every worker bundle turbopack-worker-*.js, so the geometry worker can't be told
-	// apart by its URL: a worker started, and the coastline data was requested but not by the page itself
-	// (checked below against the main thread's resource timing)
-	let workerStarted = false;
+	let geometryRequested = false;
 	let geographyRequested = false;
-	page.on('worker', () => {
-		workerStarted = true;
-	});
 	page.on('request', request => {
+		if (request.url().includes(GEOMETRY_URL)) geometryRequested = true;
 		if (request.url().includes('countries.geojson')) geographyRequested = true;
 	});
 	await page.goto('/');
@@ -191,13 +201,9 @@ test('globe preparation stays off the scroll thread and preserves modal layout',
 	await map.scrollIntoViewIfNeeded();
 	const heightBefore = await panel.evaluate(element => element.scrollHeight);
 	await expect(map).toHaveAttribute('data-state', /travelling|ready/);
-	expect(workerStarted).toBe(true);
-	expect(geographyRequested).toBe(true);
+	expect(geometryRequested).toBe(true);
+	expect(geographyRequested).toBe(false);
 	expect(await panel.evaluate(element => element.scrollHeight)).toBe(heightBefore);
-	const mainThreadGeography = await page.evaluate(() =>
-		performance.getEntriesByType('resource').filter(entry => entry.name.includes('countries.geojson'))
-	);
-	expect(mainThreadGeography).toHaveLength(0);
 	const bounds = await panel.boundingBox();
 	if (!bounds) throw new Error('Profile bounds unavailable');
 	await page.mouse.move(bounds.x + 30, bounds.y + bounds.height / 2);

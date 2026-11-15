@@ -35,6 +35,11 @@ jobs:
       - name: Check generated styles
         run: bun run styles --check
 
+      # Baked from scripts/data/globe + the Map geometry code — fails if either
+      # changed without running `bun run globe`
+      - name: Check generated globe geometry
+        run: bun run globe --check
+
       - name: Lint (Biome + Stylelint)
         run: bun run lint
 

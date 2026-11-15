@@ -157,7 +157,10 @@ const ProjectCaseBuilder = ({ blocks }: ProjectCaseBuilderProps) => {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: CMS replacement installs new media elements.
 	useEffect(() => {
 		// Warm up media near the viewport
-		if (root.current) return preloadNearbyMedia(root.current);
+		// NOTE • On a case-study page that covers the overview and outro around the blocks too
+		// (credit and reviewer portraits), which sat outside the warm-up and loaded on sight
+		const host = root.current?.closest<HTMLElement>('[data-project-panel-content]') ?? root.current;
+		if (host) return preloadNearbyMedia(host);
 	}, [blocks]);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: observe new media elements when CMS blocks change.
 	useEffect(() => {

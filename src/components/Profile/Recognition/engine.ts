@@ -121,6 +121,18 @@ const isWebKit = (agent: string) => /AppleWebKit\//.test(agent) && !/Chrome\/|Ch
 // NOTE • WebKit before 17 and Firefox before 98 don't honour every ImageBitmap option (a poster
 // could come out upside down), so they keep the <img> path: the same versions three.js's
 // GLTFLoader trusts. On iOS (every browser there is WebKit) the OS version stands in for Safari's.
+// How a poster's bytes are requested: by the scene, and by the warm-up that fills the HTTP
+// cache for it (the two must match for the scene to read the cached copy)
+const posterRequest = (signal?: AbortSignal): RequestInit => ({
+	mode: 'cors',
+	credentials: 'same-origin',
+	priority: 'low',
+	headers: { Accept: imageAccept() },
+	signal,
+});
+// Posters a scene or a warm-up has already asked for, so a warm-up never repeats a download
+const requestedPosters = new Set<string>();
+
 function bitmapOptionsHonoured() {
 	if (typeof createImageBitmap === 'undefined') return false;
 	const agent = navigator.userAgent;
@@ -564,13 +576,8 @@ export function createRecognition(
 	// (should posters ever be served through one) returning the same file an <img> would get.
 	const fetchPoster = async (url: string) => {
 		if (!useBitmaps) return null;
-		return fetch(url, {
-			mode: 'cors',
-			credentials: 'same-origin',
-			priority: 'low',
-			headers: { Accept: imageAccept() },
-			signal,
-		})
+		requestedPosters.add(url);
+		return fetch(url, posterRequest(signal))
 			.then(response => (response.ok ? response.blob() : null))
 			.catch(() => null);
 	};
@@ -747,3 +754,16 @@ export function createRecognition(
 		},
 	};
 }
+
+// Downloads every poster ahead of the scene, into the HTTP cache it then reads; never rejects
+export const warmRecognition = (posters: readonly string[]) =>
+	Promise.all(
+		posters
+			.filter(url => !requestedPosters.has(url))
+			.map(url => {
+				requestedPosters.add(url);
+				return fetch(url, posterRequest())
+					.then(response => response.blob())
+					.catch(() => undefined);
+			})
+	);

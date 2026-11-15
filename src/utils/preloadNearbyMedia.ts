@@ -14,6 +14,12 @@ const MIN_LEAD = 2400;
 // buffering one screen out: a visitor who never gets there costs a few KB
 const BUFFER_SCREENS = 1;
 const LAZY_MEDIA = 'img[loading="lazy"], video[preload="none"]';
+// NOTE • Why: a tile waiting for its reveal clips its figure to a centre line (clip-path), and
+// an IntersectionObserver honours that clip. Media behind a further overflow box (a slideshow's
+// slides, a gallery's cards) or off that line (thumbnails) never intersected, however large the
+// margin, so it only started loading once the reveal opened the clip: on screen. The tile itself
+// is never clipped, so it is watched in its media's place.
+const MEDIA_TILE = '[data-media-tile]';
 
 // Helpers
 // ------------
@@ -39,21 +45,41 @@ export function mediaScrollRoot(host: HTMLElement) {
 		: host.closest<HTMLElement>('#profile-panel, .lenis');
 }
 
+// ANCHOR • Loads and decodes every lazy image under `host` now, however far it is from view
+// (a panel that is still closed); resolves once they are all in
+export function warmImages(host: Element) {
+	return Promise.all(
+		Array.from(host.querySelectorAll<HTMLImageElement>('img[loading="lazy"]'), image => {
+			// Not rendered (a fallback that may never show): leave it to load on demand
+			if (!image.getClientRects().length) return undefined;
+			image.loading = 'eager';
+			return image.decode().catch(() => {});
+		})
+	);
+}
+
 // ANCHOR • Warms lazy images and videos ahead of the scroll; returns a cleanup
 export function preloadNearbyMedia(host: HTMLElement) {
 	let observer: IntersectionObserver | undefined;
 	let bufferObserver: IntersectionObserver | undefined;
 
-	const pending = new Set<Element>();
-	const unbuffered = new Set<HTMLVideoElement>();
+	// What each observer watches (a media tile, or the media itself outside one) and the media
+	// waiting behind it
+	const pending = new Map<Element, Set<Element>>();
+	const unbuffered = new Map<Element, Set<HTMLVideoElement>>();
+	const tracked = new WeakSet<Element>();
 
 	const track = (media: Element) => {
-		if (pending.has(media)) return;
-		pending.add(media);
-		observer?.observe(media);
+		if (tracked.has(media)) return;
+		tracked.add(media);
+		const target = media.closest(MEDIA_TILE) ?? media;
+		if (!pending.has(target)) pending.set(target, new Set());
+		pending.get(target)?.add(media);
+		observer?.observe(target);
 		if (media instanceof HTMLVideoElement) {
-			unbuffered.add(media);
-			bufferObserver?.observe(media);
+			if (!unbuffered.has(target)) unbuffered.set(target, new Set());
+			unbuffered.get(target)?.add(media);
+			bufferObserver?.observe(target);
 		}
 	};
 
@@ -74,29 +100,29 @@ export function preloadNearbyMedia(host: HTMLElement) {
 				for (const entry of entries) {
 					if (!entry.isIntersecting) continue;
 					current.unobserve(entry.target);
+					for (const media of pending.get(entry.target) ?? []) warm(media);
 					pending.delete(entry.target);
-					warm(entry.target);
 				}
 			},
 			{ root, rootMargin: `${margin}px 0px` }
 		);
 		observer = current;
-		for (const media of pending) current.observe(media);
+		for (const target of pending.keys()) current.observe(target);
 
 		bufferObserver?.disconnect();
 		const buffering = new IntersectionObserver(
 			entries => {
 				for (const entry of entries) {
-					if (!entry.isIntersecting || !(entry.target instanceof HTMLVideoElement)) continue;
+					if (!entry.isIntersecting) continue;
 					buffering.unobserve(entry.target);
+					for (const video of unbuffered.get(entry.target) ?? []) video.preload = 'auto';
 					unbuffered.delete(entry.target);
-					entry.target.preload = 'auto';
 				}
 			},
 			{ root, rootMargin: `${(root?.clientHeight || innerHeight) * BUFFER_SCREENS}px 0px` }
 		);
 		bufferObserver = buffering;
-		for (const video of unbuffered) buffering.observe(video);
+		for (const target of unbuffered.keys()) buffering.observe(target);
 	};
 
 	collect(host);

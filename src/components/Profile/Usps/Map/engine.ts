@@ -7,7 +7,7 @@ import { frameStep } from '@utils/frameClock';
 import { yieldSceneWork } from '@utils/prepareScene';
 import { enableParallelCompile } from '@utils/webgl';
 import { gsap } from 'gsap';
-import { loadGeometry } from './loadGeometry';
+import { loadGeometry, warmGeometry } from './loadGeometry';
 import { framing, projectLocation, rotation } from './projection';
 
 // Constants
@@ -478,3 +478,6 @@ export async function createGlobe(element: HTMLElement, signal: AbortSignal) {
 		},
 	};
 }
+
+// Builds the globe's geometry ahead of the scene; never rejects
+export const warmGlobe = warmGeometry;

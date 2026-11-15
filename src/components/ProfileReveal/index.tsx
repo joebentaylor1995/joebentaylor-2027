@@ -6,7 +6,8 @@ import { GlobalContext } from '@parts/Contexts';
 import { PerformanceContext } from '@parts/Contexts/Performance';
 import { DESKTOP_HOVER_QUERY, touchOnlyEventsTarget } from '@utils/desktopHover';
 import { smoothFrameTime } from '@utils/frameClock';
-import { preloadNearbyMedia } from '@utils/preloadNearbyMedia';
+import { preloadNearbyMedia, warmImages } from '@utils/preloadNearbyMedia';
+import { warmScene } from '@utils/prepareScene';
 import { gsap } from 'gsap';
 import ScrollTrigger from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
@@ -61,6 +62,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 	const sceneRef = useRef<HTMLDivElement>(null);
 	const panelRef = useRef<HTMLDivElement>(null);
 	const panelContentRef = useRef<HTMLDivElement>(null);
+	const profileRef = useRef<HTMLDivElement>(null);
 	const closeRef = useRef<HTMLButtonElement>(null);
 	const jacketRef = useRef<HTMLDivElement>(null);
 	const cursorRef = useRef<HTMLDivElement>(null);
@@ -98,6 +100,18 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 	useEffect(() => {
 		if (isOpen && panelRef.current) return preloadNearbyMedia(panelRef.current);
 	}, [isOpen, shown]);
+
+	// NOTE • Why: the profile's images are lazy, and nothing in a closed panel loads, so each one
+	// started downloading as the panel opened. They are fetched and decoded from the page's idle
+	// time instead (ahead of the scenes: the panel comes first in the page), so they are in
+	// before the panel is.
+	useEffect(
+		() =>
+			warmScene(panelRef.current, async () => {
+				if (profileRef.current) await warmImages(profileRef.current);
+			}),
+		[]
+	);
 
 	useEffect(() => {
 		// Dev only: ?modalSettings loads the tweak panel on demand
@@ -476,7 +490,7 @@ const ProfileReveal = ({ children, profile, project }: I.ProfileRevealProps) => 
 							<Image src='/images/reviews/arrow.svg' width={16} height={11} alt='' />
 						</button>
 					</div>
-					<div className={s.content} hidden={isProject}>
+					<div ref={profileRef} className={s.content} hidden={isProject}>
 						<ProfilePresenceContext.Provider value={profilePresent || keptPresent}>
 							{profile ?? <div className={s.placeholder} aria-hidden='true' />}
 						</ProfilePresenceContext.Provider>

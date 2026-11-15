@@ -15,6 +15,36 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
+# Browser caching for the media and data in public/, which have no fingerprint in
+# their names: reuse for a day, then for a week show the copy while re-checking.
+# Netlify serves these files straight from its CDN, where next.config.js headers()
+# never runs, so this repeats the policy explained there (STATIC_ASSET_FOLDERS) —
+# keep the two in step. The Next.js plugin only adds a rule for /_next/static/*.
+[[headers]]
+  for = "/images/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
+
+[[headers]]
+  for = "/videos/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
+
+[[headers]]
+  for = "/audio/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
+
+[[headers]]
+  for = "/data/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
+
+[[headers]]
+  for = "/draco/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
+
 
 # Audit the live deploy with the project's pinned Lighthouse version.
 # Desktop and mobile are separate reports; results never block publication.

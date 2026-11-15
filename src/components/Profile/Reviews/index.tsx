@@ -4,6 +4,7 @@
 // ------------
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
 import SpecialHeading from '@parts/SpecialHeading';
+import { prepareScene, warmScene } from '@utils/prepareScene';
 import { splitStega } from '@utils/stega';
 import Image from 'next/image';
 import { use, useEffect, useRef, useState } from 'react';
@@ -28,7 +29,12 @@ const Reviews = ({ reviews }: { reviews: Review[] }) => {
 	const [active, setActive] = useState(0);
 
 	// Effects
-	// Loads the GSAP slide transitions only when the section nears the viewport inside the profile panel
+	// Fetches the slide transitions while the profile is still closed
+	useEffect(() => warmScene(sectionRef.current, () => import('./motion')), []);
+
+	// Sets up the GSAP slide transitions as the profile opens
+	// NOTE • Why: they used to load once the section was 200px away, so the quote was split into
+	// lines (and the section restyled) while it scrolled into view.
 	useEffect(() => {
 		const section = sectionRef.current;
 
@@ -37,25 +43,18 @@ const Reviews = ({ reviews }: { reviews: Review[] }) => {
 		let cancelled = false;
 		let destroy: (() => void) | undefined;
 
-		const observer = new IntersectionObserver(
-			([entry]) => {
-				if (!entry.isIntersecting) return;
-				observer.disconnect();
-				void import('./motion').then(({ createReviews }) => {
-					if (cancelled) return;
-					const motion = createReviews(section, setActive);
-					navigateRef.current = motion.navigate;
-					destroy = motion.destroy;
-				});
-			},
-			{ root: section.closest('#profile-panel'), rootMargin: '200px' }
+		const stopPreparing = prepareScene(section, () =>
+			import('./motion').then(({ createReviews }) => {
+				if (cancelled) return;
+				const motion = createReviews(section, setActive);
+				navigateRef.current = motion.navigate;
+				destroy = motion.destroy;
+			})
 		);
-
-		observer.observe(section);
 
 		return () => {
 			cancelled = true;
-			observer.disconnect();
+			stopPreparing();
 			navigateRef.current = null;
 			destroy?.();
 		};

@@ -5,6 +5,7 @@
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
 import { getSettings, subscribe } from '@parts/ProfileReveal/Settings/store';
 import { canHover } from '@utils/desktopHover';
+import { warmScene, whenPanelOpens } from '@utils/prepareScene';
 import { gsap } from 'gsap';
 import NextImage from 'next/image';
 import { use, useEffect, useRef } from 'react';
@@ -26,6 +27,24 @@ const DECODE_CONCURRENCY = 4;
 // ------------
 // Frame files are numbered from 0001
 const frameUrl = (frame: number) => `/images/keycap/frames/${String(frame + 1).padStart(4, '0')}.webp`;
+
+// Downloads every frame once per page load (into the HTTP cache the key then decodes from)
+let framesWarmed: Promise<unknown> | undefined;
+const warmFrames = () => {
+	framesWarmed ??= Promise.all(
+		Array.from(
+			{ length: LAST_FRAME + 1 },
+			(_, frame) =>
+				new Promise<void>(resolve => {
+					const image = new Image();
+					image.fetchPriority = 'low';
+					image.onload = image.onerror = () => resolve();
+					image.src = frameUrl(frame);
+				})
+		)
+	);
+	return framesWarmed;
+};
 
 // Component
 // ------------
@@ -58,6 +77,9 @@ const Keycap = () => {
 		apply();
 		return subscribe(apply);
 	}, []);
+
+	// Fetches the frames while the profile is still closed
+	useEffect(() => warmScene(buttonRef.current, warmFrames), []);
 
 	// Frames, sounds and input handling, set up once the profile is present
 	useEffect(() => {
@@ -210,25 +232,22 @@ const Keycap = () => {
 			await Promise.all(Array.from({ length: DECODE_CONCURRENCY }, worker));
 		};
 
-		// Decode all frames only once the key is near the viewport; it stays unpressable until then
-		const observer = new IntersectionObserver(
-			([entry]) => {
-				if (!entry.isIntersecting) return;
-				observer.disconnect();
-				void decodeFrames()
-					.then(() => {
-						if (disposed) return;
-						ready = true;
-						draw();
-						button.dataset.state = 'ready';
-					})
-					.catch(() => {
-						if (!disposed) button.dataset.state = 'error';
-					});
-			},
-			{ rootMargin: '150px' }
-		);
-		observer.observe(button);
+		// NOTE • Why: the frames used to decode once the key was 150px from the viewport, so it sat
+		// on screen unpressable while 33 frames decoded. They now decode as the profile opens, so
+		// the key is ready before it is scrolled to. Decoding runs off the main thread, so it
+		// doesn't take a turn in the scenes' build queue (which its download would hold up).
+		const stopPreparing = whenPanelOpens(button, () => {
+			void decodeFrames()
+				.then(() => {
+					if (disposed) return;
+					ready = true;
+					draw();
+					button.dataset.state = 'ready';
+				})
+				.catch(() => {
+					if (!disposed) button.dataset.state = 'error';
+				});
+		});
 
 		button.addEventListener('pointerenter', enter);
 		button.addEventListener('pointerleave', leave);
@@ -246,7 +265,7 @@ const Keycap = () => {
 
 		return () => {
 			disposed = true;
-			observer.disconnect();
+			stopPreparing();
 			tween?.kill();
 			for (const sound of sounds) {
 				sound.pause();

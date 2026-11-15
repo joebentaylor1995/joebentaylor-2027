@@ -102,6 +102,34 @@ const securityHeaders = [
 	{ key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()' },
 ];
 
+// Static asset caching
+// ------------
+// NOTE • Why: files in public/ carry no fingerprint in their names, so by default a browser
+// re-checks every one of them on every visit (the keycap's 33 frames, the globe geometry, the
+// portrait map…). These folders hold media and data that almost never change in place, so a
+// browser may reuse its copy for a day without asking, and for a further week may show it
+// straight away while it re-checks in the background.
+// The cost: replace one of these files under the same name and a returning visitor can keep
+// the old one for up to a day (and see it once more within the following week). Rename the
+// file, or add a ?v= to its URL, when a change has to land at once.
+// Left out on purpose: /projects-ribbon (versions its own files with ?v=), /downloads (the
+// résumé must never be stale), /email, and the favicons and manifest.
+// NOTE • Netlify serves public/ straight from its CDN, where headers() never runs — the same
+// policy is repeated in netlify.toml. Keep the two in step. On Netlify the rule below is left
+// out: the only requests under these folders that reach Next there are for files that do not
+// exist, and a "not found" must not be remembered for a day.
+const isNetlify = Boolean(process.env.NETLIFY);
+const STATIC_ASSET_FOLDERS = ['images', 'videos', 'audio', 'data', 'draco'];
+const ONE_DAY_SECONDS = 86400;
+const ONE_WEEK_SECONDS = 604800;
+
+const staticAssetHeaders = [
+	{
+		key: 'Cache-Control',
+		value: `public, max-age=${ONE_DAY_SECONDS}, stale-while-revalidate=${ONE_WEEK_SECONDS}`,
+	},
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
 	// Lets other devices on the local network load the dev server, which only trusts localhost by default
@@ -278,7 +306,13 @@ const nextConfig = {
 	// Security headers on every route except the embedded Sanity Studio, which
 	// loads its own scripts and APIs and manages its own policy
 	async headers() {
-		return [{ source: '/((?!studio).*)', headers: securityHeaders }];
+		return [
+			{ source: '/((?!studio).*)', headers: securityHeaders },
+			// NOTE • Not in development, where a replaced file should show on the next reload
+			...(isDev || isNetlify
+				? []
+				: [{ source: `/:folder(${STATIC_ASSET_FOLDERS.join('|')})/:path*`, headers: staticAssetHeaders }]),
+		];
 	},
 
 	// Email signature images moved into /email/ — keep the old URLs working for

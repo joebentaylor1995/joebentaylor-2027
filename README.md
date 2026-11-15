@@ -38,7 +38,7 @@ The site uses Sanity for portfolio content and the embedded Studio at `/studio/`
 | `bun run build-storybook` | Static Storybook build |
 | `bun run lighthouse` | Lighthouse CI (desktop) — Performance 80, Best Practices 90, SEO 100, Agentic Browsing all passing (also runs in CI) |
 | `bun run commit` | Optional guided commit-message prompt |
-| `git commit` | Husky pre-commit checks generated styles, then runs lint + type-check |
+| `git commit` | Husky pre-commit checks generated styles and globe geometry, then runs lint + type-check |
 
 ### Editor setup
 

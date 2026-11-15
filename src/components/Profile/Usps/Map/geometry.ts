@@ -6,7 +6,7 @@ import { RAD, xyz } from './projection';
 // ------------
 type Coordinate = [number, number];
 type Polygon = Coordinate[][];
-type Geography = {
+export type Geography = {
 	features: {
 		geometry: { type: 'Polygon'; coordinates: Polygon } | { type: 'MultiPolygon'; coordinates: Polygon[] };
 	}[];
@@ -77,19 +77,12 @@ export function simplifyRing(ring: Coordinate[], tolerance = 0.0006): Coordinate
 	return [...keep].sort((a, b) => a - b).map(index => ring[index]);
 }
 
-// Loader
+// Builder
 // ------------
-let cached: GlobeGeometry | undefined;
-
 // Builds the three vertex layers from the countries GeoJSON: country outlines, a latitude/longitude grid,
-// and a dot for every land point on a roughly even spacing over the sphere (runs inside the geometry worker)
-export async function loadGeometry(signal: AbortSignal): Promise<GlobeGeometry> {
-	if (cached) return cached;
-	const response = await fetch('/data/globe/countries.geojson', { signal });
-	if (!response.ok) throw new Error('Globe geography could not load');
-	const data: Geography = await response.json();
-	signal.throwIfAborted();
-
+// and a dot for every land point on a roughly even spacing over the sphere. Runs at build time
+// (scripts/build-globe.ts), which ships the result as a packed file for loadGeometry to read.
+export function buildGeometry(data: Geography): GlobeGeometry {
 	const outlines: number[] = [],
 		grid: number[] = [],
 		dots: number[] = [];
@@ -143,10 +136,9 @@ export async function loadGeometry(signal: AbortSignal): Promise<GlobeGeometry> 
 	for (let lon = -180; lon < 180; lon += 15)
 		for (let lat = -90; lat < 90; lat += 2) segment(grid, [lon, lat], [lon, lat + 2]);
 
-	cached = {
+	return {
 		outlines: new Float32Array(outlines),
 		grid: new Float32Array(grid),
 		dots: new Float32Array(dots),
 	};
-	return cached;
 }
