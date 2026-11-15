@@ -22,8 +22,8 @@
 		"url": "https://github.com/12-studio/tackl"
 	},
 	"scripts": {
-		"dev": "bun run styles && next dev --turbopack",
-		"build": "bun run styles && next build",
+		"dev": "bun run styles && bun run globe && next dev --turbopack",
+		"build": "bun run styles && bun run globe && next build",
 		"start": "next start",
 		"lint": "biome check . && stylelint \"**/*.scss\"",
 		"lint:fix": "biome check --write . && stylelint \"**/*.scss\" --fix",
@@ -33,6 +33,8 @@
 		"sanity:import": "bun scripts/sanity-import.ts",
 		"sanity:deploy-schema": "sanity schema deploy",
 		"styles": "bun scripts/build-styles.ts",
+		"globe": "bun scripts/build-globe.ts",
+		"portrait": "bun scripts/build-portrait.ts",
 		"storybook": "bun run styles && storybook dev -p 6006",
 		"build-storybook": "bun run styles && storybook build",
 		"commit": "node .gitmessage.js",

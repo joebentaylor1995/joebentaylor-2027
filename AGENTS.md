@@ -298,6 +298,9 @@ on unmount or when a matchMedia condition stops matching.
   Stylelint also flags `var(--…)` names that aren't real tokens.
 - Changed a token in `src/theme`? `bun run styles` regenerates the CSS (the pre-commit hook
   fails on stale generated files).
+- Changed the globe's source data (`scripts/data/globe`) or its geometry code
+  (`Profile/Usps/Map/geometry.ts`, `packing.ts`)? `bun run globe` rebakes the vertex buffers
+  the site ships (same hook).
 - `bun run test` — Playwright specs (builds and boots the production app; add
   specs to `tests/` as features land).
 - CI also runs Lighthouse 13 (`lighthouserc.js`, desktop) and **fails below Performance 80,

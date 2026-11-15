@@ -44,6 +44,7 @@ All scripts are run with **`bun run <script>`**. No change to script bodies; onl
 | `build`       | `bun run build` – generate styles, then production build   |
 | `start`       | `bun run start` – run production build    |
 | `styles`      | `bun run styles` – regenerate `src/css/tokens.css` + breakpoint/grid SCSS from the TS tokens (`--check` fails if stale) |
+| `globe`       | `bun run globe` – rebake the profile globe's vertex buffers (`public/data/globe/geometry.v*.bin`) from `scripts/data/globe` (`--check` fails if stale) |
 | `lint`        | `bun run lint` – Biome (TS/JS/JSON/CSS) + Stylelint (SCSS) |
 | `lint:fix`    | `bun run lint:fix` – lint + fix (both tools) |
 | `format`      | `bun run format` – format code             |
@@ -66,11 +67,12 @@ The hook lives in `.husky/pre-commit` (husky 9 — no `package.json` config bloc
 
 ```sh
 bun run styles --check
+bun run globe --check
 bun run lint
 bun run type-check
 ```
 
-`styles --check` fails the commit when a token in `src/theme` changed but the generated CSS wasn't regenerated — run `bun run styles` and commit the result.
+`styles --check` fails the commit when a token in `src/theme` changed but the generated CSS wasn't regenerated — run `bun run styles` and commit the result. `globe --check` does the same for the globe's baked vertex buffers — run `bun run globe`.
 
 The interactive commit-message wizard is optional — run it with `bun run commit`. Husky is installed via the `prepare` script, which Bun runs automatically on `bun install`.
 

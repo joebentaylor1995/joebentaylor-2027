@@ -9,7 +9,7 @@ import { HERO_DESKTOP_QUERY } from '@parts/Hero/layout';
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
 import SpecialHeading from '@parts/SpecialHeading';
 import { canHover } from '@utils/desktopHover';
-import { prepareScene } from '@utils/prepareScene';
+import { prepareScene, warmScene } from '@utils/prepareScene';
 import { useAnimation } from '@utils/useAnimation';
 import gsap from 'gsap';
 import Image from 'next/image';
@@ -277,7 +277,10 @@ const CallToAction = () => {
 		return () => clearInterval(timer);
 	}, [present]);
 
-	// Lazy-loads the WebGL portrait engine once the section is prepared, and only renders while on screen
+	// Fetches the engine and builds the portrait's height map while the profile is still closed
+	useEffect(() => warmScene(sectionRef.current, () => import('./engine').then(({ warmMatrix }) => warmMatrix())), []);
+
+	// Builds the WebGL portrait as the profile opens, and only renders while on screen
 	useEffect(() => {
 		const section = sectionRef.current,
 			canvas = canvasRef.current;

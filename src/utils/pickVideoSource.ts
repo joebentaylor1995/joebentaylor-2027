@@ -27,7 +27,8 @@ const SLOW_CONNECTIONS = ['slow-2g', '2g', '3g'];
 
 // Helpers
 // ------------
-const isConstrained = () => {
+// A visitor saving data, or on a slow connection (always false in Safari, which doesn't say)
+export const isConstrained = () => {
 	const connection = (navigator as Navigator & { connection?: Connection }).connection;
 	return Boolean(connection?.saveData) || SLOW_CONNECTIONS.includes(connection?.effectiveType ?? '');
 };

@@ -3,7 +3,7 @@
 // Imports
 // ------------
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
-import { prepareScene } from '@utils/prepareScene';
+import { prepareScene, warmScene } from '@utils/prepareScene';
 import Image from 'next/image';
 import { use, useEffect, useMemo, useRef } from 'react';
 import type { ProfileImage } from '@/data/site';
@@ -20,8 +20,8 @@ const FALLBACK_POSTERS = 3;
 // Component
 // ------------
 // Awards section: posters wound into a rising 3D spiral that the visitor can drag, scroll or
-// inspect. The three.js engine loads lazily once the section is prepared; until then (or without
-// WebGL) a few static posters are shown.
+// inspect. The three.js engine and posters are warmed while the profile is closed and the scene is
+// built as it opens; without WebGL a few static posters are shown.
 const Recognition = ({ intro, outro, awards }: { intro: string; outro: string; awards: ProfileImage[] }) => {
 	// Context
 	const present = use(ProfilePresenceContext);
@@ -36,6 +36,15 @@ const Recognition = ({ intro, outro, awards }: { intro: string; outro: string; a
 	const posters = useMemo(() => awards.map(({ src }) => src), [posterKey]);
 
 	// Effects
+	// Fetches the engine and the posters while the profile is still closed
+	useEffect(
+		() =>
+			warmScene(sectionRef.current, () =>
+				import('./engine').then(({ warmRecognition }) => warmRecognition(posters))
+			),
+		[posters]
+	);
+
 	// Builds the scene when the profile is present, and pauses its rendering while off screen
 	useEffect(() => {
 		const section = sectionRef.current;
@@ -46,20 +55,16 @@ const Recognition = ({ intro, outro, awards }: { intro: string; outro: string; a
 		let scene: ReturnType<typeof import('./engine').createRecognition> | undefined;
 
 		// Import and create the scene when prepareScene says it is time; a failed import falls back to the static posters
-		const stopPreparing = prepareScene(
-			section,
-			async () => {
-				try {
-					const { createRecognition } = await import('./engine');
-					if (controller.signal.aborted) return;
-					scene = createRecognition(section, controller.signal, posters);
-					scene.setVisible(visible);
-				} catch {
-					if (!controller.signal.aborted) section.dataset.state = 'fallback';
-				}
-			},
-			3
-		);
+		const stopPreparing = prepareScene(section, async () => {
+			try {
+				const { createRecognition } = await import('./engine');
+				if (controller.signal.aborted) return;
+				scene = createRecognition(section, controller.signal, posters);
+				scene.setVisible(visible);
+			} catch {
+				if (!controller.signal.aborted) section.dataset.state = 'fallback';
+			}
+		});
 
 		const observer = new IntersectionObserver(
 			([entry]) => {

@@ -46,8 +46,7 @@ async function loadImage(src: string) {
 }
 
 // Paints one tile: rounded square in the item's colour with each layer drawn on top (optionally masked and rotated)
-async function artwork(item: ToolkitItem, signal?: AbortSignal) {
-	signal?.throwIfAborted();
+async function artwork(item: ToolkitItem) {
 	const canvas = document.createElement('canvas');
 	canvas.width = canvas.height = SIZE * RESOLUTION;
 	const context = canvas.getContext('2d');
@@ -69,7 +68,6 @@ async function artwork(item: ToolkitItem, signal?: AbortSignal) {
 
 	for (const { layer, image, mask } of images) {
 		await yieldSceneWork();
-		signal?.throwIfAborted();
 		const stamp = document.createElement('canvas');
 		stamp.width = Math.ceil(layer.width * RESOLUTION);
 		stamp.height = Math.ceil(layer.height * RESOLUTION);
@@ -92,6 +90,26 @@ async function artwork(item: ToolkitItem, signal?: AbortSignal) {
 	return canvas;
 }
 
+// NOTE • Why: each scene fetched, decoded and painted its tiles from nothing once the panel
+// was open, so the tools dropped in late. A tile's artwork depends only on its item, so it is
+// painted once per page load, by a warm-up while the profile is closed or by the first scene,
+// and every later scene (a reopened profile) textures from the same canvas. A failed paint is
+// forgotten so the next caller tries again.
+const painted = new Map<string, Promise<HTMLCanvasElement>>();
+function paint(item: ToolkitItem) {
+	const key = JSON.stringify(item);
+	let canvas = painted.get(key);
+	if (!canvas) {
+		canvas = artwork(item);
+		painted.set(key, canvas);
+		canvas.catch(() => painted.delete(key));
+	}
+	return canvas;
+}
+
+// Paints every tile ahead of the scene; never rejects
+export const warmToolkit = (items: readonly ToolkitItem[]) => Promise.all(items.map(paint)).catch(() => undefined);
+
 // Engine
 // ------------
 // Builds the toolkit scene: tile artwork is baked to canvases, drawn as textured planes by three.js
@@ -100,7 +118,8 @@ async function artwork(item: ToolkitItem, signal?: AbortSignal) {
 // runs only while visible and the physics is awake. Resolves to { setVisible, destroy }.
 export async function createToolkit(element: HTMLElement, items: readonly ToolkitItem[], signal?: AbortSignal) {
 	// Setup
-	const artworkCanvases = await Promise.all(items.map(item => artwork(item, signal)));
+	signal?.throwIfAborted();
+	const artworkCanvases = await Promise.all(items.map(paint));
 	signal?.throwIfAborted();
 
 	const buttons = Array.from(element.querySelectorAll('button'));

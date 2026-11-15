@@ -33,6 +33,7 @@ import { yieldSceneWork } from '@utils/prepareScene';
 import { enableParallelCompile, setClampedLinear, waitForProgram } from '@utils/webgl';
 import gsap from 'gsap';
 import type { MatrixScene } from './interface';
+import { PORTRAIT_MAP_WIDTH, PORTRAIT_SOURCE_SIZE, PORTRAIT_URL } from './portrait';
 import { fragmentShader, vertexShader } from './shaders';
 
 // Constants
@@ -47,8 +48,6 @@ const UNIT_ATLAS = 0;
 const UNIT_PORTRAIT = 1;
 
 const ATLAS_NAME = 'JOE BEN TAYLOR';
-const PORTRAIT_URL = '/images/connect/face.png';
-const PORTRAIT_MAP_WIDTH = 512;
 
 const GLYPH_SCALE = 9 / 23;
 
@@ -94,13 +93,59 @@ interface PortraitMap {
 
 // State
 // ------------
-// NOTE • The height map depends only on the PNG, so it is built once per page load. Reopening
+// NOTE • The height map depends only on the image, so it is built once per page load. Reopening
 // the profile (or rebuilding after a context restore) skips the decode, the canvas readback
 // and the worker, and uploads the very same pixels.
 let portraitCache: PortraitMap | undefined;
+// The build in progress, shared by a warm-up and the scene (see loadPortrait)
+let portraitLoading: Promise<PortraitMap> | undefined;
 
 // Helpers
 // ------------
+// Face height map: load the image, draw it at the map's size, let the worker cut out the backdrop
+// and convert to luminance (the shipped image is already that map, see ./portrait). Built once and
+// shared: a warm-up (while the profile is closed) and the scene both wait on the same build, and a
+// failed one is retried by the next caller.
+function loadPortrait(): Promise<PortraitMap> {
+	if (portraitCache) return Promise.resolve(portraitCache);
+	if (portraitLoading) return portraitLoading;
+	const loading = new Promise<PortraitMap>((resolve, reject) => {
+		const img = new Image();
+		img.onload = () => {
+			const map = document.createElement('canvas');
+			map.width = PORTRAIT_MAP_WIDTH;
+			map.height = Math.round((PORTRAIT_MAP_WIDTH * img.height) / img.width);
+			const context = map.getContext('2d');
+			if (!context) {
+				reject(new Error('Canvas unavailable'));
+				return;
+			}
+			context.drawImage(img, 0, 0, map.width, map.height);
+			const pixels = context.getImageData(0, 0, map.width, map.height);
+			const worker = new Worker(new URL('./portrait.worker.ts', import.meta.url));
+			worker.onmessage = (event: MessageEvent<ImageData>) => {
+				worker.terminate();
+				portraitCache = {
+					pixels: event.data,
+					aspect: PORTRAIT_SOURCE_SIZE.width / PORTRAIT_SOURCE_SIZE.height,
+				};
+				resolve(portraitCache);
+			};
+			worker.onerror = () => {
+				worker.terminate();
+				reject(new Error('Portrait worker failed'));
+			};
+			worker.postMessage(pixels, [pixels.data.buffer]);
+		};
+		img.onerror = () => reject(new Error('Portrait could not load'));
+		img.src = PORTRAIT_URL;
+	}).finally(() => {
+		portraitLoading = undefined;
+	});
+	portraitLoading = loading;
+	return loading;
+}
+
 // Unwraps a GL resource, throwing if the browser could not allocate it
 function required<T>(value: T | null): T {
 	if (!value) throw new Error('Matrix resource unavailable');
@@ -149,7 +194,7 @@ const portraitSizeSetting = (settings: ReturnType<typeof getSettings>) => {
 // Engine
 // ------------
 // Draws the Connect section's digital-rain portrait. Each glyph is a GL point; the vertex shader lifts
-// them over a greyscale height map of the face (built in a worker from /images/connect/face.png).
+// them over a greyscale height map of the face (built in a worker from /images/connect/face.webp).
 // Hover pulls glyphs towards the cursor, a tap sends a ripple, and a long press charges then bursts
 // the portrait, which re-forms after RAIN_CYCLE_END seconds. section.dataset.state/matrixPhase mirror the lifecycle.
 //
@@ -423,11 +468,8 @@ export function createMatrix(canvas: HTMLCanvasElement, section: HTMLElement): M
 		if (ready && visible && !document.hidden) draw(0);
 	}
 
-	// Face height map: load the PNG, shrink it, let the worker cut out the backdrop and
-	// convert to luminance, then upload it as the portrait texture and start rendering
-	let portraitWorker: Worker | undefined;
+	// Face height map (see loadPortrait): uploaded as the portrait texture, then rendering starts
 	let portraitMap = portraitCache;
-	const img = new Image();
 
 	const showFallback = () => {
 		if (!disposed) section.dataset.state = 'fallback';
@@ -446,35 +488,12 @@ export function createMatrix(canvas: HTMLCanvasElement, section: HTMLElement): M
 		resize();
 		syncTicker();
 	}
-	if (!portraitMap) {
-		img.onload = () => {
+	if (!portraitMap)
+		void loadPortrait().then(map => {
 			if (disposed) return;
-			const map = document.createElement('canvas');
-			map.width = PORTRAIT_MAP_WIDTH;
-			map.height = Math.round((PORTRAIT_MAP_WIDTH * img.height) / img.width);
-			const context = required(map.getContext('2d'));
-			context.drawImage(img, 0, 0, map.width, map.height);
-			const pixels = context.getImageData(0, 0, map.width, map.height);
-			const worker = new Worker(new URL('./portrait.worker.ts', import.meta.url));
-			portraitWorker = worker;
-			worker.onmessage = (event: MessageEvent<ImageData>) => {
-				worker.terminate();
-				portraitWorker = undefined;
-				portraitCache = { pixels: event.data, aspect: img.width / img.height };
-				if (disposed) return;
-				portraitMap = portraitCache;
-				if (gpu) applyPortrait(gpu, portraitMap);
-			};
-			worker.onerror = () => {
-				worker.terminate();
-				portraitWorker = undefined;
-				showFallback();
-			};
-			worker.postMessage(pixels, [pixels.data.buffer]);
-		};
-		img.onerror = showFallback;
-		img.src = PORTRAIT_URL;
-	}
+			portraitMap = map;
+			if (gpu) applyPortrait(gpu, map);
+		}, showFallback);
 
 	const unsubscribeSettings = subscribe(() => {
 		if (ready) draw(0);
@@ -603,12 +622,12 @@ export function createMatrix(canvas: HTMLCanvasElement, section: HTMLElement): M
 			observer.disconnect();
 			unsubscribeSettings();
 			gsap.ticker.remove(tick);
-			img.onload = null;
-			portraitWorker?.terminate();
-			img.onerror = null;
 			releaseResources();
 			canvas.style.removeProperty('--matrix-x');
 			canvas.style.removeProperty('--matrix-y');
 		},
 	};
 }
+
+// Builds the face height map ahead of the scene; never rejects
+export const warmMatrix = () => loadPortrait().catch(() => undefined);

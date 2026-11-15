@@ -3,7 +3,7 @@
 // Imports
 // ------------
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
-import { prepareScene } from '@utils/prepareScene';
+import { prepareScene, warmScene } from '@utils/prepareScene';
 import { use, useEffect, useRef } from 'react';
 
 // Styles + Interfaces
@@ -23,6 +23,12 @@ const Toolkit = ({ items, label }: ToolkitProps) => {
 	const container = useRef<HTMLElement>(null);
 
 	// Effects
+	// Fetches the engine and paints the tiles' artwork while the profile is still closed
+	useEffect(
+		() => warmScene(container.current, () => import('./engine').then(({ warmToolkit }) => warmToolkit(items))),
+		[items]
+	);
+
 	useEffect(() => {
 		const element = container.current;
 		if (!element || !profilePresent) return;

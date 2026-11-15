@@ -4,7 +4,7 @@
 // ------------
 import { ProfilePresenceContext } from '@parts/ProfileReveal/context';
 import { defaults, getSettings, subscribe } from '@parts/ProfileReveal/Settings/store';
-import { prepareScene } from '@utils/prepareScene';
+import { prepareScene, warmScene } from '@utils/prepareScene';
 import { type CSSProperties, use, useEffect, useRef, useSyncExternalStore } from 'react';
 
 // Styles
@@ -13,8 +13,8 @@ import s from './styles.module.scss';
 
 // Component
 // ------------
-// Interactive dotted globe centred on Doncaster. The WebGL engine is lazy-loaded when the profile is
-// present and only renders while the tile is on screen; a text fallback covers failure.
+// Interactive dotted globe centred on Doncaster. The WebGL engine is warmed while the profile is
+// closed, built as it opens and only renders while the tile is on screen; a text fallback covers failure.
 const GlobeMap = () => {
 	// Context
 	const profilePresent = use(ProfilePresenceContext);
@@ -24,6 +24,9 @@ const GlobeMap = () => {
 	const container = useRef<HTMLDivElement>(null);
 
 	// Effects
+	// Fetches the engine and builds the geometry while the profile is still closed
+	useEffect(() => warmScene(container.current, () => import('./engine').then(({ warmGlobe }) => warmGlobe())), []);
+
 	useEffect(() => {
 		const element = container.current;
 		if (!element || !profilePresent) return;

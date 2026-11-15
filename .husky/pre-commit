@@ -1,5 +1,6 @@
 # Quality gates — fast, non-interactive, no way to forget them.
 # The commit-message prompt runs next, in prepare-commit-msg.
 bun run styles --check
+bun run globe --check
 bun run lint
 bun run type-check
