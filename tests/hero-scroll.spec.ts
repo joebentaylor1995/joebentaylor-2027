@@ -5,6 +5,16 @@ import { defaultSettings } from '../src/components/Hero/Background/effect-settin
 import { marqueePhrases } from '../src/components/Hero/Background/marquee-decoration';
 import { ScrollMotion } from '../src/components/Hero/Background/scroll-motion';
 
+// Constants
+// ------------
+// Reading a uniform back is a synchronous round trip to the GPU process, so it queues behind every frame
+// already submitted. With software WebGL (CI) a frame of the scroll effects takes 0.5-1.3s: one read can
+// outlast the default 5s before it returns a single value.
+const GL_READ_TIMEOUT = 30_000;
+// Each gesture is 60 rendered frames. On CI's software WebGL one measured 33-49s, so two gestures and the
+// pause between them need more than three times the default.
+const SOFTWARE_WEBGL_TIMEOUT = 360_000;
+
 // Tests
 // ------------
 // ScrollMotion unit tests: these run in Node with no page. They protect the wheel-gesture logic behind
@@ -109,8 +119,9 @@ test('fast gestures alternate the rendered colour portrait and release sustained
 	page,
 }, testInfo) => {
 	// Both gestures are paced by rendered frames, and every frame of the scroll effects redraws the full liquid
-	// stack: on a loaded machine or software WebGL a single gesture measured 10-30s, past the 60s default
+	// stack: on a loaded machine or software WebGL a single gesture measured 10-50s, past the 60s default
 	test.slow();
+	if (process.env.CI) test.setTimeout(SOFTWARE_WEBGL_TIMEOUT);
 	await page.goto('/');
 	const effect = page.getByTestId('hero-depth');
 	await expect(effect).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
@@ -151,13 +162,13 @@ test('fast gestures alternate the rendered colour portrait and release sustained
 
 	// A fast downward gesture fully brings in the colour portrait and the pulse has already fallen back
 	await gesture(500);
-	await expect.poll(async () => (await state()).colour).toBeGreaterThan(0.95);
+	await expect.poll(async () => (await state()).colour, { timeout: GL_READ_TIMEOUT }).toBeGreaterThan(0.95);
 	expect((await state()).pulse).toBeLessThan(0.02);
 	await page.screenshot({ path: testInfo.outputPath('colour-portrait.png') });
 
 	// After a pause, a fast upward gesture takes it back out
 	await pauseBetweenGestures();
 	await gesture(-500);
-	await expect.poll(async () => (await state()).colour).toBeLessThan(0.05);
+	await expect.poll(async () => (await state()).colour, { timeout: GL_READ_TIMEOUT }).toBeLessThan(0.05);
 	expect((await state()).error).toBe(0);
 });

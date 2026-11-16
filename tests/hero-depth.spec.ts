@@ -8,6 +8,13 @@ import { expect, test } from '@playwright/test';
 // plays once the loader reveals the page, so first-load waits cover the loader too. These are waits on
 // state, not sleeps: they return as soon as the scene is ready.
 const SCENE_READY_TIMEOUT = 30_000;
+// Reading a uniform back is a synchronous round trip to the GPU process, so it queues behind every frame
+// already submitted. With software WebGL (CI) a frame of moving water takes 0.5-1.3s: one read measured
+// 2.6-3.5s on an idle runner and passed the default 5s under load, before returning a single value.
+const GL_READ_TIMEOUT = 30_000;
+// Frames the scene may take to show a pointer move. Counted in rendered frames, not milliseconds, so the
+// bound means the same at 60fps and at software WebGL's two or three frames a second.
+const POINTER_RESPONSE_FRAMES = 3;
 
 // Tests
 // ------------
@@ -106,12 +113,19 @@ test('early hover does not interrupt intro and a slow ripple keeps updating with
 	// so a busy runner's slow round trips can't push a sample past the end of the intro.
 	await page.addInitScript(() => {
 		const audit = {
+			armOnReplay: false,
 			armed: false,
 			hoverAt: 0,
 			lastMoveAt: 0,
 			frames: [] as { time: number; zoom: number; cursor: number; opening: boolean }[],
 		};
 		Object.assign(window, { introAudit: audit });
+		// Arms itself as the replay starts. Arming from the test costs a round trip, and each one waits out a
+		// frame: with software WebGL those round trips used up the ripple before the pointer had arrived.
+		new MutationObserver(() => {
+			if (audit.armOnReplay && document.querySelector('[data-hero-content][data-entrance="running"]'))
+				audit.armed = true;
+		}).observe(document, { subtree: true, attributes: true, attributeFilter: ['data-entrance'] });
 		window.addEventListener(
 			'pointermove',
 			() => {
@@ -155,6 +169,7 @@ test('early hover does not interrupt intro and a slow ripple keeps updating with
 		};
 	});
 	type IntroAudit = {
+		armOnReplay: boolean;
 		armed: boolean;
 		hoverAt: number;
 		lastMoveAt: number;
@@ -178,13 +193,14 @@ test('early hover does not interrupt intro and a slow ripple keeps updating with
 			return { cursor: gl.getUniform(program, cursor) as number, error: gl.getError() };
 		});
 
-	// Move the pointer in during the intro (the audit starts after the click, so the button hover isn't counted)
-	await page.getByRole('button', { name: 'Replay introduction', exact: true }).click();
+	// Move the pointer in during the intro (the audit starts with the replay, so the button hover isn't counted).
+	// Two moves, not a stepped path: every pointer event is another round trip spent out of the ripple's 4s.
 	await page.evaluate(() => {
-		(window as unknown as { introAudit: IntroAudit }).introAudit.armed = true;
+		(window as unknown as { introAudit: IntroAudit }).introAudit.armOnReplay = true;
 	});
+	await page.getByRole('button', { name: 'Replay introduction', exact: true }).click();
 	await page.mouse.move(100, 330);
-	await page.mouse.move(450, 420, { steps: 5 });
+	await page.mouse.move(450, 420);
 	await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
 	const audit = await page.evaluate(() => (window as unknown as { introAudit: IntroAudit }).introAudit);
 
@@ -201,31 +217,43 @@ test('early hover does not interrupt intro and a slow ripple keeps updating with
 
 	// Once the intro is done, the cursor takes over
 	await page.mouse.move(150, 350);
-	await expect.poll(async () => (await read()).cursor).toBe(1);
+	await expect.poll(async () => (await read()).cursor, { timeout: GL_READ_TIMEOUT }).toBe(1);
 	await expect(page.locator('[data-liquid-ready="true"]')).toHaveCount(1);
 });
 
 // Protects the intro handoff: pointer movement while the text is still entering already drives both
 // the depth motion and the water ripple.
 test('depth and water cursor respond together after the ripple while text is still entering', async ({ page }) => {
-	// Times, on the page clock, the first pointer move after arming, the first water splat (the water
-	// shader's "amount" uniform) and the first non-zero depth motion, and whether the text was still entering
+	// Records, in rendered frames, the pointer moves after arming, the first water splat (the water shader's
+	// "amount" uniform) and the first non-zero depth motion, and whether the text was still entering.
+	// NOTE • Frames, not milliseconds: the scene can only answer a pointer move on its next frame, and with
+	// software WebGL that frame is 300-500ms away. The old 750ms allowance was two of those frames, and the
+	// splat (which needs a second pointer position, a round trip later) measured 975-1237ms on CI.
 	await page.addInitScript(() => {
 		const audit = {
 			armed: false,
-			movedAt: 0,
-			strokeAt: 0,
-			motionAt: 0,
+			frame: 0,
+			firstMoveFrame: -1,
+			secondMoveFrame: -1,
+			strokeFrame: -1,
+			motionFrame: -1,
 			enteringAtStroke: false,
 			enteringAtMotion: false,
 		};
 		Object.assign(window, { handoffAudit: audit });
 		const entering = () =>
 			document.querySelector('[data-hero-content]')?.getAttribute('data-entrance') === 'running';
+		const countFrame = () => {
+			audit.frame++;
+			requestAnimationFrame(countFrame);
+		};
+		requestAnimationFrame(countFrame);
 		window.addEventListener(
 			'pointermove',
 			() => {
-				if (audit.armed) audit.movedAt ||= performance.now();
+				if (!audit.armed) return;
+				if (audit.firstMoveFrame < 0) audit.firstMoveFrame = audit.frame;
+				else if (audit.secondMoveFrame < 0) audit.secondMoveFrame = audit.frame;
 			},
 			true
 		);
@@ -239,21 +267,21 @@ test('depth and water cursor respond together after the ripple while text is sti
 			return location;
 		};
 		WebGLRenderingContext.prototype.uniform3fv = function (location, value) {
-			if (audit.movedAt && !audit.strokeAt && location && names.get(location) === 'amount') {
-				audit.strokeAt = performance.now();
+			if (audit.firstMoveFrame >= 0 && audit.strokeFrame < 0 && location && names.get(location) === 'amount') {
+				audit.strokeFrame = audit.frame;
 				audit.enteringAtStroke = entering();
 			}
 			return setVector.call(this, location, value);
 		};
 		WebGLRenderingContext.prototype.uniform2f = function (location, x, y) {
 			if (
-				audit.movedAt &&
-				!audit.motionAt &&
+				audit.firstMoveFrame >= 0 &&
+				audit.motionFrame < 0 &&
 				location &&
 				names.get(location) === 'motion' &&
 				Math.abs(x) > 0.01
 			) {
-				audit.motionAt = performance.now();
+				audit.motionFrame = audit.frame;
 				audit.enteringAtMotion = entering();
 			}
 			return setPair.call(this, location, x, y);
@@ -261,9 +289,11 @@ test('depth and water cursor respond together after the ripple while text is sti
 	});
 	type HandoffAudit = {
 		armed: boolean;
-		movedAt: number;
-		strokeAt: number;
-		motionAt: number;
+		frame: number;
+		firstMoveFrame: number;
+		secondMoveFrame: number;
+		strokeFrame: number;
+		motionFrame: number;
 		enteringAtStroke: boolean;
 		enteringAtMotion: boolean;
 	};
@@ -287,13 +317,18 @@ test('depth and water cursor respond together after the ripple while text is sti
 	await page.mouse.move(100, 300);
 	await page.mouse.move(350, 350, { steps: 5 });
 	await expect
-		.poll(async () => Math.min((await readAudit()).strokeAt, (await readAudit()).motionAt))
-		.toBeGreaterThan(0);
+		.poll(async () => {
+			const { strokeFrame, motionFrame } = await readAudit();
+			return Math.min(strokeFrame, motionFrame);
+		})
+		.toBeGreaterThanOrEqual(0);
 
-	// Both respond within 750ms of the pointer arriving, while the text is still entering
+	// Both respond within a few frames of the pointer move that drives them, while the text is still entering.
+	// Depth follows the first move; a splat joins two pointer positions, so the water is timed from the second.
 	const audit = await readAudit();
-	expect(audit.strokeAt - audit.movedAt).toBeLessThan(750);
-	expect(audit.motionAt - audit.movedAt).toBeLessThan(750);
+	expect(audit.secondMoveFrame).toBeGreaterThanOrEqual(0);
+	expect(audit.strokeFrame - audit.secondMoveFrame).toBeLessThanOrEqual(POINTER_RESPONSE_FRAMES);
+	expect(audit.motionFrame - audit.firstMoveFrame).toBeLessThanOrEqual(POINTER_RESPONSE_FRAMES);
 	expect(audit.enteringAtStroke).toBe(true);
 	expect(audit.enteringAtMotion).toBe(true);
 });
@@ -301,6 +336,37 @@ test('depth and water cursor respond together after the ripple while text is sti
 // Protects the intro settings panel: values appear in the exported JSON and the replay applies the
 // new timing, more than once.
 test('intro controls export and replay repeatedly with changed timing', async ({ page }) => {
+	// Stamps, on the page's own clock, when each replay starts, when its first word begins to show and when
+	// the cover finishes opening. Reading those from the test instead lands several round trips late: with
+	// software WebGL each one waits out a frame of 300-500ms, so a check meant for 1.2s ran past 2.5s.
+	await page.addInitScript(() => {
+		const audit = { armed: false, replays: [] as { startedAt: number; wordAt: number; coverAt: number }[] };
+		Object.assign(window, { replayAudit: audit });
+		const watchFirstWord = (replay: (typeof audit.replays)[number]) => {
+			const word = document.querySelector('[data-hero-content] [data-reveal-word]');
+			if (word && Number(getComputedStyle(word).opacity) > 0) replay.wordAt = performance.now();
+			else requestAnimationFrame(() => watchFirstWord(replay));
+		};
+		new MutationObserver(records => {
+			if (!audit.armed) return;
+			for (const { target, attributeName } of records) {
+				if (!(target instanceof Element)) continue;
+				if (
+					attributeName === 'data-entrance' &&
+					target.matches('[data-hero-content][data-entrance="running"]')
+				) {
+					const replay = { startedAt: performance.now(), wordAt: 0, coverAt: 0 };
+					audit.replays.push(replay);
+					watchFirstWord(replay);
+				}
+				const current = audit.replays[audit.replays.length - 1];
+				if (attributeName === 'data-complete' && target.matches('[data-scene-cover][data-complete]') && current)
+					current.coverAt ||= performance.now();
+			}
+		}).observe(document, { subtree: true, attributes: true, attributeFilter: ['data-entrance', 'data-complete'] });
+	});
+	type ReplayAudit = { armed: boolean; replays: { startedAt: number; wordAt: number; coverAt: number }[] };
+
 	await page.goto('/?heroSettings');
 	const content = page.locator('[data-hero-content]');
 	await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: SCENE_READY_TIMEOUT });
@@ -337,16 +403,21 @@ test('intro controls export and replay repeatedly with changed timing', async ({
 		portraitEase: 'power3.out',
 	});
 
-	// Replay twice: at 1.2s the first word is still hidden, and the cover and text finish afterwards
+	// Replay twice: at 1.2s the first word is still hidden and the cover still opening, and both finish afterwards
+	await page.evaluate(() => {
+		(window as unknown as { replayAudit: ReplayAudit }).replayAudit.armed = true;
+	});
 	for (let attempt = 0; attempt < 2; attempt++) {
 		await page.getByRole('button', { name: 'Replay introduction', exact: true }).click();
-		await expect(content).toHaveAttribute('data-entrance', 'running');
-		await page.waitForTimeout(1200);
-		await expect(content.locator('[data-reveal-word]').first()).toHaveCSS('opacity', '0');
-		await expect(page.locator('[data-scene-cover]')).not.toHaveAttribute('data-complete');
 		await expect(content).toHaveAttribute('data-entrance', 'complete', { timeout: 10000 });
 		await expect(content.locator('[data-reveal-word]').first()).toHaveCSS('opacity', '1');
 		await expect(page.locator('[data-scene-cover]')).toHaveAttribute('data-complete', 'true');
+	}
+	const { replays } = await page.evaluate(() => (window as unknown as { replayAudit: ReplayAudit }).replayAudit);
+	expect(replays).toHaveLength(2);
+	for (const replay of replays) {
+		expect(replay.wordAt - replay.startedAt).toBeGreaterThan(1200);
+		expect(replay.coverAt - replay.startedAt).toBeGreaterThan(1200);
 	}
 });
 
@@ -691,6 +762,9 @@ test('hero renders without prototype chrome or a settings download', async ({ pa
 // Protects ?heroSettings: it loads the scroll zoom controls (and none of the removed particle or
 // wireframe ones), and the zoom value reaches the shader.
 test('explicit query loads scroll zoom controls without particles', async ({ page }, testInfo) => {
+	// With software WebGL each click on the panel waits out several frames of moving water (5s a click was
+	// measured on CI, 4s for the screenshot), so the steps below add up to 45-60s there
+	test.slow(!!process.env.CI, 'Software WebGL draws the hero at about two frames a second');
 	await page.goto('/?heroSettings');
 	await expect(page.getByTestId('hero-depth')).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
 	const panel = page.getByRole('region', { name: 'Hero effect settings' });

@@ -15,6 +15,12 @@ export default defineConfig({
 	// occasionally stall long enough to fail a timing check. A retried pass is still reported as
 	// flaky in the run summary, so a test that needs it stays visible.
 	retries: process.env.CI ? 1 : 0,
+	// NOTE • One worker on CI. Above 500ms a frame the site's lag smoothing (frameClock) moves every tween on
+	// by 33ms a frame, so animations run in slow motion and the specs' waits on them run out. A second worker
+	// roughly doubles the software renderer's frame times and puts whichever spec sits beside a heavy scene
+	// past that line: measured on the runner, the same suite went from 10 failed and 11 flaky with two workers
+	// (35 minutes) to none failed and 3 flaky with one (41 minutes).
+	workers: process.env.CI ? 1 : undefined,
 	use: {
 		baseURL,
 		// NOTE • Sandboxed environments (agent containers, locked-down CI) often
