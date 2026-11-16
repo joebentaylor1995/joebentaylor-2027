@@ -7,6 +7,11 @@ import { expect, type Page, test } from '@playwright/test';
 // NOTE • An Open Profile click that lands as the intro loader settles can be dropped (no /profile/ push),
 // so wait for the loader to finish, as a visitor would, and confirm the panel opened before going on.
 const LOADER_TIMEOUT = 15_000;
+// NOTE • The site keeps GSAP's lag smoothing: a frame that arrives more than 500ms after the last one moves
+// every tween on by 33ms, not by the gap. With software WebGL (CI) the Connect scene draws either side of
+// that line (317ms median, 850ms worst measured), and past it a one-second tween needs 30 frames, 15-25s.
+// These are waits on the tween's end state: they return as soon as it lands.
+const TWEEN_TIMEOUT = 30_000;
 const waitForLoader = (page: Page) =>
 	expect(page.locator('[data-site-loader]')).toHaveAttribute('data-complete', 'true', { timeout: LOADER_TIMEOUT });
 const openProfile = async (page: Page) => {
@@ -116,6 +121,8 @@ test('connect matches the mobile frame and fits narrow screens', async ({ page }
 // Protects the Connect interactions: headline reveals, the cursor reacts to each link type,
 // the CTA lights its lines and opens the booking dialog without closing Profile.
 test('connect reveals its copy, attracts the cursor and opens contact without closing Profile', async ({ page }) => {
+	// Each hover waits for the scene's next frames before it lands (2-5s a hover was measured on CI)
+	test.slow(!!process.env.CI, 'Software WebGL draws the Connect scene at two or three frames a second');
 	await openProfile(page);
 	const section = page.locator('[data-connect]');
 	await section.scrollIntoViewIfNeeded();
@@ -126,20 +133,24 @@ test('connect reveals its copy, attracts the cursor and opens contact without cl
 		'true'
 	);
 	await expect
-		.poll(() =>
-			section
-				.locator('[data-connect-line]')
-				.first()
-				.evaluate(el => Number(getComputedStyle(el).getPropertyValue('--tfw-fill')))
+		.poll(
+			() =>
+				section
+					.locator('[data-connect-line]')
+					.first()
+					.evaluate(el => Number(getComputedStyle(el).getPropertyValue('--tfw-fill'))),
+			{ timeout: TWEEN_TIMEOUT }
 		)
 		.toBeGreaterThan(110);
-	await expect(section.locator('[data-year-icon]')).toHaveCSS('opacity', '1');
+	await expect(section.locator('[data-year-icon]')).toHaveCSS('opacity', '1', { timeout: TWEEN_TIMEOUT });
 	await expect
-		.poll(() =>
-			section
-				.locator('[data-year-rule]')
-				.first()
-				.evaluate(el => new DOMMatrix(getComputedStyle(el).transform).a)
+		.poll(
+			() =>
+				section
+					.locator('[data-year-rule]')
+					.first()
+					.evaluate(el => new DOMMatrix(getComputedStyle(el).transform).a),
+			{ timeout: TWEEN_TIMEOUT }
 		)
 		.toBe(1);
 
@@ -157,44 +168,54 @@ test('connect reveals its copy, attracts the cursor and opens contact without cl
 	await cta.hover();
 	await expect(profile).toHaveAttribute('data-cursor', 'cta');
 	await expect
-		.poll(() =>
-			section
-				.locator('[data-connect-line]')
-				.last()
-				.evaluate(el => Number(getComputedStyle(el).getPropertyValue('--tfw-fill')))
+		.poll(
+			() =>
+				section
+					.locator('[data-connect-line]')
+					.last()
+					.evaluate(el => Number(getComputedStyle(el).getPropertyValue('--tfw-fill'))),
+			{ timeout: TWEEN_TIMEOUT }
 		)
 		.toBeGreaterThan(110);
 	await expect
-		.poll(() =>
-			section
-				.locator('[data-connect-line]')
-				.first()
-				.evaluate(el => new DOMMatrix(getComputedStyle(el).transform).f)
+		.poll(
+			() =>
+				section
+					.locator('[data-connect-line]')
+					.first()
+					.evaluate(el => new DOMMatrix(getComputedStyle(el).transform).f),
+			{ timeout: TWEEN_TIMEOUT }
 		)
 		.toBe(-3);
 	await expect
-		.poll(() =>
-			section
-				.locator('[data-connect-line]')
-				.last()
-				.evaluate(el => Number(getComputedStyle(el).getPropertyValue('--hover-fill')))
+		.poll(
+			() =>
+				section
+					.locator('[data-connect-line]')
+					.last()
+					.evaluate(el => Number(getComputedStyle(el).getPropertyValue('--hover-fill'))),
+			{ timeout: TWEEN_TIMEOUT }
 		)
 		.toBeGreaterThan(110);
 	await legal.hover();
 	await expect
-		.poll(() =>
-			section
-				.locator('[data-connect-line]')
-				.first()
-				.evaluate(el => Number(getComputedStyle(el).getPropertyValue('--hover-fill')))
+		.poll(
+			() =>
+				section
+					.locator('[data-connect-line]')
+					.first()
+					.evaluate(el => Number(getComputedStyle(el).getPropertyValue('--hover-fill'))),
+			{ timeout: TWEEN_TIMEOUT }
 		)
 		.toBeLessThan(-15);
 	await expect
-		.poll(() =>
-			section
-				.locator('[data-connect-line]')
-				.last()
-				.evaluate(el => Number(getComputedStyle(el).getPropertyValue('--tfw-fill')))
+		.poll(
+			() =>
+				section
+					.locator('[data-connect-line]')
+					.last()
+					.evaluate(el => Number(getComputedStyle(el).getPropertyValue('--tfw-fill'))),
+			{ timeout: TWEEN_TIMEOUT }
 		)
 		.toBeGreaterThan(110);
 
